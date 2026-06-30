@@ -1,0 +1,22 @@
+LOAD 'chdb';
+
+CREATE TABLE logs (
+    req_id    BIGINT PRIMARY KEY,
+    name      TEXT     NOT NULL,
+    path      TEXT     NOT NULL
+);
+
+INSERT INTO logs VALUES
+       (1, 'page_view',   '/users/profile'),
+       (2, 'Page_View',   '/users/settings'),
+       (3, 'PAGE_VIEW',   '/admin/dashboard'),
+       (4, 'add_to_cart', '/products/shoes'),
+       (5, 'Add_To_Cart', '/products/hats'),
+       (6, 'purchase',    '/checkout'),
+       (7, 'PURCHASE',    '/checkout/confirm'),
+       (8, 'share',       '/social/twitter'),
+       (9, 'logout',      '/auth/logout'),
+       (10, 'signup',     '/auth/signup')
+;
+
+COPY logs TO STDOUT;

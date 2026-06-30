@@ -1,8 +1,8 @@
 EXTENSION    = $(shell grep -m 1 '"name":' META.json | \
                sed -e 's/[[:space:]]*"name":[[:space:]]*"\([^"]*\)",/\1/')
-EXTVERSION   = $(shell grep -m 1 '[[:space:]]\{8\}"version":' META.json | \
-               sed -e 's/[[:space:]]*"version":[[:space:]]*"\([^"]*\)",\{0,1\}/\1/')
-DISTVERSION  = $(shell grep -m 1 '[[:space:]]\{3\}"version":' META.json | \
+EXTVERSION   = $(shell grep -m 1 'default_version' chdb.control | \
+               sed -e "s/[[:space:]]*default_version[[:space:]]*=[[:space:]]*'\([^']*\)',\{0,1\}/\1/")
+DISTVERSION  = $(shell grep -m 1 '^[[:space:]]\{2\}"version":' META.json | \
                sed -e 's/[[:space:]]*"version":[[:space:]]*"\([^"]*\)",\{0,1\}/\1/')
 
 DATA         = $(wildcard sql/*.sql)
@@ -20,13 +20,20 @@ OBJS = $(subst .c,.o, $(wildcard src/*.c))
 PG_CFLAGS    = -Wno-declaration-after-statement -Wall -Werror
 
 # Clean up generated files.
-EXTRA_CLEAN  = src/version.h
+EXTRA_CLEAN  = src/version.h sql/$(EXTENSION)--$(EXTVERSION).sql
 
 PGXS := $(shell $(PG_CONFIG) --pgxs)
 include $(PGXS)
 
+# Require the versioned SQL script.
+all: sql/$(EXTENSION)--$(EXTVERSION).sql
+
 # Require the version header.
 $(OBJS): src/version.h
+
+# Versioned SQL script.
+sql/$(EXTENSION)--$(EXTVERSION).sql: sql/$(EXTENSION).sql
+	cp $< $@
 
 # Versioned source file.
 src/version.h: META.json
@@ -71,3 +78,6 @@ release-notes: CHANGELOG.md
 
 $(EXTENSION)-$(DISTVERSION).zip:
 	git archive-all -v --prefix "$(EXTENSION)-$(DISTVERSION)/" --force-submodules $(EXTENSION)-$(DISTVERSION).zip
+
+# Run make print-VARIABLE_NAME to print VARIABLE_NAME's flavor and value.
+print-%	: ; $(info $* is $(flavor $*) variable set to "$($*)") @true
