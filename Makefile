@@ -10,8 +10,11 @@ DOCS         = $(wildcard doc/*.md)
 TESTS        = $(wildcard test/sql/*.sql)
 REGRESS      = $(patsubst test/sql/%.sql,%,$(TESTS))
 REGRESS_OPTS = --inputdir=test --load-extension=$(EXTENSION)
-MODULES      = $(patsubst %.c,%,$(wildcard src/*.c))
+MODULE_big   = $(EXTENSION)
 PG_CONFIG   ?= pg_config
+
+# Collect all the C files to compile into MODULE_big.
+OBJS = $(subst .c,.o, $(wildcard src/*.c))
 
 # Suppress annoying pre-c99 warning, error on other warnings.
 PG_CFLAGS    = -Wno-declaration-after-statement -Wall -Werror
@@ -25,12 +28,36 @@ include $(PGXS)
 # Require the version header.
 $(OBJS): src/version.h
 
-# Build a PGXN distribution bundle.
-dist: $(EXTENSION)-$(DISTVERSION).zip
-
 # Versioned source file.
 src/version.h: META.json
 	@printf '#define PGCHCB_VERSION "%s"\n' "$(DISTVERSION)" > $@
+
+.PHONY: format # Format .c and .h files to project standard in .clang-format.
+format: $(wildcard src/*.c)
+	@clang-format --style=file:.clang-format -i $^
+
+.PHONY: clang-tidy # Run clang-tidy static analysis (requires compile_commands.json)
+clang-tidy: compile_commands.json
+	run-clang-tidy -p . $(wildcard src/*.c)
+
+.PHONY: lint # Lint the project
+lint: .pre-commit-config.yaml
+	@pre-commit run --show-diff-on-failure --color=always --all-files
+
+## .git/hooks/pre-commit: Install the pre-commit hook
+.git/hooks/pre-commit:
+	@printf "#!/bin/sh\nmake lint\n" > $@
+	@chmod +x $@
+
+# Requires https://github.com/rizsotto/Bear.
+compile_commands.json:
+	$(MAKE) clean -j $$(nproc)
+	bear --config "bear.$$(if [ "$$(bear --version | awk -F'[^0-9]+' '{ print $$2 }')" -eq 3 ]; then echo 'json'; else echo 'yml'; fi)" -- $(MAKE) all -j $$(nproc)
+
+debian-install-lint:
+	@curl -SsLo /tmp/pre-commit.pyz https://github.com/pre-commit/pre-commit/releases/download/v4.6.0/pre-commit-4.6.0.pyz
+	@printf "#!/bin/sh\npython3 /tmp/pre-commit.pyz \"\$$@\"\n" > /usr/local/bin/pre-commit
+	@chmod +x /usr/local/bin/pre-commit
 
 # Test the PGXN distribution.
 dist-test: $(EXTENSION)-$(DISTVERSION).zip

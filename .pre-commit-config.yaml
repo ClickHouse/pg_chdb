@@ -1,0 +1,52 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-added-large-files
+      - id: check-case-conflict
+      # - id: check-illegal-windows-names
+      - id: check-json
+      - id: check-merge-conflict
+      # - id: check-symlinks
+      - id: check-vcs-permalinks
+      - id: check-yaml
+      - id: destroyed-symlinks
+      - id: detect-private-key
+      - id: end-of-file-fixer
+        exclude: "[.]out$"
+      - id: fix-byte-order-marker
+      - id: mixed-line-ending
+        exclude: "[.]out$"
+        args: ["--fix=auto"]
+      - id: trailing-whitespace
+        exclude: "[.](?:sql|out)$"
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.4.1
+    hooks:
+      - id: codespell
+  - repo: https://github.com/pre-commit/mirrors-clang-format
+    rev: v22.1.5
+    hooks:
+      - id: clang-format
+        name: format code
+        types: [c]
+        exclude: "^vendor/"
+  - repo: local
+    hooks:
+      - id: clang-tidy
+        name: clang-tidy static analysis
+        language: system
+        entry: sh -c 'if [ -f compile_commands.json ]; then run-clang-tidy -p . "$@"; else echo "No compile_commands.json; skipping"; fi'
+        types: [c]
+        exclude: "^vendor/"
+      - id: shellcheck
+        name: ShellCheck
+        language: system
+        entry: shellcheck
+        types: [shell]
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v3.1.0
+    hooks:
+      - id: prettier
+        name: JSON and YAML formatting
+        types_or: [json, yaml]

@@ -1,10 +1,11 @@
 /*
-	A PostgreSQL extension for executing queries in an embedded chDB library.
-*/
+ * A PostgreSQL extension for executing queries in an embedded chDB library.
+ */
 
 #include "postgres.h"
-#include <stdlib.h>
+
 #include "utils/builtins.h"
+#include <stdlib.h>
 #if PG_VERSION_NUM >= 160000
 #include "varatt.h"
 #endif
@@ -18,4 +19,3 @@ PG_MODULE_MAGIC_EXT(.name = "chdb", .version = PGCHCB_VERSION);
 #else
 PG_MODULE_MAGIC;
 #endif
-
