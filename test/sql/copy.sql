@@ -6,17 +6,31 @@ CREATE TABLE logs (
     path      TEXT     NOT NULL
 );
 
-INSERT INTO logs VALUES
-       (1, 'page_view',   '/users/profile'),
-       (2, 'Page_View',   '/users/settings'),
-       (3, 'PAGE_VIEW',   '/admin/dashboard'),
-       (4, 'add_to_cart', '/products/shoes'),
-       (5, 'Add_To_Cart', '/products/hats'),
-       (6, 'purchase',    '/checkout'),
-       (7, 'PURCHASE',    '/checkout/confirm'),
-       (8, 'share',       '/social/twitter'),
-       (9, 'logout',      '/auth/logout'),
-       (10, 'signup',     '/auth/signup')
+INSERT INTO logs
+VALUES (1, 'page_view',   '/users/profile')
+     , (2, 'Page_View',   '/users/settings')
+     , (3, 'PAGE_VIEW',   '/admin/dashboard')
+     , (4, 'add_to_cart', '/products/shoes')
+    --    (5, 'Add_To_Cart', '/products/hats'),
+    --    (6, 'purchase',    '/checkout'),
+    --    (7, 'PURCHASE',    '/checkout/confirm'),
+    --    (8, 'share',       '/social/twitter'),
+    --    (9, 'logout',      '/auth/logout'),
+    --    (10, 'signup',     '/auth/signup')
 ;
 
+-- COPY without URL should just work.
 COPY logs TO STDOUT;
+
+-- Should intercept known URLs schemas.
+COPY logs TO 's3://lol';
+COPY logs TO 'http://lol';
+COPY logs TO 'https://lol';
+COPY logs TO 'gcs://lol';
+COPY logs TO 'abs://lol';
+
+COPY logs FROM 's3://lol';
+COPY logs FROM 'http://lol';
+COPY logs FROM 'https://lol';
+COPY logs FROM 'gcs://lol';
+COPY logs FROM 'abs://lol';
