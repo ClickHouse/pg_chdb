@@ -8,6 +8,7 @@ on:
 jobs:
   build:
     strategy:
+      fail-fast: false
       matrix:
         pg: [19, 18, 17, 16, 15, 14]
     name: 🐘 PostgreSQL ${{ matrix.pg }}

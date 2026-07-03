@@ -20,13 +20,13 @@ OBJS = $(subst .c,.o, $(wildcard src/*.c))
 PG_CFLAGS    = -Wno-declaration-after-statement -Wall -Werror
 
 # Clean up generated files.
-EXTRA_CLEAN  = src/version.h sql/$(EXTENSION)--$(EXTVERSION).sql
+EXTRA_CLEAN  = src/version.h sql/$(EXTENSION)--$(EXTVERSION).sql src/bgw/chdb_bgw$(DLSUFFIX)
 
 PGXS := $(shell $(PG_CONFIG) --pgxs)
 include $(PGXS)
 
 # Require the versioned SQL script.
-all: sql/$(EXTENSION)--$(EXTVERSION).sql
+all: sql/$(EXTENSION)--$(EXTVERSION).sql src/bgw/chdb_bgw$(DLSUFFIX)
 
 # Require the version header.
 $(OBJS): src/version.h
@@ -39,13 +39,25 @@ sql/$(EXTENSION)--$(EXTVERSION).sql: sql/$(EXTENSION).sql
 src/version.h: META.json
 	@printf '#define PGCHCB_VERSION "%s"\n' "$(DISTVERSION)" > $@
 
+# Background worker.
+src/bgw/chdb_bgw$(DLSUFFIX): $(wildcard src/bgw/*.c)
+	@$(MAKE) -C $(dir $@) all -j $$(nproc)
+
+# Install the chdb_bgw library.
+install-bgw: src/bgw/chdb_bgw$(DLSUFFIX)
+	cp -a $< $(DESTDIR)$(pkglibdir)/
+uninstall-bgw:
+	rm -f $(DESTDIR)$(pkglibdir)/src/bgw/chdb_bgw$(DLSUFFIX)
+install: install-bgw
+uninstall: uninstall-bgw
+
 .PHONY: format # Format .c and .h files to project standard in .clang-format.
-format: $(wildcard src/*.c)
+format: $(wildcard src/*.c src/*.h src/bgw/*.c src/bgw/*.h)
 	@clang-format --style=file:.clang-format -i $^
 
 .PHONY: clang-tidy # Run clang-tidy static analysis (requires compile_commands.json)
 clang-tidy: compile_commands.json
-	run-clang-tidy -p . $(wildcard src/*.c)
+	run-clang-tidy -p . $(wildcard src/*.c src/*.h src/bgw/*.c src/bgw/*.h)
 
 .PHONY: lint # Lint the project
 lint: .pre-commit-config.yaml

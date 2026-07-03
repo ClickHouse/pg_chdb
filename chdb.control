@@ -1,5 +1,5 @@
 # chdb extension
 comment = 'Execute queries in chDB'
-default_version = '0.0.1'
+default_version = '0.1'
 module_pathname = 'chdb'
 relocatable = true
