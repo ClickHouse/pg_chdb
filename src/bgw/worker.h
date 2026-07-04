@@ -2,6 +2,25 @@
 #ifndef CHDB_WORKER_H
 #define CHDB_WORKER_H
 
+/* Identifier for shared memory segments used by this extension. */
+#define CHDB_SHM_MAGIC 0x49af4fb3
+
+/* Magic numbers for chDB state sharing .*/
+#define CHDB_KEY_DB_ID UINT64CONST(0xB000000000000001)
+#define CHDB_KEY_ROLE_ID UINT64CONST(0xB000000000000002)
+#define CHDB_KEY_SCHEME UINT64CONST(0xB000000000000003)
+#define CHDB_KEY_SCHEMA UINT64CONST(0xB000000000000004)
+#define CHDB_KEY_TABLE UINT64CONST(0xB000000000000005)
+#define CHDB_KEY_URL UINT64CONST(0xB000000000000006)
+#define CHDB_KEY_ACCESS_KEY UINT64CONST(0xB000000000000007)
+#define CHDB_KEY_ACCESS_SECRET UINT64CONST(0xB000000000000008)
+#define CHDB_KEY_SESSION_TOKEN UINT64CONST(0xB000000000000009)
+#define CHDB_KEY_FORMAT UINT64CONST(0xB00000000000000a)
+#define CHDB_KEY_STRUCTURE UINT64CONST(0xB00000000000000b)
+#define CHDB_KEY_COMPRESSION UINT64CONST(0xB00000000000000c)
+#define CHDB_KEY_HEADERS UINT64CONST(0xB00000000000000d)
+#define CHDB_KEY_EXTRA_CREDENTIALS UINT64CONST(0xB00000000000000e)
+
 typedef enum scheme {
     http_scheme,
     https_scheme,
@@ -25,8 +44,8 @@ static char const* const scheme_name[5] = {
 };
 
 typedef struct chdbCopyContext {
-    Oid dboid;
-    Oid roleoid;
+    Oid db_id;
+    Oid role_id;
     scheme scheme;
     char* schema;
     char* table;
