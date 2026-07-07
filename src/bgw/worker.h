@@ -37,6 +37,7 @@
 #define CHDB_KEY_ERROR_QUEUE UINT64CONST(0xB00000000000000c)
 #define CHDB_NUM_SHM_KEYS 12 /* Must equal highest CHDB_KEY number above. */
 
+/* URL schemes that the COPY hook understands. */
 typedef enum scheme {
     http_scheme,
     https_scheme,
@@ -46,6 +47,7 @@ typedef enum scheme {
     no_scheme, /* Must be last.*/
 } scheme;
 
+/* Strings for the URL schemes that the COPY hook understands. */
 static char const* const table_function[5] = {
     [http_scheme]  = "url",
     [https_scheme] = "url",
@@ -54,16 +56,32 @@ static char const* const table_function[5] = {
     [abs_scheme]   = "azureBlobStorage",
 };
 
+/*
+ * The names of the ClickHouse functions that correspond to each supported URL
+ * scheme.
+ */
 static char const* const scheme_name[5] = {
     [http_scheme] = "http", [https_scheme] = "https", [s3_scheme] = "s3",
     [gcs_scheme] = "gcs",   [abs_scheme] = "abs",
 };
 
-typedef struct chdbCopyContext {
+/*
+ * Fixed-size context data for chdbCopyContext. Must not exceed BGW_EXTRALEN.
+ * An assertion in hook.c ensures as much.
+ */
+typedef struct chdbCopyExtra {
     Oid db_id;
     Oid role_id;
     scheme scheme;
     bool is_from;
+} chdbCopyExtra;
+
+/*
+ * Contextual data from a COPY command assembled by hook.c and read into
+ * bgw/worker.c.
+ */
+typedef struct chdbCopyContext {
+    chdbCopyExtra extra;
     char* schema;
     char* table;
     char* url;

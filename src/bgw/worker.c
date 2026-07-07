@@ -72,14 +72,7 @@ chdb_bgw_main(Datum main_arg) {
 
     /* Reconstruct the context, starting with fixed size fields in bgw_extra. */
     chdbCopyContext* ctx = palloc_object(chdbCopyContext);
-    char* p              = MyBgworkerEntry->bgw_extra;
-    memcpy(&ctx->db_id, p, sizeof(Oid));
-    p += sizeof(Oid);
-    memcpy(&ctx->role_id, p, sizeof(Oid));
-    p += sizeof(Oid);
-    memcpy(&ctx->scheme, p, sizeof(scheme));
-    p += sizeof(scheme);
-    memcpy(&ctx->is_from, p, sizeof(bool));
+    memcpy(&ctx->extra, MyBgworkerEntry->bgw_extra, sizeof(chdbCopyExtra));
 
     /* Assemble the rest of the context from shared memory. */
     ctx->schema            = shm_toc_lookup(toc, CHDB_KEY_SCHEMA, false);
@@ -115,8 +108,8 @@ chdb_bgw_main(Datum main_arg) {
      * because the creator of the worker always passes the current role.
      */
     BackgroundWorkerInitializeConnectionByOid(
-        ctx->db_id,
-        ctx->role_id,
+        ctx->extra.db_id,
+        ctx->extra.role_id,
         BGWORKER_BYPASS_ALLOWCONN
 #if PG_VERSION_NUM >= 170000
             | BGWORKER_BYPASS_ROLELOGINCHECK
@@ -143,7 +136,7 @@ chdb_bgw_main(Datum main_arg) {
         MyBgworkerEntry->bgw_name,
         ctx->schema,
         ctx->table,
-        ctx->is_from ? "FROM" : "TO",
+        ctx->extra.is_from ? "FROM" : "TO",
         ctx->url
     );
 

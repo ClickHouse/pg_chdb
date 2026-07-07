@@ -146,12 +146,14 @@ chDBProcessUtilityHook(
                                      RangeVarGetRelid(copy->relation, NoLock, true)
                                  ));
             chdbCopyContext ctx = {
-                .scheme  = scheme,
-                .db_id   = MyDatabaseId,
-                .role_id = GetAuthenticatedUserId(),
-                // .session_user_id = GetSessionUserId(),
-                // .outer_user_id = GetCurrentRoleId(),
-                .is_from = copy->is_from,
+                .extra = {
+                    .scheme  = scheme,
+                    .db_id   = MyDatabaseId,
+                    .role_id = GetAuthenticatedUserId(),
+                    .is_from = copy->is_from
+                    // .session_user_id = GetSessionUserId(),
+                    // .outer_user_id = GetCurrentRoleId(),
+                 },
                 .table   = copy->relation->relname,
                 .schema  = schema,
                 .url     = copy->filename,
@@ -281,14 +283,11 @@ LaunchWorker(chdbCopyContext* ctx) {
     worker.bgw_notify_pid = MyProcPid;
 
     /* Send the fixed size values via bgw_extra. */
-    char* p = worker.bgw_extra;
-    memcpy(p, &ctx->db_id, sizeof(Oid));
-    p += sizeof(Oid);
-    memcpy(p, &ctx->role_id, sizeof(Oid));
-    p += sizeof(Oid);
-    memcpy(p, &ctx->scheme, sizeof(scheme));
-    p += sizeof(scheme);
-    memcpy(p, &ctx->is_from, sizeof(bool));
+    StaticAssertDecl(
+        sizeof(struct chdbCopyExtra) <= BGW_EXTRALEN,
+        "chdbCopyExtra is to large to fix into BackgroundWorker.bgw_extra"
+    );
+    memcpy(worker.bgw_extra, &ctx->extra, sizeof(chdbCopyExtra));
 
     /* Register the worker. */
     BackgroundWorkerHandle* handle;
