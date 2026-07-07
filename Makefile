@@ -5,9 +5,9 @@ EXTVERSION   = $(shell grep -m 1 'default_version' chdb.control | \
 DISTVERSION  = $(shell grep -m 1 '^[[:space:]]\{2\}"version":' META.json | \
                sed -e 's/[[:space:]]*"version":[[:space:]]*"\([^"]*\)",\{0,1\}/\1/')
 
-DATA         = $(wildcard sql/*.sql)
+DATA         = $(sort $(wildcard sql/$(EXTENSION)--*.sql) sql/$(EXTENSION)--$(EXTVERSION).sql)
 DOCS         = $(wildcard doc/*.md)
-TESTS        = $(wildcard test/sql/*.sql)
+TESTS        ?= $(wildcard test/sql/*.sql)
 REGRESS      = $(patsubst test/sql/%.sql,%,$(TESTS))
 REGRESS_OPTS = --inputdir=test --load-extension=$(EXTENSION)
 MODULE_big   = $(EXTENSION)
@@ -20,7 +20,7 @@ OBJS = $(subst .c,.o, $(wildcard src/*.c))
 PG_CFLAGS    = -Wno-declaration-after-statement -Wall -Werror
 
 # Clean up generated files.
-EXTRA_CLEAN  = src/version.h sql/$(EXTENSION)--$(EXTVERSION).sql src/bgw/chdb_bgw$(DLSUFFIX)
+EXTRA_CLEAN  = src/version.h sql/$(EXTENSION)--$(EXTVERSION).sql src/bgw/chdb_bgw.* src/bgw/worker.o src/bgw/worker.bc
 
 PGXS := $(shell $(PG_CONFIG) --pgxs)
 include $(PGXS)

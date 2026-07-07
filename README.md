@@ -48,6 +48,21 @@ env PG_CONFIG=/path/to/pg_config make && make installcheck && make install
 If you encounter an error such as:
 
 ```
+worker.c:1:10: fatal error: 'chdb.h' file not found
+```
+
+You either need to install [chDB] or tell the compiler where to find it.
+If, for example, you installed it via the [lib.chdb.io] shell script, point to
+`/usr/local`:
+
+``` sh
+make CFLAGS=-I/usr/local/include \
+     LDFLAGS=-L/usr/local/lib
+```
+
+If you encounter an error such as:
+
+```
 ERROR:  must be owner of database regression
 ```
 
@@ -93,8 +108,6 @@ Dependencies
 
 The `chdb` extension requires PostgreSQL 14 or higher and the [chDB] library.
 
-  [chDB]: https://clickhouse.com/chdb "chDB - fast, reliable, and scalable in-process database"
-
 Author
 ------
 
@@ -104,3 +117,7 @@ Copyright
 ---------
 
 Copyright (c) 2026, ClickHouse
+
+  [chDB]: https://clickhouse.com/chdb
+    "chDB - fast, reliable, and scalable in-process database"
+  [lib.chdb.io]: https://lib.chdb.io "curl -sL https://lib.chdb.io | bash"

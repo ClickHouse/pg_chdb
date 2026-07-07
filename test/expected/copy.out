@@ -24,22 +24,32 @@ COPY logs TO STDOUT;
 4	add_to_cart	/products/shoes
 -- Should intercept known URLs schemas.
 COPY logs TO 's3://lol';
+NOTICE:  chdb public.logs worker initialized COPY public.logs TO s3://lol
 NOTICE:  COPY logs TO s3('s3://lol')
 COPY logs TO 'http://lol';
+NOTICE:  chdb public.logs worker initialized COPY public.logs TO http://lol
 NOTICE:  COPY logs TO url('http://lol')
 COPY logs TO 'https://lol';
+NOTICE:  chdb public.logs worker initialized COPY public.logs TO https://lol
 NOTICE:  COPY logs TO url('https://lol')
 COPY logs TO 'gcs://lol';
+NOTICE:  chdb public.logs worker initialized COPY public.logs TO gcs://lol
 NOTICE:  COPY logs TO gcs('gcs://lol')
 COPY logs TO 'abs://lol';
+NOTICE:  chdb public.logs worker initialized COPY public.logs TO abs://lol
 NOTICE:  COPY logs TO azureBlobStorage('abs://lol')
 COPY logs FROM 's3://lol';
+NOTICE:  chdb public.logs worker initialized COPY public.logs FROM s3://lol
 NOTICE:  COPY logs FROM s3('s3://lol')
 COPY logs FROM 'http://lol';
+NOTICE:  chdb public.logs worker initialized COPY public.logs FROM http://lol
 NOTICE:  COPY logs FROM url('http://lol')
 COPY logs FROM 'https://lol';
+NOTICE:  chdb public.logs worker initialized COPY public.logs FROM https://lol
 NOTICE:  COPY logs FROM url('https://lol')
 COPY logs FROM 'gcs://lol';
+NOTICE:  chdb public.logs worker initialized COPY public.logs FROM gcs://lol
 NOTICE:  COPY logs FROM gcs('gcs://lol')
 COPY logs FROM 'abs://lol';
+NOTICE:  chdb public.logs worker initialized COPY public.logs FROM abs://lol
 NOTICE:  COPY logs FROM azureBlobStorage('abs://lol')

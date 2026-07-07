@@ -3,10 +3,13 @@
 
 #include "bgw/worker.h"
 #include "catalog/namespace.h"
+#include "libpq/pqformat.h"
+#include "libpq/pqmq.h"
 #include "miscadmin.h"
 #include "nodes/pg_list.h"
 #include "postmaster/bgworker.h"
 #include "storage/dsm.h"
+#include "storage/proc.h"
 #include "storage/shm_toc.h"
 #include "tcop/cmdtag.h"
 #include "tcop/utility.h"
@@ -39,6 +42,8 @@ scheme
 scheme_for(const char* str);
 static void
 contextualize_options(chdbCopyContext* ctx, List* options);
+void
+ProcessMessages(shm_mq_handle* queue);
 
 /*
  * InitializeUtilityHook hooks chDBProcessUtilityHook into the process utility
@@ -146,9 +151,10 @@ chDBProcessUtilityHook(
                 .role_id = GetAuthenticatedUserId(),
                 // .session_user_id = GetSessionUserId(),
                 // .outer_user_id = GetCurrentRoleId(),
-                .table  = copy->relation->relname,
-                .schema = schema,
-                .url    = copy->filename,
+                .is_from = copy->is_from,
+                .table   = copy->relation->relname,
+                .schema  = schema,
+                .url     = copy->filename,
             };
             contextualize_options(&ctx, copy->options);
             LaunchWorker(&ctx);
@@ -199,15 +205,14 @@ LaunchWorker(chdbCopyContext* ctx) {
     shm_toc_estimate_chunk(&estimator, strlen(ctx->compression) + 1);
     shm_toc_estimate_chunk(&estimator, strlen(ctx->headers) + 1);
     shm_toc_estimate_chunk(&estimator, strlen(ctx->extra_credentials) + 1);
-    shm_toc_estimate_keys(&estimator, 11);
+    shm_toc_estimate_chunk(&estimator, CHDB_ERROR_QUEUE_SIZE);
+    shm_toc_estimate_keys(&estimator, CHDB_NUM_SHM_KEYS);
 
     /* Create the shared memory segment. */
     Size seg_size    = shm_toc_estimate(&estimator);
     dsm_segment* seg = dsm_create(seg_size, 0);
 
-    /*
-     * Copy the context strings into the shared memory segment.
-     */
+    /* Copy the context strings into the shared memory segment. */
     shm_toc* toc = shm_toc_create(CHDB_SHM_MAGIC, dsm_segment_address(seg), seg_size);
 
     char* string_shm = shm_toc_allocate(toc, strlen(ctx->schema) + 1);
@@ -254,6 +259,14 @@ LaunchWorker(chdbCopyContext* ctx) {
     strcpy(string_shm, ctx->extra_credentials);
     shm_toc_insert(toc, CHDB_KEY_EXTRA_CREDENTIALS, string_shm);
 
+    /* Set up the error queue. */
+    shm_mq* err_queue = shm_mq_create(
+        shm_toc_allocate(toc, CHDB_ERROR_QUEUE_SIZE), CHDB_ERROR_QUEUE_SIZE
+    );
+    shm_toc_insert(toc, CHDB_KEY_ERROR_QUEUE, err_queue);
+    shm_mq_set_receiver(err_queue, MyProc);
+    shm_mq_handle* mqh = shm_mq_attach(err_queue, seg, NULL);
+
     /* Create the worker. */
     BackgroundWorker worker;
     memset(&worker, 0, sizeof(worker));
@@ -274,6 +287,8 @@ LaunchWorker(chdbCopyContext* ctx) {
     memcpy(p, &ctx->role_id, sizeof(Oid));
     p += sizeof(Oid);
     memcpy(p, &ctx->scheme, sizeof(scheme));
+    p += sizeof(scheme);
+    memcpy(p, &ctx->is_from, sizeof(bool));
 
     /* Register the worker. */
     BackgroundWorkerHandle* handle;
@@ -287,6 +302,9 @@ LaunchWorker(chdbCopyContext* ctx) {
             errhint("You might need to increase max_worker_processes.")
         );
     }
+
+    /* Associate this worker with the message queue. */
+    shm_mq_set_handle(mqh, handle);
 
     /* Wait for the background worker to start */
     pid_t pid;
@@ -312,6 +330,68 @@ LaunchWorker(chdbCopyContext* ctx) {
     Assert(status == BGWH_STARTED);
 
     /* Wait for it to finish. */
+    PG_TRY();
+    { ProcessMessages(mqh); }
+    PG_FINALLY();
+    { dsm_detach(seg); }
+    PG_END_TRY();
+
     WaitForBackgroundWorkerShutdown(handle);
-    dsm_detach(seg);
+}
+
+/*
+ * ProcessMessages consumes all messages from queue until it finishes. If it
+ * reads an error message it throws the error. Otherwise it returns once the
+ * queue has been drained.
+ */
+void
+ProcessMessages(shm_mq_handle* queue) {
+    Size msg_len;
+    void* data;
+    StringInfoData msg;
+
+    for (;;) {
+        CHECK_FOR_INTERRUPTS();
+
+        shm_mq_result res = shm_mq_receive(queue, &msg_len, &data, false);
+        if (res != SHM_MQ_SUCCESS) {
+            ereport(
+                ERROR,
+                errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
+                errmsg("lost connection to chdb worker")
+            );
+        }
+
+        initStringInfo(&msg);
+        appendBinaryStringInfo(&msg, data, msg_len);
+        int msg_type = pq_getmsgbyte(&msg);
+
+        switch (msg_type) {
+        case PqMsg_ErrorResponse:
+        case PqMsg_NoticeResponse: {
+            /* Read in the error and throw it. */
+            ErrorData err;
+            pq_parse_errornotice(&msg, &err);
+
+            /* Death of a worker isn't enough justification for suicide. */
+            err.elevel = Min(err.elevel, ERROR);
+
+            /* Clean up and rethrow error or print notice. */
+            pfree(msg.data);
+            ThrowErrorData(&err);
+            break;
+        }
+        case PqMsg_Terminate:
+            /* Successful termination. */
+            pfree(msg.data);
+            return;
+
+        default:
+            pfree(msg.data);
+            elog(
+                WARNING, "unexpected message type: %c (%zu bytes)", msg.data[0], msg_len
+            );
+            break;
+        }
+    }
 }

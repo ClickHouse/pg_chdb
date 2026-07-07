@@ -14,7 +14,25 @@ jobs:
     name: 🐘 PostgreSQL ${{ matrix.pg }}
     runs-on: ubuntu-latest
     container: pgxn/pgxn-tools
+    env: { chdb_version: v26.5.1-rc.2 }
     steps:
-      - run: pg-start ${{ matrix.pg }}
-      - uses: actions/checkout@v7
-      - run: pg-build-test
+      - name: Start Postgres ${{ matrix.pg }}
+        run: pg-start ${{ matrix.pg }} libkrb5-dev
+      - name: Checkout the Repository
+        uses: actions/checkout@v7
+      - name: Cache chDB
+        id: cache-chdb
+        uses: actions/cache@v6
+        with:
+          key: chdb-${{ env.chdb_version }}-${{ runner.os }}-${{ runner.arch }}
+          path: |
+            /usr/local/lib/libchdb.so
+            /usr/local/include/chdb.*
+      - name: Install chDB
+        run: ${{ steps.cache-chdb.outputs.cache-hit != 'true' && 'curl -sL https://lib.chdb.io | bash' || 'ldconfig' }}
+        env: { INSTALL_VERSION: "${{ env.chdb_version }}" }
+      - run: |
+          ls -lah /usr/local/lib/libchdb.so /usr/local/include/chdb.*
+          md5sum /usr/local/lib/libchdb.so /usr/local/include/chdb.h
+      - name: Test
+        run: pg-build-test

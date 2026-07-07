@@ -1,4 +1,4 @@
-
+#include "chdb.h"
 #include "postgres.h"
 
 /* These are always necessary for a bgworker */
@@ -9,7 +9,11 @@
 
 /* these headers are used by this particular worker's code */
 #include "access/xact.h"
+#include "libpq/libpq.h"
+#include "libpq/pqmq.h"
 #include "storage/dsm.h"
+#include "storage/ipc.h"
+#include "storage/proc.h"
 #include "storage/shm_toc.h"
 #include "tcop/utility.h"
 #include "utils/memutils.h"
@@ -74,6 +78,8 @@ chdb_bgw_main(Datum main_arg) {
     memcpy(&ctx->role_id, p, sizeof(Oid));
     p += sizeof(Oid);
     memcpy(&ctx->scheme, p, sizeof(scheme));
+    p += sizeof(scheme);
+    memcpy(&ctx->is_from, p, sizeof(bool));
 
     /* Assemble the rest of the context from shared memory. */
     ctx->schema            = shm_toc_lookup(toc, CHDB_KEY_SCHEMA, false);
@@ -89,6 +95,22 @@ chdb_bgw_main(Datum main_arg) {
     ctx->extra_credentials = shm_toc_lookup(toc, CHDB_KEY_EXTRA_CREDENTIALS, false);
 
     /*
+     * Now we can find and attach to the error queue provided for us.  That's
+     * good, because until we do that, any errors that happen here will not be
+     * reported back to the process that requested that this worker be
+     * launched.
+     */
+    shm_mq* mq = shm_toc_lookup(toc, CHDB_KEY_ERROR_QUEUE, false);
+    shm_mq_set_sender(mq, MyProc);
+    shm_mq_handle* mqh = shm_mq_attach(mq, seg, NULL);
+    pq_redirect_to_shm_mq(seg, mqh);
+
+    /*
+     * Hooray! Primary initialization is complete.  Now, we need to set up our
+     * backend-local state to match the original backend.
+     */
+
+    /*
      * Connect to the database. We skip connection authorization checks,
      * because the creator of the worker always passes the current role.
      */
@@ -101,14 +123,33 @@ chdb_bgw_main(Datum main_arg) {
 #endif
     );
 
+    /*
+     * Connect to chDB. It will use a temporary directory that it cleans up
+     * upon exit.
+     */
+    chdb_connection* conn = chdb_connect(1, (char*[]){ "chdb" });
+
+    if (!conn) {
+        ereport(
+            ERROR,
+            errcode(ERRCODE_CONNECTION_FAILURE),
+            errmsg("unable to connect to chDB")
+        );
+    }
+
     elog(
-        LOG,
-        "%s initialized COPY %s.%s %s",
+        NOTICE,
+        "%s initialized COPY %s.%s %s %s",
         MyBgworkerEntry->bgw_name,
         ctx->schema,
         ctx->table,
+        ctx->is_from ? "FROM" : "TO",
         ctx->url
     );
 
     /* Do the work. */
+
+    /* Report success and exit. */
+    pq_putmessage(PqMsg_Terminate, NULL, 0);
+    proc_exit(0);
 }
