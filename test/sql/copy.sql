@@ -65,3 +65,11 @@ COPY logs FROM 'https://example.com/data.csv' (
 COPY logs FROM 'https://example.com/data.csv' (
     STRUCTURE 'id UInt32'
 );
+CREATE SCHEMA "big deal";
+
+CREATE TABLE "big deal"."myParts" (
+    part_id   BIGINT PRIMARY KEY,
+    name      TEXT     NOT NULL
+);
+
+COPY "big deal"."myParts" TO 'gcs://lol.parquet';

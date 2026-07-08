@@ -24,39 +24,39 @@ COPY logs TO STDOUT;
 4	add_to_cart	/products/shoes
 -- Should intercept known URLs schemas.
 COPY logs TO 's3://lol';
-NOTICE:  QUERY: INSERT INTO FUNCTION s3({url:String})
+NOTICE:  CH QUERY: INSERT INTO FUNCTION s3({url:String})
 PARAMS: url: "s3://lol"
-NOTICE:  COPY logs TO s3('s3://lol')
+NOTICE:  PG QUERY: COPY public.logs TO STDOUT (FORMAT text);
 COPY logs TO 'http://lol';
-NOTICE:  QUERY: INSERT INTO FUNCTION url({url:String})
+NOTICE:  CH QUERY: INSERT INTO FUNCTION url({url:String})
 PARAMS: url: "http://lol"
-NOTICE:  COPY logs TO url('http://lol')
+NOTICE:  PG QUERY: COPY public.logs TO STDOUT (FORMAT text);
 COPY logs TO 'https://lol';
-NOTICE:  QUERY: INSERT INTO FUNCTION url({url:String})
+NOTICE:  CH QUERY: INSERT INTO FUNCTION url({url:String})
 PARAMS: url: "https://lol"
-NOTICE:  COPY logs TO url('https://lol')
+NOTICE:  PG QUERY: COPY public.logs TO STDOUT (FORMAT text);
 COPY logs TO 'gcs://lol';
-NOTICE:  QUERY: INSERT INTO FUNCTION gcs({url:String})
+NOTICE:  CH QUERY: INSERT INTO FUNCTION gcs({url:String})
 PARAMS: url: "gcs://lol"
-NOTICE:  COPY logs TO gcs('gcs://lol')
+NOTICE:  PG QUERY: COPY public.logs TO STDOUT (FORMAT text);
 COPY logs TO 'abs://lol';
 ERROR:  unsupported URL scheme 4
 COPY logs FROM 's3://lol';
-NOTICE:  QUERY: SELECT * FROM s3({url:String})
+NOTICE:  CH QUERY: SELECT * FROM s3({url:String})
 PARAMS: url: "s3://lol"
-NOTICE:  COPY logs FROM s3('s3://lol')
+NOTICE:  PG QUERY: COPY public.logs FROM STDIN (FORMAT text);
 COPY logs FROM 'http://lol';
-NOTICE:  QUERY: SELECT * FROM url({url:String})
+NOTICE:  CH QUERY: SELECT * FROM url({url:String})
 PARAMS: url: "http://lol"
-NOTICE:  COPY logs FROM url('http://lol')
+NOTICE:  PG QUERY: COPY public.logs FROM STDIN (FORMAT text);
 COPY logs FROM 'https://lol';
-NOTICE:  QUERY: SELECT * FROM url({url:String})
+NOTICE:  CH QUERY: SELECT * FROM url({url:String})
 PARAMS: url: "https://lol"
-NOTICE:  COPY logs FROM url('https://lol')
+NOTICE:  PG QUERY: COPY public.logs FROM STDIN (FORMAT text);
 COPY logs FROM 'gcs://lol';
-NOTICE:  QUERY: SELECT * FROM gcs({url:String})
+NOTICE:  CH QUERY: SELECT * FROM gcs({url:String})
 PARAMS: url: "gcs://lol"
-NOTICE:  COPY logs FROM gcs('gcs://lol')
+NOTICE:  PG QUERY: COPY public.logs FROM STDIN (FORMAT text);
 COPY logs FROM 'abs://lol';
 ERROR:  unsupported URL scheme 4
 COPY logs FROM 's3://lol.parquet' (
@@ -67,36 +67,45 @@ COPY logs FROM 's3://lol.parquet' (
     structure 'id Int64',
     compression 'lz4'
 );
-NOTICE:  QUERY: SELECT * FROM s3({url:String}, {access_key:String}, {access_secret:String}, {session_token:String}, {format:String}, {structure:String}, {compression:String})
+NOTICE:  CH QUERY: SELECT * FROM s3({url:String}, {access_key:String}, {access_secret:String}, {session_token:String}, {format:String}, {structure:String}, {compression:String})
 PARAMS: url: "s3://lol.parquet", access_key: "key", access_secret: "secret", session_token: "big fat token", format: "parquet", structure: "id Int64", compression: "lz4"
-NOTICE:  COPY logs FROM s3('s3://lol.parquet')
+NOTICE:  PG QUERY: COPY public.logs FROM STDIN (FORMAT text);
 COPY logs TO 'gcs://lol.parquet' (
     ACCESS_KEY 'gcs_key',
     ACCESS_SECRET 'gcs_secret',
     STRUCTURE 'id UInt64',
     compression 'snappy'
 );
-NOTICE:  QUERY: INSERT INTO FUNCTION gcs({url:String}, {access_key:String}, {access_secret:String}, {format:String}, {structure:String}, {compression:String})
+NOTICE:  CH QUERY: INSERT INTO FUNCTION gcs({url:String}, {access_key:String}, {access_secret:String}, {format:String}, {structure:String}, {compression:String})
 PARAMS: url: "gcs://lol.parquet", access_key: "gcs_key", access_secret: "gcs_secret", format: "", structure: "id UInt64", compression: "snappy"
-NOTICE:  COPY logs TO gcs('gcs://lol.parquet')
+NOTICE:  PG QUERY: COPY public.logs TO STDOUT (FORMAT text);
 COPY logs TO 'gcs://lol.parquet' (
     ACCESS_KEY 'gcs_key',
     ACCESS_SECRET 'gcs_secret',
     STRUCTURE 'id UInt64'
 );
-NOTICE:  QUERY: INSERT INTO FUNCTION gcs({url:String}, {access_key:String}, {access_secret:String}, {format:String}, {structure:String})
+NOTICE:  CH QUERY: INSERT INTO FUNCTION gcs({url:String}, {access_key:String}, {access_secret:String}, {format:String}, {structure:String})
 PARAMS: url: "gcs://lol.parquet", access_key: "gcs_key", access_secret: "gcs_secret", format: "", structure: "id UInt64"
-NOTICE:  COPY logs TO gcs('gcs://lol.parquet')
+NOTICE:  PG QUERY: COPY public.logs TO STDOUT (FORMAT text);
 COPY logs FROM 'https://example.com/data.csv' (
     FORMAT 'TSVWithNamesAndTypes',
     STRUCTURE 'id UInt32'
 );
-NOTICE:  QUERY: SELECT * FROM url({url:String}, {format:String}, {structure:String})
+NOTICE:  CH QUERY: SELECT * FROM url({url:String}, {format:String}, {structure:String})
 PARAMS: url: "https://example.com/data.csv", format: "TSVWithNamesAndTypes", structure: "id UInt32"
-NOTICE:  COPY logs FROM url('https://example.com/data.csv')
+NOTICE:  PG QUERY: COPY public.logs FROM STDIN (FORMAT text);
 COPY logs FROM 'https://example.com/data.csv' (
     STRUCTURE 'id UInt32'
 );
-NOTICE:  QUERY: SELECT * FROM url({url:String}, {format:String}, {structure:String})
+NOTICE:  CH QUERY: SELECT * FROM url({url:String}, {format:String}, {structure:String})
 PARAMS: url: "https://example.com/data.csv", format: "", structure: "id UInt32"
-NOTICE:  COPY logs FROM url('https://example.com/data.csv')
+NOTICE:  PG QUERY: COPY public.logs FROM STDIN (FORMAT text);
+CREATE SCHEMA "big deal";
+CREATE TABLE "big deal"."myParts" (
+    part_id   BIGINT PRIMARY KEY,
+    name      TEXT     NOT NULL
+);
+COPY "big deal"."myParts" TO 'gcs://lol.parquet';
+NOTICE:  CH QUERY: INSERT INTO FUNCTION gcs({url:String})
+PARAMS: url: "gcs://lol.parquet"
+NOTICE:  PG QUERY: COPY "big deal"."myParts" TO STDOUT (FORMAT text);

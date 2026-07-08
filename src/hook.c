@@ -12,7 +12,6 @@
 #include "storage/shm_toc.h"
 #include "tcop/cmdtag.h"
 #include "tcop/utility.h"
-#include "utils/builtins.h"
 #include "utils/lsyscache.h"
 #include "utils/rel.h"
 
@@ -155,15 +154,6 @@ chDBProcessUtilityHook(
             };
             contextualize_options(&ctx, copy->options);
             LaunchWorker(&ctx);
-
-            elog(
-                NOTICE,
-                "COPY %s %s %s(%s)",
-                quote_identifier(copy->relation->relname),
-                copy->is_from ? "FROM" : "TO",
-                table_function[scheme],
-                quote_literal_cstr(copy->filename)
-            );
 
             return;
         }
