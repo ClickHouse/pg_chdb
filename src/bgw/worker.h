@@ -33,7 +33,7 @@
 #define CHDB_KEY_STRUCTURE UINT64CONST(0xB000000000000008)
 #define CHDB_KEY_COMPRESSION UINT64CONST(0xB000000000000009)
 #define CHDB_KEY_HEADERS UINT64CONST(0xB00000000000000a)
-#define CHDB_KEY_EXTRA_CREDENTIALS UINT64CONST(0xB00000000000000b)
+#define CHDB_KEY_EXTRA_CREDS UINT64CONST(0xB00000000000000b)
 #define CHDB_KEY_ERROR_QUEUE UINT64CONST(0xB00000000000000c)
 #define CHDB_NUM_SHM_KEYS 12 /* Must equal highest CHDB_KEY number above. */
 
@@ -91,8 +91,9 @@ typedef struct chdbCopyContext {
     char* format;
     char* structure;
     char* compression;
-    char* headers;
-    char* extra_credentials;
 } chdbCopyContext;
+
+/* URL + number of options (char* fields other than schema and table). */
+#define CHDB_MAX_TABLEFUNC_ARGS 7
 
 #endif /* CHDB_WORKER_H */

@@ -1,7 +1,6 @@
 
 #include "postgres.h"
 
-#include "bgw/worker.h"
 #include "catalog/namespace.h"
 #include "libpq/pqformat.h"
 #include "libpq/pqmq.h"
@@ -16,6 +15,8 @@
 #include "utils/builtins.h"
 #include "utils/lsyscache.h"
 #include "utils/rel.h"
+
+#include "bgw/worker.h"
 
 /* previous hook */
 static ProcessUtility_hook_type PrevProcessUtility = NULL;
@@ -78,14 +79,12 @@ scheme_for(const char* str) {
 static void
 contextualize_options(chdbCopyContext* ctx, List* options) {
     ListCell* lc;
-    ctx->access_key        = "";
-    ctx->access_secret     = "";
-    ctx->session_token     = "";
-    ctx->format            = "";
-    ctx->structure         = "";
-    ctx->compression       = "";
-    ctx->headers           = "";
-    ctx->extra_credentials = "";
+    ctx->access_key    = "";
+    ctx->access_secret = "";
+    ctx->session_token = "";
+    ctx->format        = "";
+    ctx->structure     = "";
+    ctx->compression   = "";
 
     foreach (lc, options) {
         DefElem* elem = (DefElem*)lfirst(lc);
@@ -103,14 +102,10 @@ contextualize_options(chdbCopyContext* ctx, List* options) {
             ctx->structure = pval;
         } else if (strcmp(pname, "compression") == 0) {
             ctx->compression = pval;
-        } else if (strcmp(pname, "headers") == 0) {
-            ctx->headers = pval;
-        } else if (strcmp(pname, "extra_credentials") == 0) {
-            ctx->extra_credentials = pval;
         } else {
             ereport(
-                NOTICE,
-                errcode(ERRCODE_FDW_INVALID_OPTION_NAME),
+                WARNING,
+                errcode(ERRCODE_WARNING),
                 errmsg("chdb does not support COPY option %s", pname)
             );
         }
@@ -205,8 +200,6 @@ LaunchWorker(chdbCopyContext* ctx) {
     shm_toc_estimate_chunk(&estimator, strlen(ctx->format) + 1);
     shm_toc_estimate_chunk(&estimator, strlen(ctx->structure) + 1);
     shm_toc_estimate_chunk(&estimator, strlen(ctx->compression) + 1);
-    shm_toc_estimate_chunk(&estimator, strlen(ctx->headers) + 1);
-    shm_toc_estimate_chunk(&estimator, strlen(ctx->extra_credentials) + 1);
     shm_toc_estimate_chunk(&estimator, CHDB_ERROR_QUEUE_SIZE);
     shm_toc_estimate_keys(&estimator, CHDB_NUM_SHM_KEYS);
 
@@ -252,14 +245,6 @@ LaunchWorker(chdbCopyContext* ctx) {
     string_shm = shm_toc_allocate(toc, strlen(ctx->compression) + 1);
     strcpy(string_shm, ctx->compression);
     shm_toc_insert(toc, CHDB_KEY_COMPRESSION, string_shm);
-
-    string_shm = shm_toc_allocate(toc, strlen(ctx->headers) + 1);
-    strcpy(string_shm, ctx->headers);
-    shm_toc_insert(toc, CHDB_KEY_HEADERS, string_shm);
-
-    string_shm = shm_toc_allocate(toc, strlen(ctx->extra_credentials) + 1);
-    strcpy(string_shm, ctx->extra_credentials);
-    shm_toc_insert(toc, CHDB_KEY_EXTRA_CREDENTIALS, string_shm);
 
     /* Set up the error queue. */
     shm_mq* err_queue = shm_mq_create(

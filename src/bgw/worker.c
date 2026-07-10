@@ -30,6 +30,8 @@ PG_MODULE_MAGIC;
 
 PGDLLEXPORT void
 chdb_bgw_main(Datum main_arg);
+size_t
+make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** values);
 
 void
 chdb_bgw_main(Datum main_arg) {
@@ -75,17 +77,15 @@ chdb_bgw_main(Datum main_arg) {
     memcpy(&ctx->extra, MyBgworkerEntry->bgw_extra, sizeof(chdbCopyExtra));
 
     /* Assemble the rest of the context from shared memory. */
-    ctx->schema            = shm_toc_lookup(toc, CHDB_KEY_SCHEMA, false);
-    ctx->table             = shm_toc_lookup(toc, CHDB_KEY_TABLE, false);
-    ctx->url               = shm_toc_lookup(toc, CHDB_KEY_URL, false);
-    ctx->access_key        = shm_toc_lookup(toc, CHDB_KEY_ACCESS_KEY, false);
-    ctx->access_secret     = shm_toc_lookup(toc, CHDB_KEY_ACCESS_SECRET, false);
-    ctx->session_token     = shm_toc_lookup(toc, CHDB_KEY_SESSION_TOKEN, false);
-    ctx->format            = shm_toc_lookup(toc, CHDB_KEY_FORMAT, false);
-    ctx->structure         = shm_toc_lookup(toc, CHDB_KEY_STRUCTURE, false);
-    ctx->compression       = shm_toc_lookup(toc, CHDB_KEY_COMPRESSION, false);
-    ctx->headers           = shm_toc_lookup(toc, CHDB_KEY_HEADERS, false);
-    ctx->extra_credentials = shm_toc_lookup(toc, CHDB_KEY_EXTRA_CREDENTIALS, false);
+    ctx->schema        = shm_toc_lookup(toc, CHDB_KEY_SCHEMA, false);
+    ctx->table         = shm_toc_lookup(toc, CHDB_KEY_TABLE, false);
+    ctx->url           = shm_toc_lookup(toc, CHDB_KEY_URL, false);
+    ctx->access_key    = shm_toc_lookup(toc, CHDB_KEY_ACCESS_KEY, false);
+    ctx->access_secret = shm_toc_lookup(toc, CHDB_KEY_ACCESS_SECRET, false);
+    ctx->session_token = shm_toc_lookup(toc, CHDB_KEY_SESSION_TOKEN, false);
+    ctx->format        = shm_toc_lookup(toc, CHDB_KEY_FORMAT, false);
+    ctx->structure     = shm_toc_lookup(toc, CHDB_KEY_STRUCTURE, false);
+    ctx->compression   = shm_toc_lookup(toc, CHDB_KEY_COMPRESSION, false);
 
     /*
      * Now we can find and attach to the error queue provided for us.  That's
@@ -130,19 +130,105 @@ chdb_bgw_main(Datum main_arg) {
         );
     }
 
-    elog(
-        NOTICE,
-        "%s initialized COPY %s.%s %s %s",
-        MyBgworkerEntry->bgw_name,
-        ctx->schema,
-        ctx->table,
-        ctx->extra.is_from ? "FROM" : "TO",
-        ctx->url
-    );
+    /* Assemble the ClickHouse query. */
+    StringInfoData ch_query;
+    char* names[CHDB_MAX_TABLEFUNC_ARGS];
+    char* values[CHDB_MAX_TABLEFUNC_ARGS];
+    size_t param_count;
+    initStringInfo(&ch_query);
+    param_count = make_ch_query(ctx, &ch_query, names, values);
 
-    /* Do the work. */
+    /* Reassemble params for testing. */
+    StringInfoData params;
+    initStringInfo(&params);
+    bool first = true;
+    for (size_t i = 0; i < param_count; i++) {
+        if (!first) {
+            appendStringInfoString(&params, ", ");
+        }
+        appendStringInfo(&params, "%s: \"%s\"", names[i], values[i]);
+        first = false;
+    }
+
+    elog(NOTICE, "QUERY: %s\nPARAMS: %s", ch_query.data, params.data);
 
     /* Report success and exit. */
     pq_putmessage(PqMsg_Terminate, NULL, 0);
     proc_exit(0);
+}
+
+/* Convenience constant function to append a parameter to a query. */
+#define PARAM(format, name, val)                                                       \
+    Assert(i + 1 <= CHDB_MAX_TABLEFUNC_ARGS);                                          \
+    appendStringInfoString(query, format);                                             \
+    names[i]  = name;                                                                  \
+    values[i] = val;                                                                   \
+    i++;
+
+size_t
+make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** values) {
+    /* Start the query. */
+    appendStringInfo(
+        query,
+        "%s %s(",
+        ctx->extra.is_from ? "SELECT * FROM" : "INSERT INTO FUNCTION",
+        table_function[ctx->extra.scheme]
+    );
+
+    size_t i = 0;
+    /* First parameter: the base query. */
+    if (ctx->extra.scheme != abs_scheme) {
+        PARAM("{url:String}", "url", ctx->url);
+    }
+
+    switch (ctx->extra.scheme) {
+    case s3_scheme:
+    case gcs_scheme:
+        /*
+         * https://clickhouse.com/docs/sql-reference/table-functions/s3#syntax
+         * https://clickhouse.com/docs/sql-reference/table-functions/gcs#syntax
+         */
+
+        if (ctx->access_key[0] != '\0') {
+            Assert(i + 2 <= CHDB_MAX_TABLEFUNC_ARGS);
+            /* access_key implies access secret and maybe s3 session_token. */
+            PARAM(", {access_key:String}", "access_key", ctx->access_key);
+            PARAM(", {access_secret:String}", "access_secret", ctx->access_secret);
+            if (ctx->session_token[0] != '\0' && ctx->extra.scheme == s3_scheme) {
+                PARAM(", {session_token:String}", "session_token", ctx->session_token);
+            }
+        }
+
+        /* Append remaining arguments. */
+        if (ctx->compression[0] != '\0') {
+            PARAM(", {format:String}", "format", ctx->format);
+            PARAM(", {structure:String}", "structure", ctx->structure);
+            PARAM(", {compression:String}", "compression", ctx->compression);
+        } else if (ctx->structure[0] != '\0') {
+            PARAM(", {format:String}", "format", ctx->format);
+            PARAM(", {structure:String}", "structure", ctx->structure);
+        } else if (ctx->format[0] != '\0') {
+            PARAM(", {format:String}", "format", ctx->format);
+        }
+        break;
+    case http_scheme:
+    case https_scheme:
+        /* https://clickhouse.com/docs/sql-reference/table-functions/url#syntax */
+        if (ctx->structure[0] != '\0') {
+            PARAM(", {format:String}", "format", ctx->format);
+            PARAM(", {structure:String}", "structure", ctx->structure);
+        } else if (ctx->format[0] != '\0') {
+            PARAM(", {format:String}", "format", ctx->format);
+        }
+        break;
+    case abs_scheme:
+        /* TODO, requires parsing URL. */
+    default:
+        elog(ERROR, "unsupported URL scheme %d", ctx->extra.scheme);
+        break;
+    }
+
+    appendStringInfoChar(query, ')');
+
+    return i;
 }

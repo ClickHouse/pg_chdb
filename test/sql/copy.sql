@@ -34,3 +34,34 @@ COPY logs FROM 'http://lol';
 COPY logs FROM 'https://lol';
 COPY logs FROM 'gcs://lol';
 COPY logs FROM 'abs://lol';
+
+COPY logs FROM 's3://lol.parquet' (
+    access_key 'key',
+    access_secret 'secret',
+    session_token 'big fat token',
+    format 'parquet',
+    structure 'id Int64',
+    compression 'lz4'
+);
+
+COPY logs TO 'gcs://lol.parquet' (
+    ACCESS_KEY 'gcs_key',
+    ACCESS_SECRET 'gcs_secret',
+    STRUCTURE 'id UInt64',
+    compression 'snappy'
+);
+
+COPY logs TO 'gcs://lol.parquet' (
+    ACCESS_KEY 'gcs_key',
+    ACCESS_SECRET 'gcs_secret',
+    STRUCTURE 'id UInt64'
+);
+
+COPY logs FROM 'https://example.com/data.csv' (
+    FORMAT 'TSVWithNamesAndTypes',
+    STRUCTURE 'id UInt32'
+);
+
+COPY logs FROM 'https://example.com/data.csv' (
+    STRUCTURE 'id UInt32'
+);
