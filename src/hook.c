@@ -149,7 +149,7 @@ chDBProcessUtilityHook(
         /* Look for a URL filename. */
         CopyStmt* copy = (CopyStmt*)parsetree;
         scheme scheme  = scheme_for(copy->filename);
-        if (scheme != no_scheme) {
+        if (copy->relation && scheme != no_scheme) {
             /* We own this copy. Fire up a worker to execute it. */
             char* schema = copy->relation->schemaname
                                ? copy->relation->schemaname

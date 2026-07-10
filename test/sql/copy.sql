@@ -75,6 +75,10 @@ COPY logs FROM 'https://datasets-documentation.s3.eu-west-3.amazonaws.com/my-tes
 COPY logs FROM 'https://datasets-documentation.s3.eu-west-3.amazonaws.com/my-test-bucket-768/some_prefix/some_file_1.csv' (
     STRUCTURE 'id UInt32, num UInt32, age UInt32'
 );
+
+-- No table support yet
+COPY (SELECT 1 AS x) TO 's3://bucket/key';
+
 CREATE SCHEMA "big deal";
 
 CREATE TABLE "big deal"."myParts" (

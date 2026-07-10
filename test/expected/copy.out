@@ -173,6 +173,9 @@ NOTICE:  CHUNK: 1	2	3
 3	2	1
 4	5	6
 
+-- No table support yet
+COPY (SELECT 1 AS x) TO 's3://bucket/key';
+ERROR:  relative path not allowed for COPY to file
 CREATE SCHEMA "big deal";
 CREATE TABLE "big deal"."myParts" (
     part_id   BIGINT PRIMARY KEY,
