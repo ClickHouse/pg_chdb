@@ -27,13 +27,13 @@ COPY logs TO 's3://datasets-documentation/my-test-bucket-768/some_prefix/some_fi
 COPY logs TO 'http://datasets-documentation.s3.eu-west-3.amazonaws.com/my-test-bucket-768/some_prefix/some_file_1.csv';
 COPY logs TO 'https://datasets-documentation.s3.eu-west-3.amazonaws.com/my-test-bucket-768/some_prefix/some_file_1.csv';
 COPY logs TO 'gcs://storage.googleapis.com/clickhouse_public_datasets/my-test-bucket-768/data.csv.gz';
-COPY logs TO 'abs://account.blob.core.windows.net/container/path/to.csv';
+COPY logs TO 'az://account.blob.core.windows.net/container/path/to.csv';
 
 COPY logs FROM 's3://datasets-documentation/my-test-bucket-768/some_prefix/some_file_1.csv';
 COPY logs FROM 'http://datasets-documentation.s3.eu-west-3.amazonaws.com/my-test-bucket-768/some_prefix/some_file_1.csv';
 COPY logs FROM 'https://datasets-documentation.s3.eu-west-3.amazonaws.com/my-test-bucket-768/some_prefix/some_file_1.csv';
 COPY logs FROM 'gcs://storage.googleapis.com/clickhouse_public_datasets/my-test-bucket-768/data.csv.gz';
-COPY logs FROM 'abs://account.blob.core.windows.net/container/path/to.csv';
+COPY logs FROM 'az://account.blob.core.windows.net/container/path/to.csv';
 
 COPY logs FROM 's3://datasets-documentation/my-test-bucket-768/some_prefix/some_file_1.csv' (
     access_key 'key',
@@ -52,7 +52,7 @@ COPY logs TO 'gcs://storage.googleapis.com/clickhouse_public_datasets/my-test-bu
     compression 'snappy'
 );
 
-COPY logs TO 'abs://account.blob.core.windows.net/container/path/to.csv' (
+COPY logs TO 'az://account.blob.core.windows.net/container/path/to.csv' (
     ACCESS_KEY 'az_key',
     ACCESS_SECRET 'az_secret',
     STRUCTURE 'id UInt64',

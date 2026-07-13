@@ -419,7 +419,6 @@ make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** value
         );
         break;
     case http_scheme:
-    case https_scheme:
         /* https://clickhouse.com/docs/sql-reference/table-functions/url#syntax */
 
         /* First parameter: the base URL. */
@@ -543,7 +542,7 @@ parse_azure_url(char* url, azureURLParts* parts) {
             ERROR,
             errcode(ERRCODE_INVALID_PARAMETER_VALUE),
             errmsg("chdb: Azure URL missing the storage account host"),
-            errhint("abs://<account>.blob.core.windows.net/<container>/<path>")
+            errhint("az://<account>.blob.core.windows.net/<container>/<path>")
         );
     }
 
@@ -559,7 +558,7 @@ parse_azure_url(char* url, azureURLParts* parts) {
             ERROR,
             errcode(ERRCODE_INVALID_PARAMETER_VALUE),
             errmsg("chdb: Azure URL missing the container name"),
-            errhint("abs://<account>.blob.core.windows.net/<container>/<path>")
+            errhint("az://<account>.blob.core.windows.net/<container>/<path>")
         );
     }
 }

@@ -51,7 +51,7 @@ NOTICE:  PG QUERY: COPY public.logs TO STDOUT (FORMAT text);
 ERROR:  error executing chDB query
 DETAIL:  ERR: Failed to receive table structure
 CONTEXT:  query: INSERT INTO FUNCTION gcs({url:String}) SETTINGS date_time_output_format='iso', s3_request_timeout_ms = 30000
-COPY logs TO 'abs://account.blob.core.windows.net/container/path/to.csv';
+COPY logs TO 'az://account.blob.core.windows.net/container/path/to.csv';
 NOTICE:  CH QUERY: INSERT INTO FUNCTION azureBlobStorage({url:String}, {container:String}, {path:String}, {account_name:String}, {account_key:String}) SETTINGS date_time_output_format='iso', azure_request_timeout_ms=30000
 PARAMS: url: "https://account.blob.core.windows.net", container: "container", path: "path/to.csv", account_name: "", account_key: ""
 NOTICE:  PG QUERY: COPY public.logs TO STDOUT (FORMAT text);
@@ -90,7 +90,7 @@ NOTICE:  CHUNK: 1	2	3
 3	2	1
 4	5	6
 
-COPY logs FROM 'abs://account.blob.core.windows.net/container/path/to.csv';
+COPY logs FROM 'az://account.blob.core.windows.net/container/path/to.csv';
 NOTICE:  CH QUERY: SELECT * FROM azureBlobStorage({url:String}, {container:String}, {path:String}, {account_name:String}, {account_key:String}) SETTINGS date_time_output_format='iso', azure_request_timeout_ms=30000
 PARAMS: url: "https://account.blob.core.windows.net", container: "container", path: "path/to.csv", account_name: "", account_key: ""
 NOTICE:  PG QUERY: COPY public.logs FROM STDIN (FORMAT text);
@@ -127,7 +127,7 @@ NOTICE:  PG QUERY: COPY public.logs TO STDOUT (FORMAT text);
 ERROR:  error executing chDB query
 DETAIL:  ERR: Failed to receive table structure
 CONTEXT:  query: INSERT INTO FUNCTION gcs({url:String}, {access_key:String}, {access_secret:String}, {format:String}, {structure:String}, {compression:String}) SETTINGS date_time_output_format='iso', s3_request_timeout_ms = 30000
-COPY logs TO 'abs://account.blob.core.windows.net/container/path/to.csv' (
+COPY logs TO 'az://account.blob.core.windows.net/container/path/to.csv' (
     ACCESS_KEY 'az_key',
     ACCESS_SECRET 'az_secret',
     STRUCTURE 'id UInt64',

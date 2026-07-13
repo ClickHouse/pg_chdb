@@ -40,29 +40,40 @@
 /* URL schemes that the COPY hook understands. */
 typedef enum scheme {
     http_scheme,
-    https_scheme,
     s3_scheme,
     gcs_scheme,
     abs_scheme,
+    // file_scheme,
+    // hdfs_scheme,
     no_scheme, /* Must be last.*/
 } scheme;
-
-/* Strings for the URL schemes that the COPY hook understands. */
-static char const* const table_function[5] = {
-    [http_scheme]  = "url",
-    [https_scheme] = "url",
-    [s3_scheme]    = "s3",
-    [gcs_scheme]   = "gcs", /* Alias of s3, but keep it explicit.*/
-    [abs_scheme]   = "azureBlobStorage",
-};
 
 /*
  * The names of the ClickHouse functions that correspond to each supported URL
  * scheme.
  */
-static char const* const scheme_name[5] = {
-    [http_scheme] = "http", [https_scheme] = "https", [s3_scheme] = "s3",
-    [gcs_scheme] = "gcs",   [abs_scheme] = "abs",
+static char const* const table_function[] = {
+    [http_scheme] = "url",
+    [s3_scheme]   = "s3",
+    [gcs_scheme]  = "gcs", /* Alias of s3, but keep it explicit.*/
+    [abs_scheme]  = "azureBlobStorage",
+    // [file_scheme] = "file",
+    // [hdfs_scheme] = "hdfs",
+};
+
+/*
+ * Strings for the URL schemes that the COPY hook understands. Same as for the
+ * schemes used for dispatch in the ClickHouse 26.7 `url()` function. Must
+ * allocate one more than the longest list, so that each ends in a NULL.
+ * https://clickhouse.com/docs/sql-reference/table-functions/url#scheme-dispatch
+ */
+static char const* const scheme_name[no_scheme][5] = {
+    [http_scheme] = { "http", "https" },
+    [s3_scheme]   = { "s3" },
+    [gcs_scheme]  = { "gs", "gcs", "oss" },
+    [abs_scheme]  = { "az", "azure", "abfss", "abfs" },
+    // [file_scheme] = { "file", NULL },
+    // [hdfs_scheme] = { "hdfs", NULL },
 };
 
 /*

@@ -70,9 +70,11 @@ scheme_for(const char* str) {
             size_t len = ptr - str;
 
             for (size_t sch = http_scheme; sch < no_scheme; sch++) {
-                if (strlen(scheme_name[sch]) == len &&
-                    memcmp(str, scheme_name[sch], len) == 0) {
-                    return sch;
+                for (size_t i = 0; scheme_name[sch][i]; i++) {
+                    if (strlen(scheme_name[sch][i]) == len &&
+                        memcmp(str, scheme_name[sch][i], len) == 0) {
+                        return sch;
+                    }
                 }
             }
         }
