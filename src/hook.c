@@ -7,15 +7,12 @@
 #include "libpq/pqformat.h"
 #include "libpq/pqmq.h"
 #include "miscadmin.h"
-#include "nodes/pg_list.h"
-#include "postmaster/bgworker.h"
-#include "storage/dsm.h"
-#include "storage/proc.h"
 #include "storage/shm_toc.h"
-#include "tcop/cmdtag.h"
 #include "tcop/utility.h"
-#include "utils/lsyscache.h"
-#include "utils/rel.h"
+#include "utils/builtins.h"
+#if PG_VERSION_NUM >= 190000
+#include "storage/proc.h"
+#endif
 
 #ifndef SCNu32
 #include <inttypes.h>
@@ -151,22 +148,17 @@ chDBProcessUtilityHook(
         scheme scheme  = scheme_for(copy->filename);
         if (copy->relation && scheme != no_scheme) {
             /* We own this copy. Fire up a worker to execute it. */
-            char* schema = copy->relation->schemaname
-                               ? copy->relation->schemaname
-                               : get_namespace_name(get_rel_namespace(
-                                     RangeVarGetRelid(copy->relation, NoLock, true)
-                                 ));
+            Oid rel_id = RangeVarGetRelid(copy->relation, NoLock, true);
             chdbCopyContext ctx = {
                 .extra = {
                     .scheme  = scheme,
+                    .rel_id = rel_id,
                     .db_id   = MyDatabaseId,
                     .role_id = GetAuthenticatedUserId(),
                     .is_from = copy->is_from
                     // .session_user_id = GetSessionUserId(),
                     // .outer_user_id = GetCurrentRoleId(),
                  },
-                .table   = copy->relation->relname,
-                .schema  = schema,
                 .url     = copy->filename,
             };
             contextualize_options(&ctx, copy->options);
@@ -198,8 +190,6 @@ LaunchWorker(chdbCopyContext* ctx) {
     shm_toc_estimator estimator;
 
     shm_toc_initialize_estimator(&estimator);
-    shm_toc_estimate_chunk(&estimator, strlen(ctx->schema) + 1);
-    shm_toc_estimate_chunk(&estimator, strlen(ctx->table) + 1);
     shm_toc_estimate_chunk(&estimator, strlen(ctx->url) + 1);
     shm_toc_estimate_chunk(&estimator, strlen(ctx->access_key) + 1);
     shm_toc_estimate_chunk(&estimator, strlen(ctx->access_secret) + 1);
@@ -217,15 +207,7 @@ LaunchWorker(chdbCopyContext* ctx) {
     /* Copy the context strings into the shared memory segment. */
     shm_toc* toc = shm_toc_create(CHDB_SHM_MAGIC, dsm_segment_address(seg), seg_size);
 
-    char* string_shm = shm_toc_allocate(toc, strlen(ctx->schema) + 1);
-    strcpy(string_shm, ctx->schema);
-    shm_toc_insert(toc, CHDB_KEY_SCHEMA, string_shm);
-
-    string_shm = shm_toc_allocate(toc, strlen(ctx->table) + 1);
-    strcpy(string_shm, ctx->table);
-    shm_toc_insert(toc, CHDB_KEY_TABLE, string_shm);
-
-    string_shm = shm_toc_allocate(toc, strlen(ctx->url) + 1);
+    char* string_shm = shm_toc_allocate(toc, strlen(ctx->url) + 1);
     strcpy(string_shm, ctx->url);
     shm_toc_insert(toc, CHDB_KEY_URL, string_shm);
 
@@ -269,7 +251,14 @@ LaunchWorker(chdbCopyContext* ctx) {
     worker.bgw_restart_time = BGW_NEVER_RESTART;
     sprintf(worker.bgw_library_name, "chdb_bgw");
     sprintf(worker.bgw_function_name, "chdb_bgw_main");
-    snprintf(worker.bgw_name, BGW_MAXLEN, "chdb %s.%s worker", ctx->schema, ctx->table);
+    snprintf(
+        worker.bgw_name,
+        BGW_MAXLEN,
+        "chdb %s worker",
+        DatumGetCString(
+            DirectFunctionCall1(regclassout, ObjectIdGetDatum(ctx->extra.rel_id))
+        )
+    );
     snprintf(worker.bgw_type, BGW_MAXLEN, "chdb_bgw dynamic");
     worker.bgw_main_arg   = UInt32GetDatum(dsm_segment_handle(seg));
     worker.bgw_notify_pid = MyProcPid;
