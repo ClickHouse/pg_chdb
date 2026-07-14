@@ -116,7 +116,7 @@ NOTICE:  CH QUERY: SELECT * FROM hdfs({url:String}) SETTINGS date_time_output_fo
 PARAMS: url: "hdfs://localhost:9865/test"
 NOTICE:  PG QUERY: COPY logs FROM STDIN (FORMAT text);
 ERROR:  error fetching chDB query result
-DETAIL:  Code: 46. DB::Exception: Unknown table function hdfs. (UNKNOWN_FUNCTION)
+DETAIL:  Code: 660. DB::Exception: Unable to connect to HDFS: Hdfs::HdfsRpcException: HdfsFailoverException: Failed to invoke RPC call "getFsStats" on server "localhost:9865"	Caused by: HdfsNetworkConnectException: Connect to "localhost:9865" failed: (errno: 111) Connection refused: The data format cannot be detected by the contents of the files. You can specify the format manually. (HDFS_ERROR)
 CONTEXT:  query: SELECT * FROM hdfs({url:String}) SETTINGS date_time_output_format='iso'
 COPY logs FROM 's3://datasets-documentation/my-test-bucket-768/some_prefix/some_file_1.csv' (
     access_key 'key',
@@ -199,7 +199,7 @@ NOTICE:  CH QUERY: SELECT * FROM hdfs({url:String}, {format:String}, {structure:
 PARAMS: url: "hdfs://localhost:9865/test", format: "CSV", structure: "id UInt32, num UInt32, age UInt32"
 NOTICE:  PG QUERY: COPY logs FROM STDIN (FORMAT text);
 ERROR:  error fetching chDB query result
-DETAIL:  Code: 46. DB::Exception: Unknown table function hdfs. (UNKNOWN_FUNCTION)
+DETAIL:  Code: 660. DB::Exception: Unable to connect to HDFS: Hdfs::HdfsRpcException: HdfsFailoverException: Failed to invoke RPC call "getFsStats" on server "localhost:9865"	Caused by: HdfsNetworkConnectException: Connect to "localhost:9865" failed: (errno: 111) Connection refused: While executing ReadFromObjectStorage. (HDFS_ERROR)
 CONTEXT:  query: SELECT * FROM hdfs({url:String}, {format:String}, {structure:String}) SETTINGS date_time_output_format='iso'
 COPY logs FROM 'hdfs://localhost:9865/test' (
     STRUCTURE 'id UInt32, num UInt32, age UInt32'
@@ -208,7 +208,7 @@ NOTICE:  CH QUERY: SELECT * FROM hdfs({url:String}, {format:String}, {structure:
 PARAMS: url: "hdfs://localhost:9865/test", format: "auto", structure: "id UInt32, num UInt32, age UInt32"
 NOTICE:  PG QUERY: COPY logs FROM STDIN (FORMAT text);
 ERROR:  error fetching chDB query result
-DETAIL:  Code: 46. DB::Exception: Unknown table function hdfs. (UNKNOWN_FUNCTION)
+DETAIL:  Code: 660. DB::Exception: Unable to connect to HDFS: Hdfs::HdfsRpcException: HdfsFailoverException: Failed to invoke RPC call "getFsStats" on server "localhost:9865"	Caused by: HdfsNetworkConnectException: Connect to "localhost:9865" failed: (errno: 111) Connection refused: The data format cannot be detected by the contents of the files. You can specify the format manually. (HDFS_ERROR)
 CONTEXT:  query: SELECT * FROM hdfs({url:String}, {format:String}, {structure:String}) SETTINGS date_time_output_format='iso'
 -- No table support yet
 COPY (SELECT 1 AS x) TO 's3://bucket/key';

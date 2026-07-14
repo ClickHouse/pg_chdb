@@ -28,12 +28,16 @@ COPY logs TO 'http://datasets-documentation.s3.eu-west-3.amazonaws.com/my-test-b
 COPY logs TO 'https://datasets-documentation.s3.eu-west-3.amazonaws.com/my-test-bucket-768/some_prefix/some_file_1.csv';
 COPY logs TO 'gcs://storage.googleapis.com/clickhouse_public_datasets/my-test-bucket-768/data.csv.gz';
 COPY logs TO 'az://account.blob.core.windows.net/container/path/to.csv';
+COPY logs TO 'file://logs.csv';
+COPY logs TO 'hdfs://localhost:9865/test';
 
 COPY logs FROM 's3://datasets-documentation/my-test-bucket-768/some_prefix/some_file_1.csv';
 COPY logs FROM 'http://datasets-documentation.s3.eu-west-3.amazonaws.com/my-test-bucket-768/some_prefix/some_file_1.csv';
 COPY logs FROM 'https://datasets-documentation.s3.eu-west-3.amazonaws.com/my-test-bucket-768/some_prefix/some_file_1.csv';
 COPY logs FROM 'gcs://storage.googleapis.com/clickhouse_public_datasets/my-test-bucket-768/data.csv.gz';
 COPY logs FROM 'az://account.blob.core.windows.net/container/path/to.csv';
+COPY logs FROM 'file://logs.csv';
+COPY logs FROM 'hdfs://localhost:9865/test';
 
 COPY logs FROM 's3://datasets-documentation/my-test-bucket-768/some_prefix/some_file_1.csv' (
     access_key 'key',
@@ -73,6 +77,15 @@ COPY logs FROM 'https://datasets-documentation.s3.eu-west-3.amazonaws.com/my-tes
 );
 
 COPY logs FROM 'https://datasets-documentation.s3.eu-west-3.amazonaws.com/my-test-bucket-768/some_prefix/some_file_1.csv' (
+    STRUCTURE 'id UInt32, num UInt32, age UInt32'
+);
+
+COPY logs FROM 'hdfs://localhost:9865/test' (
+    FORMAT 'CSV',
+    STRUCTURE 'id UInt32, num UInt32, age UInt32'
+);
+
+COPY logs FROM 'hdfs://localhost:9865/test' (
     STRUCTURE 'id UInt32, num UInt32, age UInt32'
 );
 

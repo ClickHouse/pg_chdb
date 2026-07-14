@@ -60,6 +60,9 @@ make_pg_query(chdbCopyContext* ctx, Relation rel, StringInfo query);
 static void
 parse_azure_url(char* url, azureURLParts* parts);
 
+static char*
+get_local_path_from_file_url(const char* url);
+
 static void
 chdb_conn_free(void*);
 
@@ -484,6 +487,44 @@ make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** value
         );
         break;
     }
+    case file_scheme:
+        /* https://clickhouse.com/docs/sql-reference/table-functions/file#syntax */
+
+        /* First parameter: the path to the file. */
+        PARAM("{path:String}", "path", get_local_path_from_file_url(ctx->url));
+
+        /* Append remaining arguments and settings. */
+        if (ctx->compression[0] != '\0') {
+            PARAM(", {format:String}", "format", ctx->format[0] ? ctx->format : "auto");
+            PARAM(
+                ", {structure:String}",
+                "structure",
+                ctx->structure[0] ? ctx->structure : "auto"
+            );
+            PARAM(", {compression:String}", "compression", ctx->compression);
+        } else if (ctx->structure[0] != '\0') {
+            PARAM(", {format:String}", "format", ctx->format[0] ? ctx->format : "auto");
+            PARAM(", {structure:String}", "structure", ctx->structure);
+        } else if (ctx->format[0] != '\0') {
+            PARAM(", {format:String}", "format", ctx->format);
+        }
+        appendStringInfo(query, ") SETTINGS %s", settings);
+        break;
+    case hdfs_scheme:
+        /* https://clickhouse.com/docs/sql-reference/table-functions/hdfs#syntax */
+
+        /* First parameter: the base URL. */
+        PARAM("{url:String}", "url", ctx->url);
+
+        /* Append remaining arguments and settings. */
+        if (ctx->structure[0] != '\0') {
+            PARAM(", {format:String}", "format", ctx->format[0] ? ctx->format : "auto");
+            PARAM(", {structure:String}", "structure", ctx->structure);
+        } else if (ctx->format[0] != '\0') {
+            PARAM(", {format:String}", "format", ctx->format);
+        }
+        appendStringInfo(query, ") SETTINGS %s", settings);
+        break;
     default:
         elog(ERROR, "unsupported URL scheme %d", ctx->extra.scheme);
         break;
@@ -572,6 +613,31 @@ parse_azure_url(char* url, azureURLParts* parts) {
             errhint("az://<account>.blob.core.windows.net/<container>/<path>")
         );
     }
+}
+
+/*
+ * Get the local path from a file:// URL. Must be an absolute path or else it
+ * raises an error.
+ */
+static char*
+get_local_path_from_file_url(const char* url) {
+    /* https://github.com/ClickHouse/ClickHouse/blob/0b235b0/src/Storages/StorageURL.cpp#L2000-L2014*/
+    char* path = strstr(url, "://");
+    if (!path) {
+        /* Should not happen, validated by the hook. */
+        elog(ERROR, "chdb: malformed file URL %s ", url);
+    }
+
+    path += 3;
+    if (!is_absolute_path(path)) {
+        ereport(
+            ERROR,
+            errcode(ERRCODE_INVALID_NAME),
+            errmsg("chdb: relative path not allowed for COPY to file URL")
+        );
+    }
+
+    return path;
 }
 
 /*

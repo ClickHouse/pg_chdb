@@ -41,8 +41,8 @@ typedef enum scheme {
     s3_scheme,
     gcs_scheme,
     abs_scheme,
-    // file_scheme,
-    // hdfs_scheme,
+    file_scheme,
+    hdfs_scheme,
     no_scheme, /* Must be last.*/
 } scheme;
 
@@ -55,8 +55,8 @@ static char const* const table_function[] = {
     [s3_scheme]   = "s3",
     [gcs_scheme]  = "gcs", /* Alias of s3, but keep it explicit.*/
     [abs_scheme]  = "azureBlobStorage",
-    // [file_scheme] = "file",
-    // [hdfs_scheme] = "hdfs",
+    [file_scheme] = "file",
+    [hdfs_scheme] = "hdfs",
 };
 
 /*
@@ -70,8 +70,8 @@ static char const* const scheme_name[no_scheme][5] = {
     [s3_scheme]   = { "s3" },
     [gcs_scheme]  = { "gs", "gcs", "oss" },
     [abs_scheme]  = { "az", "azure", "abfss", "abfs" },
-    // [file_scheme] = { "file", NULL },
-    // [hdfs_scheme] = { "hdfs", NULL },
+    [file_scheme] = { "file", NULL },
+    [hdfs_scheme] = { "hdfs", NULL },
 };
 
 /*

@@ -36,3 +36,9 @@ jobs:
           md5sum /usr/local/lib/libchdb.so /usr/local/include/chdb.h
       - name: Test
         run: pg-build-test
+      - name: Upload Diffs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: regression-diffs-pg${{ matrix.pg }}
+          path: regression.diffs
