@@ -23,47 +23,57 @@ VALUES (1, 'page_view',   '/users/profile')
 COPY logs TO STDOUT;
 
 -- Should intercept known URLs schemas.
-COPY logs TO 's3://lol';
-COPY logs TO 'http://lol';
-COPY logs TO 'https://lol';
-COPY logs TO 'gcs://lol';
-COPY logs TO 'abs://lol';
+COPY logs TO 's3://datasets-documentation/my-test-bucket-768/some_prefix/some_file_1.csv';
+COPY logs TO 'http://datasets-documentation.s3.eu-west-3.amazonaws.com/my-test-bucket-768/some_prefix/some_file_1.csv';
+COPY logs TO 'https://datasets-documentation.s3.eu-west-3.amazonaws.com/my-test-bucket-768/some_prefix/some_file_1.csv';
+COPY logs TO 'gcs://storage.googleapis.com/clickhouse_public_datasets/my-test-bucket-768/data.csv.gz';
+COPY logs TO 'abs://account.blob.core.windows.net/container/path/to.csv';
 
-COPY logs FROM 's3://lol';
-COPY logs FROM 'http://lol';
-COPY logs FROM 'https://lol';
-COPY logs FROM 'gcs://lol';
-COPY logs FROM 'abs://lol';
+COPY logs FROM 's3://datasets-documentation/my-test-bucket-768/some_prefix/some_file_1.csv';
+COPY logs FROM 'http://datasets-documentation.s3.eu-west-3.amazonaws.com/my-test-bucket-768/some_prefix/some_file_1.csv';
+COPY logs FROM 'https://datasets-documentation.s3.eu-west-3.amazonaws.com/my-test-bucket-768/some_prefix/some_file_1.csv';
+COPY logs FROM 'gcs://storage.googleapis.com/clickhouse_public_datasets/my-test-bucket-768/data.csv.gz';
+COPY logs FROM 'abs://account.blob.core.windows.net/container/path/to.csv';
 
-COPY logs FROM 's3://lol.parquet' (
+COPY logs FROM 's3://datasets-documentation/my-test-bucket-768/some_prefix/some_file_1.csv' (
     access_key 'key',
     access_secret 'secret',
     session_token 'big fat token',
     format 'parquet',
     structure 'id Int64',
-    compression 'lz4'
+    compression 'lz4',
+    timeout 50000
 );
 
-COPY logs TO 'gcs://lol.parquet' (
+COPY logs TO 'gcs://storage.googleapis.com/clickhouse_public_datasets/my-test-bucket-768/data.csv.gz' (
     ACCESS_KEY 'gcs_key',
     ACCESS_SECRET 'gcs_secret',
     STRUCTURE 'id UInt64',
     compression 'snappy'
 );
 
-COPY logs TO 'gcs://lol.parquet' (
+COPY logs TO 'abs://account.blob.core.windows.net/container/path/to.csv' (
+    ACCESS_KEY 'az_key',
+    ACCESS_SECRET 'az_secret',
+    STRUCTURE 'id UInt64',
+    compression 'snappy',
+    format 'CSV',
+    timeout 1000
+);
+
+COPY logs TO 'gcs://storage.googleapis.com/clickhouse_public_datasets/my-test-bucket-768/data.csv.gz' (
     ACCESS_KEY 'gcs_key',
     ACCESS_SECRET 'gcs_secret',
     STRUCTURE 'id UInt64'
 );
 
-COPY logs FROM 'https://example.com/data.csv' (
-    FORMAT 'TSVWithNamesAndTypes',
-    STRUCTURE 'id UInt32'
+COPY logs FROM 'https://datasets-documentation.s3.eu-west-3.amazonaws.com/my-test-bucket-768/some_prefix/some_file_1.csv' (
+    FORMAT 'CSV',
+    STRUCTURE 'id UInt32, num UInt32, age UInt32'
 );
 
-COPY logs FROM 'https://example.com/data.csv' (
-    STRUCTURE 'id UInt32'
+COPY logs FROM 'https://datasets-documentation.s3.eu-west-3.amazonaws.com/my-test-bucket-768/some_prefix/some_file_1.csv' (
+    STRUCTURE 'id UInt32, num UInt32, age UInt32'
 );
 CREATE SCHEMA "big deal";
 
@@ -72,4 +82,9 @@ CREATE TABLE "big deal"."myParts" (
     name      TEXT     NOT NULL
 );
 
-COPY "big deal"."myParts" TO 'gcs://lol.parquet';
+COPY "big deal"."myParts" FROM 'https://datasets-documentation.s3.eu-west-3.amazonaws.com/my-test-bucket-768/some_prefix/some_file_1.csv';
+
+-- Option failure modes.
+COPY logs FROM 's3://thing.csv' (timeout '10');
+COPY logs FROM 's3://thing.csv' (format 22, nope true);
+COPY logs FROM 's3://thing.csv' (nonesuch 'hi');

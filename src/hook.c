@@ -1,7 +1,9 @@
 
+
 #include "postgres.h"
 
 #include "catalog/namespace.h"
+#include "commands/defrem.h"
 #include "libpq/pqformat.h"
 #include "libpq/pqmq.h"
 #include "miscadmin.h"
@@ -14,6 +16,10 @@
 #include "tcop/utility.h"
 #include "utils/lsyscache.h"
 #include "utils/rel.h"
+
+#ifndef SCNu32
+#include <inttypes.h>
+#endif
 
 #include "bgw/worker.h"
 
@@ -84,28 +90,37 @@ contextualize_options(chdbCopyContext* ctx, List* options) {
     ctx->format        = "";
     ctx->structure     = "";
     ctx->compression   = "";
+    ctx->extra.timeout = 30000; /* Same as ClickHouse. */
 
     foreach (lc, options) {
         DefElem* elem = (DefElem*)lfirst(lc);
-        char* pname   = elem->defname;
-        char* pval    = strVal(elem->arg);
-        if (strcmp(pname, "access_key") == 0) {
-            ctx->access_key = pval;
-        } else if (strcmp(pname, "access_secret") == 0) {
-            ctx->access_secret = pval;
-        } else if (strcmp(pname, "session_token") == 0) {
-            ctx->session_token = pval;
-        } else if (strcmp(pname, "format") == 0) {
-            ctx->format = pval;
-        } else if (strcmp(pname, "structure") == 0) {
-            ctx->structure = pval;
-        } else if (strcmp(pname, "compression") == 0) {
-            ctx->compression = pval;
+        if (strcmp(elem->defname, "access_key") == 0) {
+            ctx->access_key = defGetString(elem);
+        } else if (strcmp(elem->defname, "access_secret") == 0) {
+            ctx->access_secret = defGetString(elem);
+        } else if (strcmp(elem->defname, "session_token") == 0) {
+            ctx->session_token = defGetString(elem);
+        } else if (strcmp(elem->defname, "format") == 0) {
+            ctx->format = defGetString(elem);
+        } else if (strcmp(elem->defname, "structure") == 0) {
+            ctx->structure = defGetString(elem);
+        } else if (strcmp(elem->defname, "compression") == 0) {
+            ctx->compression = defGetString(elem);
+        } else if (strcmp(elem->defname, "timeout") == 0) {
+            uint64_t timeout = defGetInt64(elem);
+            if (timeout < 0) {
+                ereport(
+                    ERROR,
+                    errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+                    errmsg("chdb: argument to COPY option \"timeout\" must be a uint32")
+                );
+            }
+            ctx->extra.timeout = (uint32_t)timeout;
         } else {
             ereport(
-                WARNING,
-                errcode(ERRCODE_WARNING),
-                errmsg("chdb does not support COPY option %s", pname)
+                ERROR,
+                errcode(ERRCODE_SYNTAX_ERROR),
+                errmsg("chdb: option \"%s\" not supported", elem->defname)
             );
         }
     }

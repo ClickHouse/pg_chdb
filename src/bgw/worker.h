@@ -52,7 +52,7 @@ static char const* const table_function[5] = {
     [http_scheme]  = "url",
     [https_scheme] = "url",
     [s3_scheme]    = "s3",
-    [gcs_scheme]   = "gcs",
+    [gcs_scheme]   = "gcs", /* Alias of s3, but keep it explicit.*/
     [abs_scheme]   = "azureBlobStorage",
 };
 
@@ -74,6 +74,7 @@ typedef struct chdbCopyExtra {
     Oid role_id;
     scheme scheme;
     bool is_from;
+    uint32_t timeout; /* request timeout in milliseconds */
 } chdbCopyExtra;
 
 /*
@@ -93,7 +94,10 @@ typedef struct chdbCopyContext {
     char* compression;
 } chdbCopyContext;
 
-/* URL + number of options (char* fields other than schema and table). */
-#define CHDB_MAX_TABLEFUNC_ARGS 7
+/*
+ * URL + number of options (char* fields other than schema and table) +2 for
+ * Azure URL parsing.
+ */
+#define CHDB_MAX_TABLEFUNC_ARGS 9
 
 #endif /* CHDB_WORKER_H */

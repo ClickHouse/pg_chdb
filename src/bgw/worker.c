@@ -29,12 +29,39 @@ PG_MODULE_MAGIC_EXT(.name = "chdb_bgw", .version = PGCHCB_VERSION);
 PG_MODULE_MAGIC;
 #endif
 
+/*
+ * Decomposition of an Azure URL into the arguments that `azureBlobStorage()`
+ * expects.
+ */
+typedef struct azureURLParts {
+    char* account_url;
+    char* container;
+    char* path;
+} azureURLParts;
+
+/* Main entrypoint for worker execution. */
 PGDLLEXPORT void
 chdb_bgw_main(Datum main_arg);
+
+/* Creates the chDB query for a COPY. */
 size_t
 make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** values);
+
+/* Creates the Postgres query for a COPY. */
 void
 make_pg_query(chdbCopyContext* ctx, StringInfo query);
+
+/* Parses `url` into `parts`. */
+static void
+parse_azure_url(char* url, azureURLParts* parts);
+
+static void
+chdb_conn_free(void*);
+
+inline static void
+chdb_conn_free(void* c) {
+    chdb_close_conn((chdb_connection*)c);
+}
 
 void
 chdb_bgw_main(Datum main_arg) {
@@ -133,7 +160,13 @@ chdb_bgw_main(Datum main_arg) {
         );
     }
 
-    /* Assemble the ClickHouse query. */
+    /* Set up a callback to release the connection when we're done. */
+    MemoryContextCallback cleanup = { 0 };
+    cleanup.func                  = chdb_conn_free;
+    cleanup.arg                   = conn;
+    MemoryContextRegisterResetCallback(CurrentMemoryContext, &cleanup);
+
+    /* Assemble the chDB query. */
     StringInfoData ch_query;
     char* names[CHDB_MAX_TABLEFUNC_ARGS];
     char* values[CHDB_MAX_TABLEFUNC_ARGS];
@@ -160,6 +193,144 @@ chdb_bgw_main(Datum main_arg) {
     initStringInfo(&pg_query);
     make_pg_query(ctx, &pg_query);
     elog(NOTICE, "PG QUERY: %s", pg_query.data);
+    const char* error;
+    chdb_result* result;
+
+    /* [Complete List of
+     * Formats](https://github.com/chdb-io/chdb/blob/main/refs/clickhouse-formats-settings.md#complete-format-names-table)
+     */
+    if (ctx->extra.is_from) {
+        /* Start streaming the chDB query. */
+        result = chdb_stream_query_with_params(
+            *conn,
+            ch_query.data,
+            "TSV", /* Compatible with COPY's text format */
+            (const char* const*)names,
+            (const char* const*)values,
+            param_count
+        );
+
+        if (!result) {
+            ereport(
+                ERROR,
+                errcode(ERRCODE_EXTERNAL_ROUTINE_EXCEPTION),
+                errmsg("error executing chDB query"),
+                errcontext("query: %s", ch_query.data)
+            );
+        }
+
+        /* Check for errors. */
+        if ((error = chdb_result_error(result))) {
+            error = pstrdup(error);
+            chdb_destroy_query_result(result);
+            ereport(
+                ERROR,
+                errcode(ERRCODE_EXTERNAL_ROUTINE_EXCEPTION),
+                errmsg("error executing chDB query"),
+                errdetail("%s", error),
+                errcontext("query: %s", ch_query.data)
+            );
+        }
+
+        /* Process chunks. */
+        while (true) {
+            CHECK_FOR_INTERRUPTS();
+            chdb_result* chunk = chdb_stream_fetch_result(*conn, result);
+            if (!chunk) {
+                break;
+            }
+
+            if ((error = chdb_result_error(chunk))) {
+                /* Cut out the request ID line if present. */
+                char* rec_id = strstr(error, "Request ID:");
+                if (rec_id) {
+                    char* end = (char*)error + strlen(error) + 1;
+                    char* c   = rec_id;
+                    while (c < end && *c != '\n') {
+                        c++;
+                    }
+                    if (c < end) {
+                        memmove(rec_id, c + 1, strlen(c + 1) + 1);
+                    }
+                }
+                ereport(
+                    ERROR,
+                    errcode(ERRCODE_EXTERNAL_ROUTINE_EXCEPTION),
+                    errmsg("error fetching chDB query result"),
+                    errdetail("%s", error),
+                    errcontext("query: %s", ch_query.data)
+                );
+            }
+
+            /* Check if we have data in this chunk. */
+            size_t chunk_length = chdb_result_length(chunk);
+            if (chunk_length == 0) {
+                chdb_destroy_query_result(chunk);
+                break; /* End of stream */
+            }
+
+            /* Send the chunk to the Postgres table */
+            char* data = chdb_result_buffer(chunk);
+            elog(NOTICE, "CHUNK: %.*s", (int)chdb_result_length(chunk), data);
+            chdb_destroy_query_result(chunk);
+        }
+
+        /* Cleanup streaming query. */
+        chdb_destroy_query_result(result);
+    } else {
+        /* Start the streaming insert. */
+        chdb_insert_stream stream = chdb_stream_insert(*conn, ch_query.data, "TSV");
+
+        /* Check for errors. */
+        if ((error = chdb_stream_insert_error(stream))) {
+            error = pstrdup(error);
+            chdb_destroy_insert_stream(stream);
+            ereport(
+                ERROR,
+                errcode(ERRCODE_EXTERNAL_ROUTINE_EXCEPTION),
+                errmsg("error executing chDB query"),
+                errdetail("ERR: %s", error),
+                errcontext("query: %s", ch_query.data)
+            );
+        }
+
+        /* Stream results from Postgres to chDB. */
+        const char* rec = NULL;
+        while ((rec)) {
+            CHECK_FOR_INTERRUPTS();
+            if (chdb_stream_append(stream, rec, strlen(rec)) != CHDBSuccess) {
+                error = pstrdup(chdb_stream_insert_error(stream));
+                chdb_stream_cancel_insert(stream);
+                chdb_destroy_insert_stream(stream);
+                ereport(
+                    ERROR,
+                    errcode(ERRCODE_EXTERNAL_ROUTINE_EXCEPTION),
+                    errmsg("error appending to chDB query"),
+                    errdetail("%s", error),
+                    errcontext("query: %s", ch_query.data)
+                );
+            }
+        }
+
+        /* Tell chDB the insert is done. */
+        result = chdb_stream_done(stream);
+        if ((error = chdb_result_error(result))) {
+            error = pstrdup(error);
+            chdb_destroy_query_result(result);
+            chdb_destroy_insert_stream(stream);
+            ereport(
+                ERROR,
+                errcode(ERRCODE_EXTERNAL_ROUTINE_EXCEPTION),
+                errmsg("error finishing chDB query"),
+                errdetail("%s", error),
+                errcontext("query: %s", ch_query.data)
+            );
+        }
+
+        /* Cleanup streaming insert. */
+        chdb_destroy_query_result(result);
+        chdb_destroy_insert_stream(stream);
+    }
 
     /* Report success and exit. */
     pq_putmessage(PqMsg_Terminate, NULL, 0);
@@ -174,6 +345,9 @@ chdb_bgw_main(Datum main_arg) {
     values[i] = val;                                                                   \
     i++;
 
+/* Default chDB query settings. */
+static const char settings[] = "date_time_output_format='iso'";
+
 size_t
 make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** values) {
     /* Start the query. */
@@ -184,11 +358,14 @@ make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** value
         table_function[ctx->extra.scheme]
     );
 
+    /*
+     * TODO: For streaming queries, the buffer is sized to fit one block of
+     * output: each fetch returns up to max_block_size rows (default 65409).
+     * Consider estimating row size and adjusting the batch size accordingly.
+     * Use `SETTINGS max_block_size = N` to set it per-query.
+     */
+
     size_t i = 0;
-    /* First parameter: the base query. */
-    if (ctx->extra.scheme != abs_scheme) {
-        PARAM("{url:String}", "url", ctx->url);
-    }
 
     switch (ctx->extra.scheme) {
     case s3_scheme:
@@ -198,8 +375,19 @@ make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** value
          * https://clickhouse.com/docs/sql-reference/table-functions/gcs#syntax
          */
 
+        /* First parameter: the base URL. */
+        if (ctx->extra.scheme == s3_scheme) {
+            PARAM("{url:String}", "url", ctx->url);
+        } else {
+            char* uri = strstr(ctx->url, "://");
+            if (!uri) {
+                /* Should not happen, validated by the hook. */
+                elog(ERROR, "chdb: malformed GCS URL %s ", ctx->url);
+            }
+            PARAM("{url:String}", "url", psprintf("https%s", uri));
+        }
+
         if (ctx->access_key[0] != '\0') {
-            Assert(i + 2 <= CHDB_MAX_TABLEFUNC_ARGS);
             /* access_key implies access secret and maybe s3 session_token. */
             PARAM(", {access_key:String}", "access_key", ctx->access_key);
             PARAM(", {access_secret:String}", "access_secret", ctx->access_secret);
@@ -208,36 +396,87 @@ make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** value
             }
         }
 
-        /* Append remaining arguments. */
+        /* Append remaining arguments and settings. */
         if (ctx->compression[0] != '\0') {
-            PARAM(", {format:String}", "format", ctx->format);
-            PARAM(", {structure:String}", "structure", ctx->structure);
+            PARAM(", {format:String}", "format", ctx->format[0] ? ctx->format : "auto");
+            PARAM(
+                ", {structure:String}",
+                "structure",
+                ctx->structure[0] ? ctx->structure : "auto"
+            );
             PARAM(", {compression:String}", "compression", ctx->compression);
         } else if (ctx->structure[0] != '\0') {
-            PARAM(", {format:String}", "format", ctx->format);
+            PARAM(", {format:String}", "format", ctx->format[0] ? ctx->format : "auto");
             PARAM(", {structure:String}", "structure", ctx->structure);
         } else if (ctx->format[0] != '\0') {
             PARAM(", {format:String}", "format", ctx->format);
         }
+        appendStringInfo(
+            query,
+            ") SETTINGS %s, s3_request_timeout_ms = %u",
+            settings,
+            ctx->extra.timeout
+        );
         break;
     case http_scheme:
     case https_scheme:
         /* https://clickhouse.com/docs/sql-reference/table-functions/url#syntax */
+
+        /* First parameter: the base URL. */
+        PARAM("{url:String}", "url", ctx->url);
+
         if (ctx->structure[0] != '\0') {
-            PARAM(", {format:String}", "format", ctx->format);
+            PARAM(", {format:String}", "format", ctx->format[0] ? ctx->format : "auto");
             PARAM(", {structure:String}", "structure", ctx->structure);
         } else if (ctx->format[0] != '\0') {
             PARAM(", {format:String}", "format", ctx->format);
         }
+        appendStringInfo(
+            query,
+            ") SETTINGS %s, http_connection_timeout=%u, http_max_tries=1",
+            settings,
+            ctx->extra.timeout / 1000
+        );
         break;
-    case abs_scheme:
-        /* TODO, requires parsing URL. */
+    case abs_scheme: {
+        /*
+         * https://clickhouse.com/docs/sql-reference/table-functions/azureBlobStorage#syntax
+         */
+
+        /* Parse the Azure URL to get the account URL, container, and path. */
+        azureURLParts parts;
+        parse_azure_url(ctx->url, &parts);
+
+        /* Append required args. */
+        PARAM("{url:String}", "url", parts.account_url);
+        PARAM(", {container:String}", "container", parts.container);
+        PARAM(", {path:String}", "path", parts.path);
+        PARAM(", {account_name:String}", "account_name", ctx->access_key);
+        PARAM(", {account_key:String}", "account_key", ctx->access_secret);
+
+        /* Append remaining arguments (different order from the others) and settings. */
+        if (ctx->structure[0] != '\0') {
+            PARAM(", {format:String}", "format", ctx->format[0] ? ctx->format : "auto");
+            PARAM(", {compression:String}", "compression", ctx->compression);
+            PARAM(", {structure:String}", "structure", ctx->structure);
+        } else if (ctx->compression[0] != '\0') {
+            PARAM(", {format:String}", "format", ctx->format[0] ? ctx->format : "auto");
+            PARAM(", {compression:String}", "compression", ctx->compression);
+        } else if (ctx->format[0] != '\0') {
+            PARAM(", {format:String}", "format", ctx->format);
+        }
+        appendStringInfo(
+            query,
+            ") SETTINGS %s, azure_request_timeout_ms=%u",
+            settings,
+            ctx->extra.timeout
+        );
+        break;
+    }
     default:
         elog(ERROR, "unsupported URL scheme %d", ctx->extra.scheme);
         break;
     }
-
-    appendStringInfoChar(query, ')');
 
     return i;
 }
@@ -256,4 +495,71 @@ make_pg_query(chdbCopyContext* ctx, StringInfo query) {
         ctx->extra.is_from ? "FROM" : "TO",
         ctx->extra.is_from ? "IN" : "OUT"
     );
+}
+
+/*
+* Decomposition of an Azure URL into the arguments the `azureBlobStorage`
+  engine expects.
+*/
+static void
+parse_azure_url(char* url, azureURLParts* parts) {
+    /*
+     * Based on Azure URL parsing for the url() function in ClickHouse 26.7:
+     * https://github.com/ClickHouse/ClickHouse/blob/0b235b0/src/Storages/StorageURL.cpp#L2016-L2087
+     */
+    char* uri = strstr(url, "://");
+    if (!uri) {
+        /* Should not happen, validated by the hook. */
+        elog(ERROR, "chdb: malformed Azure URL %s ", url);
+    }
+
+    uri += 3;
+
+    /// Split off the query string (a SAS token such as `?sp=...&sig=...`)
+    /// before parsing the host and path.
+    char* query = strchr(uri, '?');
+    if (query) {
+        /* NUL terminate the URL and split off the query. */
+        *query = '\0';
+        query++;
+    }
+
+    /*
+     * `<account>.blob.core.windows.net/<container>/<blob>` or
+     * `<host>/<container>/<blob>`.
+     */
+    char* path = strstr(uri, "/");
+
+    /*
+     * `az://<account>.blob.core.windows.net/<container>/<blob>` or
+     * `azure://<host>/<container>/<blob>`
+     */
+    const char* host = path ? pnstrdup(uri, path - uri) : uri;
+    path             = path ? path + 1 : "";
+
+    char* dot = strchr(host, '.');
+    if (!dot) {
+        ereport(
+            ERROR,
+            errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+            errmsg("chdb: Azure URL missing the storage account host"),
+            errhint("abs://<account>.blob.core.windows.net/<container>/<path>")
+        );
+    }
+
+    parts->account_url =
+        query ? psprintf("https://%s?%s", host, query) : psprintf("https://%s", host);
+    char* slash = strchr(path, '/');
+    parts->container =
+        slash ? pnstrdup(path, slash - path) : pnstrdup(path, strlen(path));
+    parts->path = slash ? slash + 1 : "";
+
+    if (strlen(parts->container) == 0) {
+        ereport(
+            ERROR,
+            errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+            errmsg("chdb: Azure URL missing the container name"),
+            errhint("abs://<account>.blob.core.windows.net/<container>/<path>")
+        );
+    }
 }
