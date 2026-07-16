@@ -4,11 +4,14 @@ CREATE TABLE requests (
     name      TEXT     NOT NULL,
     path      TEXT     NOT NULL
 );
+-- Disable quiet to emit COPY numbers.
+\set QUIET false
 -- directory paths are passed to us in environment variables
 \getenv test_dir PG_ABS_SRCDIR
 \set file_base file:// :test_dir /corpus
 \set requests_csv :file_base /requests.csv
 COPY requests FROM :'requests_csv';
+COPY 4
 SELECT * FROM requests ORDER BY req_id;
  req_id |    name     |       path       
 --------+-------------+------------------
@@ -21,6 +24,7 @@ SELECT * FROM requests ORDER BY req_id;
 \set temp_base file:// :test_dir /temp
 \set dest :temp_base /requests.csv
 COPY requests TO :'dest' (structure 'id UInt64, name String, path String');
+COPY 4
 \! cat test/temp/requests.csv
 1,"page_view","/users/profile"
 2,"Page_View","/users/settings"

@@ -6,6 +6,9 @@ CREATE TABLE requests (
     path      TEXT     NOT NULL
 );
 
+-- Disable quiet to emit COPY numbers.
+\set QUIET false
+
 -- directory paths are passed to us in environment variables
 \getenv test_dir PG_ABS_SRCDIR
 \set file_base file:// :test_dir /corpus

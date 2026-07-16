@@ -40,13 +40,13 @@ chDBProcessUtilityHook(
 void
 InitializeUtilityHook(void);
 void
-LaunchWorker(chdbCopyContext* ctx);
+LaunchWorker(chdbCopyContext* ctx, QueryCompletion* qc);
 scheme
 scheme_for(const char* str);
 static void
 contextualize_options(chdbCopyContext* ctx, List* options);
 void
-ProcessMessages(shm_mq_handle* queue);
+ProcessMessages(shm_mq_handle* queue, QueryCompletion* qc);
 
 /*
  * InitializeUtilityHook hooks chDBProcessUtilityHook into the process utility
@@ -137,7 +137,7 @@ chDBProcessUtilityHook(
     ParamListInfo params,
     struct QueryEnvironment* queryEnv,
     DestReceiver* dest,
-    QueryCompletion* completionTag
+    QueryCompletion* qc
 ) {
     Node* parsetree = plannedStmt->utilityStmt;
 
@@ -162,7 +162,7 @@ chDBProcessUtilityHook(
                 .url     = copy->filename,
             };
             contextualize_options(&ctx, copy->options);
-            LaunchWorker(&ctx);
+            LaunchWorker(&ctx, qc);
 
             return;
         }
@@ -170,14 +170,7 @@ chDBProcessUtilityHook(
 
     /* Continue with the internal execution. */
     PrevProcessUtility(
-        plannedStmt,
-        queryString,
-        readOnlyTree,
-        context,
-        params,
-        queryEnv,
-        dest,
-        completionTag
+        plannedStmt, queryString, readOnlyTree, context, params, queryEnv, dest, qc
     );
 }
 
@@ -185,7 +178,7 @@ chDBProcessUtilityHook(
  * Dynamically launch a chDB worker.
  */
 void
-LaunchWorker(chdbCopyContext* ctx) {
+LaunchWorker(chdbCopyContext* ctx, QueryCompletion* qc) {
     /* Size the shared memory for the chdbCopyContext. */
     shm_toc_estimator estimator;
 
@@ -311,7 +304,7 @@ LaunchWorker(chdbCopyContext* ctx) {
 
     /* Wait for it to finish. */
     PG_TRY();
-    { ProcessMessages(mqh); }
+    { ProcessMessages(mqh, qc); }
     PG_FINALLY();
     { dsm_detach(seg); }
     PG_END_TRY();
@@ -325,10 +318,11 @@ LaunchWorker(chdbCopyContext* ctx) {
  * queue has been drained.
  */
 void
-ProcessMessages(shm_mq_handle* queue) {
+ProcessMessages(shm_mq_handle* queue, QueryCompletion* qc) {
     Size msg_len;
     void* data;
     StringInfoData msg;
+    initStringInfo(&msg);
 
     for (;;) {
         CHECK_FOR_INTERRUPTS();
@@ -342,7 +336,6 @@ ProcessMessages(shm_mq_handle* queue) {
             );
         }
 
-        initStringInfo(&msg);
         appendBinaryStringInfo(&msg, data, msg_len);
         int msg_type = pq_getmsgbyte(&msg);
 
@@ -356,9 +349,17 @@ ProcessMessages(shm_mq_handle* queue) {
             /* Death of a worker isn't enough justification for suicide. */
             err.elevel = Min(err.elevel, ERROR);
 
-            /* Clean up and rethrow error or print notice. */
-            pfree(msg.data);
+            /* Rethrow error or print notice, then reset. */
             ThrowErrorData(&err);
+            resetStringInfo(&msg);
+            break;
+        }
+        case PqMsg_Progress: {
+            /* Progress report. See pgstat_progress_parallel_incr_param for format. */
+            (void)pq_getmsgint(&msg, sizeof(uint32_t)); /* unused for now */
+            qc->nprocessed = pq_getmsgint64(&msg);
+            qc->commandTag = CMDTAG_COPY;
+            resetStringInfo(&msg);
             break;
         }
         case PqMsg_Terminate:
@@ -367,7 +368,7 @@ ProcessMessages(shm_mq_handle* queue) {
             return;
 
         default:
-            pfree(msg.data);
+            resetStringInfo(&msg);
             elog(
                 WARNING, "unexpected message type: %c (%zu bytes)", msg.data[0], msg_len
             );

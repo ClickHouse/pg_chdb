@@ -12,6 +12,7 @@
 #include "access/xact.h"
 #include "catalog/namespace.h"
 #include "libpq/libpq.h"
+#include "libpq/pqformat.h"
 #include "libpq/pqmq.h"
 #include "storage/ipc.h"
 #include "storage/shm_toc.h"
@@ -219,6 +220,7 @@ chdb_bgw_main(Datum main_arg) {
     );
 
     const char* error;
+    uint64_t num_rows = 0;
 
     /* [Complete List of
      * Formats](https://github.com/chdb-io/chdb/blob/main/refs/clickhouse-formats-settings.md#complete-format-names-table)
@@ -271,7 +273,7 @@ chdb_bgw_main(Datum main_arg) {
             );
 
             /* Do the copy. */
-            (void)CopyFrom(cstate);
+            num_rows = CopyFrom(cstate);
             EndCopyFrom(cstate);
         }
         PG_CATCH();
@@ -318,7 +320,7 @@ chdb_bgw_main(Datum main_arg) {
                 NIL
             );
 
-            (void)DoCopyTo(cstate);
+            num_rows = DoCopyTo(cstate);
             EndCopyTo(cstate);
 
             /* Tell chDB the insert is done. */
@@ -356,10 +358,18 @@ chdb_bgw_main(Datum main_arg) {
         StreamingInProgress = false;
     }
 
-    /* Report success and exit. */
+    /* Success! Close and commit. */
     table_close(rel, ctx->extra.is_from ? RowExclusiveLock : AccessShareLock);
     PopActiveSnapshot();
     CommitTransactionCommand();
+
+    /* Progress report. See pgstat_progress_parallel_incr_param for format. */
+    StringInfo msg = makeStringInfoExt(sizeof(uint32_t) + sizeof(uint64_t));
+    pq_sendint32(msg, 0); /* unused for now */
+    pq_sendint64(msg, num_rows);
+    pq_putmessage(PqMsg_Progress, msg->data, msg->len);
+
+    /* Report success and exit. */
     pq_putmessage(PqMsg_Terminate, NULL, 0);
     proc_exit(0);
 }
