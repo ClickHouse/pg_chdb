@@ -106,7 +106,7 @@ CREATE EXTENSION chdb SCHEMA chdb;
 Dependencies
 -----------
 
-The `chdb` extension requires PostgreSQL 14 or higher and the [chDB] library.
+The `chdb` extension requires PostgreSQL 16 or higher and the [chDB] library.
 
 Author
 ------

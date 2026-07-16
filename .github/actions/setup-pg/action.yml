@@ -1,0 +1,32 @@
+name: Start Postgres
+description: Install, configure, and start a Postgres cluster
+
+inputs:
+  version:
+    description: Major Postgres version to install
+    required: true
+    default: "19"
+  port:
+    description: The Postgres server port for Postgres
+    default: "5432"
+    required: false
+  packages:
+    description: List of additional packages to install"
+    required: false
+  start:
+    description: Whether or not to start Postgres after installing
+    default: "yes"
+
+runs:
+  using: composite
+  steps:
+    - name: Install ${{ inputs.version }}
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y postgresql-common ca-certificates build-essential ${{ inputs.packages }}
+        sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -v ${{ inputs.version }} -i -p
+        sudo sed -i 's/#create_main_cluster = true/create_main_cluster = false/' /etc/postgresql-common/createcluster.conf
+        [ "${{ inputs.start }}" == 'yes' ] && sudo pg_createcluster --start ${{ inputs.version }} test -p 55435 -- -A trust
+        echo /usr/lib/postgresql/${{ inputs.version }}/bin >> "$GITHUB_PATH"
+        echo printf 'PGPORT=55435\nPGUSER=postgres\n' >> "$GITHUB_ENV"

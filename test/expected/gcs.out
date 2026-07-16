@@ -1,0 +1,16 @@
+LOAD 'chdb';
+CREATE TABLE gcs_times (
+    id    INT PRIMARY KEY,
+    months INT NOT NULL,
+    days   INT NOT NULL
+);
+COPY gcs_times FROM 'gcs://storage.googleapis.com/clickhouse_public_datasets/my-test-bucket-768/data.csv.gz';
+SELECT * FROM gcs_times ORDER BY id;
+ id | months | days 
+----+--------+------
+  1 |      2 |    3
+  3 |      2 |    1
+  4 |      5 |    6
+(3 rows)
+
+TRUNCATE gcs_times;

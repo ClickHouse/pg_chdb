@@ -10,13 +10,15 @@ jobs:
   lint:
     name: 🔎 Lint Code
     runs-on: ubuntu-latest
-    container: pgxn/pgxn-tools
     env: { pg: 19, chdb_version: v26.5.1-rc.2 }
     steps:
-      - name: Install Postgres
-        run: NO_CLUSTER=1 pg-start ${{ env.pg }} libkrb5-dev clang-tidy bear
       - name: Checkout the Repository
         uses: actions/checkout@v7
+      - name: Install Postgres ${{ env.pg }}
+        uses: ./.github/actions/setup-pg
+        with:
+          version: ${{ env.pg }}
+          packages: libkrb5-dev clang-tidy bear
       - name: Install pre-commit
         run: make debian-install-lint
       - name: Cache chDB
