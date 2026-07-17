@@ -6,20 +6,44 @@ CREATE TABLE requests (
     path      TEXT     NOT NULL
 );
 
--- Disable quiet to emit COPY numbers.
+-- Disable quiet to emit COPY numbers and make NULLs show up
+\pset null '#null#'
 \set QUIET false
 
 -- directory paths are passed to us in environment variables
 \getenv test_dir PG_ABS_SRCDIR
 \set file_base file:// :test_dir /corpus
+\set temp_base file:// :test_dir /temp
 
 \set requests_csv :file_base /requests.csv
 COPY requests FROM :'requests_csv';
 SELECT * FROM requests ORDER BY req_id;
 
-\set temp_base file:// :test_dir /temp
-\set dest :temp_base /requests.csv
-COPY requests TO :'dest' (structure 'id UInt64, name String, path String');
-
+\set requests_out :temp_base /requests.csv
+COPY requests TO :'requests_out' (structure 'id UInt64, name String, path String');
 \! cat test/temp/requests.csv
+
+-- Test importing from ClickHouse with all possible backslash escapes.
+-- https://clickhouse.com/docs/interfaces/formats/TabSeparated
+CREATE TABLE people (
+    id           INT PRIMARY KEY,
+    family_name  TEXT NOT NULL,
+    given_name   TEXT NOT NULL,
+    notes        TEXT     NULL
+);
+
+\set people_tsv :file_base /people.tsv
+COPY people FROM :'people_tsv';
+SELECT * FROM people ORDER BY id;
+
+-- Export back out.
+\set people_out :temp_base /people.tsv
+COPY people TO :'people_out' (structure 'i Int32, f String, g String, n String NULL');
+\! cat test/temp/people.tsv
+
+-- Import it again;
+TRUNCATE people;
+COPY people FROM :'people_out';
+SELECT * FROM people ORDER BY id;
+
 \! rm -rf test/temp
