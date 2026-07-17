@@ -1,3 +1,5 @@
+#include <math.h>
+
 #include "chdb.h"
 #include "postgres.h"
 
@@ -18,6 +20,7 @@
 #include "storage/shm_toc.h"
 #include "tcop/utility.h"
 #include "utils/builtins.h"
+#include "utils/guc.h"
 #include "utils/lsyscache.h"
 #include "utils/memutils.h"
 #include "utils/rel.h"
@@ -74,7 +77,7 @@ make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** value
 
 /* Parses `url` into `parts`. */
 static void
-parse_azure_url(char* url, azureURLParts* parts);
+parse_azure_url(chdbCopyContext*, azureURLParts* parts);
 
 /* Extracts and returns the local file path from `url`. */
 static char*
@@ -364,7 +367,11 @@ chdb_bgw_main(Datum main_arg) {
     CommitTransactionCommand();
 
     /* Progress report. See pgstat_progress_parallel_incr_param for format. */
+#if PG_VERSION_NUM >= 180000
     StringInfo msg = makeStringInfoExt(sizeof(uint32_t) + sizeof(uint64_t));
+#else
+    StringInfo msg = makeStringInfo();
+#endif
     pq_sendint32(msg, 0); /* unused for now */
     pq_sendint64(msg, num_rows);
     pq_putmessage(PqMsg_Progress, msg->data, msg->len);
@@ -481,17 +488,18 @@ make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** value
             query,
             ") SETTINGS %s, http_connection_timeout=%u, http_max_tries=1",
             settings,
-            ctx->extra.timeout / 1000
+            (uint32_t)ceil(ctx->extra.timeout / (double)1000)
         );
         break;
-    case abs_scheme: {
+    case az_scheme:
+    case abfs_scheme: {
         /*
          * https://clickhouse.com/docs/sql-reference/table-functions/azureBlobStorage#syntax
          */
 
         /* Parse the Azure URL to get the account URL, container, and path. */
         azureURLParts parts;
-        parse_azure_url(ctx->url, &parts);
+        parse_azure_url(ctx, &parts);
 
         /* Append required args. */
         PARAM("{url:String}", "url", parts.account_url);
@@ -563,6 +571,34 @@ make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** value
         break;
     }
 
+    if (
+#if PG_VERSION_NUM >= 190000
+        log_min_messages[MyBackendType] <= DEBUG1
+#else
+        log_min_messages <= DEBUG1
+#endif
+    ) {
+        /* Reassemble params for logging. */
+        StringInfoData params;
+        initStringInfo(&params);
+        bool first = true;
+        for (size_t j = 0; j < i; j++) {
+            if (!first) {
+                appendStringInfoString(&params, ", ");
+            }
+            appendStringInfo(&params, "%s: \"%s\"", names[j], values[j]);
+            first = false;
+        }
+
+        /* Log the query and params for the TAP tests to examine. */
+        ereport(
+            LOG_SERVER_ONLY,
+            errmsg("executing chDB query"),
+            errdetail("query: %s", query->data),
+            errcontext("params: { %s }", params.data)
+        );
+    }
+
     return i;
 }
 
@@ -571,15 +607,15 @@ make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** value
   engine expects.
 */
 static void
-parse_azure_url(char* url, azureURLParts* parts) {
+parse_azure_url(chdbCopyContext* ctx, azureURLParts* parts) {
     /*
      * Based on Azure URL parsing for the url() function in ClickHouse 26.7:
      * https://github.com/ClickHouse/ClickHouse/blob/0b235b0/src/Storages/StorageURL.cpp#L2016-L2087
      */
-    char* uri = strstr(url, "://");
+    char* uri = strstr(ctx->url, "://");
     if (!uri) {
         /* Should not happen, validated by the hook. */
-        elog(ERROR, "chdb: malformed Azure URL %s ", url);
+        elog(ERROR, "chdb: malformed Azure URL %s ", ctx->url);
     }
 
     uri += 3;
@@ -591,6 +627,34 @@ parse_azure_url(char* url, azureURLParts* parts) {
         /* NUL terminate the URL and split off the query. */
         *query = '\0';
         query++;
+    }
+
+    /*
+     * Hadoop-style
+     * `abfss://<container>@<account>.dfs.core.windows.net/<blob path>`.
+     */
+    if (ctx->extra.scheme == abfs_scheme) {
+        char* at = strchr(uri, '@');
+        if (!at) {
+            ereport(
+                ERROR,
+                errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+                errmsg("chdb: Azure ABFS URL missing the container part"),
+                errhint("abfs://<container>@<account>.dfs.core.windows.net/<path>")
+            );
+        }
+
+        parts->container    = pnstrdup(uri, at - uri);
+        char* host_and_path = at + 1;
+        char* slash         = strchr(host_and_path, '/');
+        char* host =
+            slash ? pnstrdup(host_and_path, slash - host_and_path) : host_and_path;
+        parts->path        = slash ? slash + 1 : "";
+        char* dot          = strchr(host, '.');
+        char* account      = dot ? host : psprintf("%s.blob.core.windows.net", host);
+        parts->account_url = query ? psprintf("https://%s?%s", account, query)
+                                   : psprintf("https://%s", account);
+        return;
     }
 
     /*

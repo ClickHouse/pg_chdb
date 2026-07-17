@@ -182,6 +182,7 @@ LaunchWorker(chdbCopyContext* ctx, QueryCompletion* qc) {
     /* Size the shared memory for the chdbCopyContext. */
     shm_toc_estimator estimator;
 
+    /* Estimate the share memory sizing for query parameters. */
     shm_toc_initialize_estimator(&estimator);
     shm_toc_estimate_chunk(&estimator, strlen(ctx->url) + 1);
     shm_toc_estimate_chunk(&estimator, strlen(ctx->access_key) + 1);

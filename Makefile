@@ -12,6 +12,7 @@ REGRESS      = $(patsubst test/sql/%.sql,%,$(TESTS))
 REGRESS_OPTS = --inputdir=test --load-extension=$(EXTENSION)
 MODULE_big   = $(EXTENSION)
 PG_CONFIG   ?= pg_config
+TAP_TESTS   ?= 1
 
 # Collect all the C files to compile into MODULE_big.
 OBJS = $(subst .c,.o, $(wildcard src/*.c))
@@ -24,6 +25,11 @@ EXTRA_CLEAN  = src/version.h sql/$(EXTENSION)--$(EXTVERSION).sql src/bgw/chdb_bg
 
 PGXS := $(shell $(PG_CONFIG) --pgxs)
 include $(PGXS)
+
+# Set default prove flags.
+ifeq ($(PROVE_FLAGS),)
+PROVE_FLAGS = -fwj $(shell nproc)
+endif
 
 # Require the versioned SQL script.
 all: sql/$(EXTENSION)--$(EXTVERSION).sql src/bgw/chdb_bgw$(DLSUFFIX)

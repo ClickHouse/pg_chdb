@@ -7,6 +7,7 @@
 #define PqMsg_Terminate 'X'
 #define PqMsg_ErrorResponse 'E'
 #define PqMsg_NoticeResponse 'N'
+#define PqMsg_Progress 'P'
 #endif
 
 /* Identifier for shared memory segments used by this extension. */
@@ -40,7 +41,8 @@ typedef enum scheme {
     http_scheme,
     s3_scheme,
     gcs_scheme,
-    abs_scheme,
+    az_scheme,
+    abfs_scheme,
     file_scheme,
     hdfs_scheme,
     no_scheme, /* Must be last.*/
@@ -54,7 +56,8 @@ static char const* const table_function[] = {
     [http_scheme] = "url",
     [s3_scheme]   = "s3",
     [gcs_scheme]  = "gcs", /* Alias of s3, but keep it explicit.*/
-    [abs_scheme]  = "azureBlobStorage",
+    [az_scheme]   = "azureBlobStorage",
+    [abfs_scheme] = "azureBlobStorage",
     [file_scheme] = "file",
     [hdfs_scheme] = "hdfs",
 };
@@ -65,13 +68,14 @@ static char const* const table_function[] = {
  * allocate one more than the longest list, so that each ends in a NULL.
  * https://clickhouse.com/docs/sql-reference/table-functions/url#scheme-dispatch
  */
-static char const* const scheme_name[no_scheme][5] = {
+static char const* const scheme_name[no_scheme][4] = {
     [http_scheme] = { "http", "https" },
     [s3_scheme]   = { "s3" },
     [gcs_scheme]  = { "gs", "gcs", "oss" },
-    [abs_scheme]  = { "az", "azure", "abfss", "abfs" },
-    [file_scheme] = { "file", NULL },
-    [hdfs_scheme] = { "hdfs", NULL },
+    [az_scheme]   = { "az", "azure" },
+    [abfs_scheme] = { "abfs", "abfss" },
+    [file_scheme] = { "file" },
+    [hdfs_scheme] = { "hdfs" },
 };
 
 /*
