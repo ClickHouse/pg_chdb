@@ -90,4 +90,15 @@ SELECT * FROM people ORDER BY id;
   7 | Others      | Some       | go \ get \x07 your \x0B mouse @
 (7 rows)
 
+-- Export it again, should replace previous.
+COPY people TO :'people_out' (structure 'i Int32, f String, g String, n String NULL');
+COPY 7
+\! cat test/file.tmp/people.tsv
+1	Obama	Barack	\'Bama to his friends
+2	Clinton	William	Hillary\tChelsea\tSocks\n
+3	Gates	Bill	Dos\r\nWindows\r\nExplorer
+4	Matrix	Dot	a \f b \f c \f \b
+5	Language	C	\N
+6	Others 	Some	go \\ get  your  mouse @
+7	Others	Some	go \\ get  your  mouse @
 \! rm -rf test/file.tmp

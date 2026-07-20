@@ -46,4 +46,8 @@ TRUNCATE people;
 COPY people FROM :'people_out';
 SELECT * FROM people ORDER BY id;
 
+-- Export it again, should replace previous.
+COPY people TO :'people_out' (structure 'i Int32, f String, g String, n String NULL');
+\! cat test/file.tmp/people.tsv
+
 \! rm -rf test/file.tmp

@@ -399,7 +399,8 @@ static bool isInsert = false;
     i++;
 
 /* Default chDB query settings. */
-static const char settings[] = "date_time_output_format='iso'";
+static const char settings[] = "date_time_output_format='iso', "
+                               "engine_file_truncate_on_insert=1";
 
 size_t
 make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** values) {
