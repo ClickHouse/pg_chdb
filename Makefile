@@ -8,7 +8,7 @@ DISTVERSION  = $(shell grep -m 1 '^[[:space:]]\{2\}"version":' META.json | \
 DATA         = $(sort $(wildcard sql/$(EXTENSION)--*.sql) sql/$(EXTENSION)--$(EXTVERSION).sql)
 DOCS         = $(wildcard doc/*.md)
 TESTS        ?= $(wildcard test/sql/*.sql)
-REGRESS      = $(patsubst test/sql/%.sql,%,$(TESTS))
+REGRESS      = --schedule test/schedule
 REGRESS_OPTS = --inputdir=test --load-extension=$(EXTENSION)
 MODULE_big   = $(EXTENSION)
 PG_CONFIG   ?= pg_config
@@ -21,7 +21,7 @@ OBJS = $(subst .c,.o, $(wildcard src/*.c))
 PG_CFLAGS    = -Wno-declaration-after-statement -Wall -Werror
 
 # Clean up generated files.
-EXTRA_CLEAN  = src/version.h sql/$(EXTENSION)--$(EXTVERSION).sql src/bgw/chdb_bgw.* src/bgw/worker.o src/bgw/worker.bc
+EXTRA_CLEAN  = src/version.h sql/$(EXTENSION)--$(EXTVERSION).sql src/bgw/chdb_bgw.* src/bgw/worker.o src/bgw/worker.bc test/schedule
 
 PGXS := $(shell $(PG_CONFIG) --pgxs)
 include $(PGXS)
@@ -56,6 +56,12 @@ uninstall-bgw:
 	rm -f $(DESTDIR)$(pkglibdir)/src/bgw/chdb_bgw$(DLSUFFIX)
 install: install-bgw
 uninstall: uninstall-bgw
+
+.PHONY: test/schedule # Depends on $(TESTS), so always rebuild.
+test/schedule:
+	@echo "test: $(patsubst test/sql/%.sql,%,$(TESTS))" > $@
+
+installcheck: test/schedule
 
 .PHONY: format # Format .c and .h files to project standard in .clang-format.
 format: $(wildcard src/*.c src/*.h src/bgw/*.c src/bgw/*.h)

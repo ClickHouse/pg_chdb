@@ -13,7 +13,7 @@ CREATE TABLE requests (
 -- directory paths are passed to us in environment variables
 \getenv test_dir PG_ABS_SRCDIR
 \set file_base file:// :test_dir /corpus
-\set temp_base file:// :test_dir /temp
+\set temp_base file:// :test_dir /file.tmp
 
 \set requests_csv :file_base /requests.csv
 COPY requests FROM :'requests_csv';
@@ -21,7 +21,7 @@ SELECT * FROM requests ORDER BY req_id;
 
 \set requests_out :temp_base /requests.csv
 COPY requests TO :'requests_out' (structure 'id UInt64, name String, path String');
-\! cat test/temp/requests.csv
+\! cat test/file.tmp/requests.csv
 
 -- Test importing from ClickHouse with all possible backslash escapes.
 -- https://clickhouse.com/docs/interfaces/formats/TabSeparated
@@ -39,11 +39,11 @@ SELECT * FROM people ORDER BY id;
 -- Export back out.
 \set people_out :temp_base /people.tsv
 COPY people TO :'people_out' (structure 'i Int32, f String, g String, n String NULL');
-\! cat test/temp/people.tsv
+\! cat test/file.tmp/people.tsv
 
 -- Import it again;
 TRUNCATE people;
 COPY people FROM :'people_out';
 SELECT * FROM people ORDER BY id;
 
-\! rm -rf test/temp
+\! rm -rf test/file.tmp

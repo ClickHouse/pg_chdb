@@ -10,7 +10,7 @@ CREATE TABLE requests (
 -- directory paths are passed to us in environment variables
 \getenv test_dir PG_ABS_SRCDIR
 \set file_base file:// :test_dir /corpus
-\set temp_base file:// :test_dir /temp
+\set temp_base file:// :test_dir /file.tmp
 \set requests_csv :file_base /requests.csv
 COPY requests FROM :'requests_csv';
 COPY 4
@@ -26,7 +26,7 @@ SELECT * FROM requests ORDER BY req_id;
 \set requests_out :temp_base /requests.csv
 COPY requests TO :'requests_out' (structure 'id UInt64, name String, path String');
 COPY 4
-\! cat test/temp/requests.csv
+\! cat test/file.tmp/requests.csv
 1,"page_view","/users/profile"
 2,"Page_View","/users/settings"
 3,"PAGE_VIEW","/admin/dashboard"
@@ -62,7 +62,7 @@ SELECT * FROM people ORDER BY id;
 \set people_out :temp_base /people.tsv
 COPY people TO :'people_out' (structure 'i Int32, f String, g String, n String NULL');
 COPY 7
-\! cat test/temp/people.tsv
+\! cat test/file.tmp/people.tsv
 1	Obama	Barack	\'Bama to his friends
 2	Clinton	William	Hillary\tChelsea\tSocks\n
 3	Gates	Bill	Dos\r\nWindows\r\nExplorer
@@ -90,4 +90,4 @@ SELECT * FROM people ORDER BY id;
   7 | Others      | Some       | go \ get \x07 your \x0B mouse @
 (7 rows)
 
-\! rm -rf test/temp
+\! rm -rf test/file.tmp

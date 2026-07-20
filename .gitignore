@@ -21,3 +21,4 @@ compile_commands.json
 log/
 /test/schedule
 /tmp_check/
+*.tmp

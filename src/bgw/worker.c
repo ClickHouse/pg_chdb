@@ -229,6 +229,7 @@ chdb_bgw_main(Datum main_arg) {
      * Formats](https://github.com/chdb-io/chdb/blob/main/refs/clickhouse-formats-settings.md#complete-format-names-table)
      */
     if (ctx->extra.is_from) {
+        // elog(NOTICE, "QUERY: %s", ch_query.data);
         /* Start streaming the chDB query. */
         chDBStreamingResult = chdb_stream_query_with_params(
             *chDBConnection,
@@ -803,6 +804,7 @@ fetch_chdb_data(void* outbuf, int minread, int maxread) {
             CopyBuf->data   = chdb_result_buffer(chunk);
             CopyBuf->len    = (int)chunk_length;
             CopyBuf->cursor = 0;
+            // elog(NOTICE, "%s", pnstrdup(CopyBuf->data, CopyBuf->len));
 
             avail = CopyBuf->len - CopyBuf->cursor;
             if (avail > maxread) {
@@ -827,6 +829,7 @@ fetch_chdb_data(void* outbuf, int minread, int maxread) {
 static void
 send_chdb_data(void* data, int len) {
     CHECK_FOR_INTERRUPTS();
+    // elog(NOTICE, "%s", pnstrdup(data, len));
     if (chdb_stream_append(chDBInsertStream, data, len) != CHDBSuccess ||
         chdb_stream_append(chDBInsertStream, "\n", 1) != CHDBSuccess) {
         const char* error = pstrdup(chdb_stream_insert_error(chDBInsertStream));
