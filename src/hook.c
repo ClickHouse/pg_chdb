@@ -358,8 +358,7 @@ ProcessMessages(shm_mq_handle* queue, QueryCompletion* qc) {
         case PqMsg_Progress: {
             /* Progress report. See pgstat_progress_parallel_incr_param for format. */
             (void)pq_getmsgint(&msg, sizeof(uint32_t)); /* unused for now */
-            qc->nprocessed = pq_getmsgint64(&msg);
-            qc->commandTag = CMDTAG_COPY;
+            SetQueryCompletion(qc, CMDTAG_COPY, pq_getmsgint64(&msg));
             resetStringInfo(&msg);
             break;
         }

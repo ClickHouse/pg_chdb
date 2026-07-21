@@ -10,9 +10,11 @@
 #include "storage/latch.h"
 
 /* these headers are used by this particular worker's code */
+#include "access/htup_details.h"
 #include "access/table.h"
 #include "access/xact.h"
 #include "catalog/namespace.h"
+#include "catalog/pg_type.h"
 #include "libpq/libpq.h"
 #include "libpq/pqformat.h"
 #include "libpq/pqmq.h"
@@ -25,6 +27,7 @@
 #include "utils/memutils.h"
 #include "utils/rel.h"
 #include "utils/snapmgr.h"
+#include "utils/syscache.h"
 #if PG_VERSION_NUM >= 190000
 #include "storage/proc.h"
 #endif
@@ -56,6 +59,18 @@ static StringInfo CopyBuf = NULL;
 
 /* Indicates whether streaming is in progress. */
 static bool StreamingInProgress = false;
+
+/* Returns the ClickHouse type name that corresponds to the `attr` type. */
+static const char*
+chdb_type_for(Form_pg_attribute attr);
+
+/* Returns typname, possibly with a typemod. */
+static const char*
+format_ch_type(const char* typname, Form_pg_attribute attr);
+
+/* Populates `ctx->structure` if it's not already set. */
+static void
+setup_structure(chdbCopyContext* ctx, Relation rel);
 
 /*
  * Decomposition of an Azure URL into the arguments that `azureBlobStorage()`
@@ -208,19 +223,21 @@ chdb_bgw_main(Datum main_arg) {
     cleanup.arg                   = chDBConnection;
     MemoryContextRegisterResetCallback(CurrentMemoryContext, &cleanup);
 
-    /* Assemble the chDB query. */
+    /* Start a transaction and fetch the relation. */
+    StartTransactionCommand();
+    PushActiveSnapshot(GetTransactionSnapshot());
+    Relation rel = table_open(
+        ctx->extra.rel_id, ctx->extra.is_from ? RowExclusiveLock : AccessShareLock
+    );
+
+    /* Assemble the chDB query; we always need a structure. */
+    setup_structure(ctx, rel);
     StringInfoData ch_query;
     char* names[CHDB_MAX_TABLEFUNC_ARGS];
     char* values[CHDB_MAX_TABLEFUNC_ARGS];
     size_t param_count;
     initStringInfo(&ch_query);
     param_count = make_ch_query(ctx, &ch_query, names, values);
-
-    StartTransactionCommand();
-    PushActiveSnapshot(GetTransactionSnapshot());
-    Relation rel = table_open(
-        ctx->extra.rel_id, ctx->extra.is_from ? RowExclusiveLock : AccessShareLock
-    );
 
     const char* error;
     uint64_t num_rows = 0;
@@ -229,7 +246,6 @@ chdb_bgw_main(Datum main_arg) {
      * Formats](https://github.com/chdb-io/chdb/blob/main/refs/clickhouse-formats-settings.md#complete-format-names-table)
      */
     if (ctx->extra.is_from) {
-        // elog(NOTICE, "QUERY: %s", ch_query.data);
         /* Start streaming the chDB query. */
         chDBStreamingResult = chdb_stream_query_with_params(
             *chDBConnection,
@@ -453,19 +469,10 @@ make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** value
         }
 
         /* Append remaining arguments and settings. */
+        PARAM(", {format:String}", "format", ctx->format[0] ? ctx->format : "auto");
+        PARAM(", {structure:String}", "structure", ctx->structure);
         if (ctx->compression[0] != '\0') {
-            PARAM(", {format:String}", "format", ctx->format[0] ? ctx->format : "auto");
-            PARAM(
-                ", {structure:String}",
-                "structure",
-                ctx->structure[0] ? ctx->structure : "auto"
-            );
             PARAM(", {compression:String}", "compression", ctx->compression);
-        } else if (ctx->structure[0] != '\0') {
-            PARAM(", {format:String}", "format", ctx->format[0] ? ctx->format : "auto");
-            PARAM(", {structure:String}", "structure", ctx->structure);
-        } else if (ctx->format[0] != '\0') {
-            PARAM(", {format:String}", "format", ctx->format);
         }
         appendStringInfo(
             query,
@@ -479,13 +486,8 @@ make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** value
 
         /* First parameter: the base URL. */
         PARAM("{url:String}", "url", ctx->url);
-
-        if (ctx->structure[0] != '\0') {
-            PARAM(", {format:String}", "format", ctx->format[0] ? ctx->format : "auto");
-            PARAM(", {structure:String}", "structure", ctx->structure);
-        } else if (ctx->format[0] != '\0') {
-            PARAM(", {format:String}", "format", ctx->format);
-        }
+        PARAM(", {format:String}", "format", ctx->format[0] ? ctx->format : "auto");
+        PARAM(", {structure:String}", "structure", ctx->structure);
         appendStringInfo(
             query,
             ") SETTINGS %s, http_connection_timeout=%u, http_max_tries=1",
@@ -512,16 +514,13 @@ make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** value
 
         /* Append remaining arguments (different order from the others) and
          * settings. */
-        if (ctx->structure[0] != '\0') {
-            PARAM(", {format:String}", "format", ctx->format[0] ? ctx->format : "auto");
-            PARAM(", {compression:String}", "compression", ctx->compression);
-            PARAM(", {structure:String}", "structure", ctx->structure);
-        } else if (ctx->compression[0] != '\0') {
-            PARAM(", {format:String}", "format", ctx->format[0] ? ctx->format : "auto");
-            PARAM(", {compression:String}", "compression", ctx->compression);
-        } else if (ctx->format[0] != '\0') {
-            PARAM(", {format:String}", "format", ctx->format);
-        }
+        PARAM(", {format:String}", "format", ctx->format[0] ? ctx->format : "auto");
+        PARAM(
+            ", {compression:String}",
+            "compression",
+            ctx->compression[0] ? ctx->compression : "auto"
+        );
+        PARAM(", {structure:String}", "structure", ctx->structure);
         appendStringInfo(
             query,
             ") SETTINGS %s, azure_request_timeout_ms=%u",
@@ -537,19 +536,10 @@ make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** value
         PARAM("{path:String}", "path", get_local_path_from_file_url(ctx->url));
 
         /* Append remaining arguments and settings. */
+        PARAM(", {format:String}", "format", ctx->format[0] ? ctx->format : "auto");
+        PARAM(", {structure:String}", "structure", ctx->structure);
         if (ctx->compression[0] != '\0') {
-            PARAM(", {format:String}", "format", ctx->format[0] ? ctx->format : "auto");
-            PARAM(
-                ", {structure:String}",
-                "structure",
-                ctx->structure[0] ? ctx->structure : "auto"
-            );
             PARAM(", {compression:String}", "compression", ctx->compression);
-        } else if (ctx->structure[0] != '\0') {
-            PARAM(", {format:String}", "format", ctx->format[0] ? ctx->format : "auto");
-            PARAM(", {structure:String}", "structure", ctx->structure);
-        } else if (ctx->format[0] != '\0') {
-            PARAM(", {format:String}", "format", ctx->format);
         }
         appendStringInfo(query, ") SETTINGS %s", settings);
         break;
@@ -560,12 +550,8 @@ make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** value
         PARAM("{url:String}", "url", ctx->url);
 
         /* Append remaining arguments and settings. */
-        if (ctx->structure[0] != '\0') {
-            PARAM(", {format:String}", "format", ctx->format[0] ? ctx->format : "auto");
-            PARAM(", {structure:String}", "structure", ctx->structure);
-        } else if (ctx->format[0] != '\0') {
-            PARAM(", {format:String}", "format", ctx->format);
-        }
+        PARAM(", {format:String}", "format", ctx->format[0] ? ctx->format : "auto");
+        PARAM(", {structure:String}", "structure", ctx->structure);
         appendStringInfo(query, ") SETTINGS %s", settings);
         break;
     default:
@@ -842,4 +828,227 @@ send_chdb_data(void* data, int len) {
             errdetail("chDB Error: %s", error)
         );
     }
+}
+
+static const char*
+chdb_type_for(Form_pg_attribute attr) {
+    switch (attr->atttypid) {
+    case BOOLOID:
+        return "Bool";
+    case BYTEAOID:
+    case NAMEOID:
+    case TEXTOID:
+    case INETOID: // Or IPv4 or IPv6
+    case CIDROID:
+    case MACADDROID:
+    case MACADDR8OID:
+    case INTERVALOID:
+    case TSVECTOROID:
+    case JSONPATHOID:
+    case MONEYOID:
+    case XMLOID:
+    case CIRCLEOID:
+    case ANYENUMOID:
+    case LINEOID:
+        return "String";
+    case VARCHAROID:
+    case VARBITOID:
+        return format_ch_type("String", attr);
+    case CHAROID:
+    case BITOID:
+        return format_ch_type("FixedString", attr);
+    case BPCHAROID:
+        return attr->atttypmod < 0 ? "String" : format_ch_type("FixedString", attr);
+    case INT8OID:
+        return "Int64";
+    case INT2OID:
+        return "Int16";
+    case INT4OID:
+        return "Int32";
+    case OIDOID:
+        return "UInt32";
+    case JSONOID:
+    case JSONBOID:
+        return "JSON";
+    case POINTOID:
+        return "Point";
+    case LSEGOID:
+    case PATHOID:
+        return "LineString";
+    case BOXOID:
+    case POLYGONOID:
+        return "Polygon";
+    case FLOAT4OID:
+        return "Float32";
+    case FLOAT8OID:
+        return "Float64";
+    case DATEOID:
+        return "Date32";
+    case TIMEOID:
+    case TIMETZOID:
+        /* Don't bother with attr->atttypmod, incompatible syntax. */
+        return "Time64";
+    case TIMESTAMPOID:
+        /* Until we can specify TZ as part of the type. */
+        return "String";
+    case TIMESTAMPTZOID:
+        /* Don't bother with attr->atttypmod, incompatible syntax. */
+        return "DateTime64";
+    case NUMERICOID:
+        return format_ch_type("Decimal", attr);
+    case UUIDOID:
+        return "UUID";
+    case OID8OID:
+        return "UInt64";
+    case BOOLARRAYOID:
+        return "Array(Bool)";
+    case BYTEAARRAYOID:
+    case NAMEARRAYOID:
+    case TEXTARRAYOID:
+    case XMLARRAYOID:
+    case MONEYARRAYOID:
+    case MACADDRARRAYOID:
+    case INETARRAYOID:
+    case CIDRARRAYOID:
+    case MACADDR8ARRAYOID:
+    case INTERVALARRAYOID:
+    case TSVECTORARRAYOID:
+    case TSQUERYARRAYOID:
+    case JSONPATHARRAYOID:
+    case CSTRINGARRAYOID:
+    case CIRCLEARRAYOID:
+    case LINEARRAYOID:
+        return "Array(String)";
+    case VARCHARARRAYOID:
+    case VARBITARRAYOID:
+        return psprintf("Array(%s)", format_ch_type("String", attr));
+    case CHARARRAYOID:
+    case BITARRAYOID:
+    case BPCHARARRAYOID:
+        return psprintf(
+            "Array(%s)",
+            attr->atttypmod < 0 ? "String" : format_ch_type("FixedString", attr)
+        );
+    case INT8ARRAYOID:
+        return "Array(Int64)";
+    case INT2ARRAYOID:
+        return "Array(Int16)";
+    case INT4ARRAYOID:
+        return "Array(Int32)";
+    case OIDARRAYOID:
+        return "Array(UInt32)";
+    case JSONARRAYOID:
+    case JSONBARRAYOID:
+        return "Array(JSON)";
+    case POINTARRAYOID:
+        return "Array(Point)";
+    case LSEGARRAYOID:
+    case PATHARRAYOID:
+        return "Array(LineString)";
+    case BOXARRAYOID:
+    case POLYGONARRAYOID:
+        return "Array(Polygon)";
+    case FLOAT4ARRAYOID:
+        return "Array(Float32)";
+    case FLOAT8ARRAYOID:
+        return "Array(Float64)";
+    case DATEARRAYOID:
+        return "Array(Date32)";
+    case TIMEARRAYOID:
+    case TIMETZARRAYOID:
+        /* Don't bother with attr->atttypmod, incompatible syntax. */
+        return "Array(Time64)";
+    case TIMESTAMPARRAYOID:
+        /* Until we can specify TZ as part of the type. */
+        return "Array(String)";
+    case TIMESTAMPTZARRAYOID:
+        /* Don't bother with attr->atttypmod, incompatible syntax. */
+        return "Array(DateTime64)";
+    case NUMERICARRAYOID:
+        return psprintf("Array(%s)", format_ch_type("Decimal", attr));
+    case UUIDARRAYOID:
+        return "Array(UUID)";
+    case OID8ARRAYOID:
+        return "Array(UInt64)";
+    default:
+        return attr->attndims ? "Array(String)" : "String";
+    }
+}
+
+/*
+ * Add typmod decoration to the basic type name. Copied from
+ * src/backend/utils/adt/format_ch_type.c in the Postgres source.
+ */
+static const char*
+format_ch_type(const char* typname, Form_pg_attribute attr) {
+    Oid pg_type     = attr->atttypid;
+    int32_t typemod = attr->atttypmod;
+    if (typemod < 0) {
+        return typname;
+    }
+    HeapTuple tuple = SearchSysCache1(TYPEOID, ObjectIdGetDatum(pg_type));
+    if (!HeapTupleIsValid(tuple)) {
+        elog(ERROR, "chdb: cache lookup failed for type %u", pg_type);
+    }
+    Form_pg_type form = (Form_pg_type)GETSTRUCT(tuple);
+
+    if (form->typmodout == InvalidOid) {
+        /* Default behavior: just print the integer typmod with parens */
+        return psprintf("%s(%d)", typname, typemod);
+    }
+
+    /* Use the type-specific typmodout procedure */
+    return psprintf(
+        "%s%s",
+        typname,
+        DatumGetCString(OidFunctionCall1(form->typmodout, Int32GetDatum(typemod)))
+    );
+}
+
+/*
+ * Setup `ctx->structure` if none is provided. Builds it from the columns in
+ * the relation to be copied.
+ */
+static void
+setup_structure(chdbCopyContext* ctx, Relation rel) {
+    if (ctx->structure[0] != '\0') {
+        return;
+    }
+
+    StringInfoData buf;
+    initStringInfo(&buf);
+    TupleDesc tupDesc = RelationGetDescr(rel);
+    int attr_count    = tupDesc->natts;
+    bool first        = true;
+
+    for (int i = 0; i < attr_count; i++) {
+        Form_pg_attribute attr = TupleDescAttr(tupDesc, i);
+        if (attr->attisdropped || attr->attgenerated) {
+            continue;
+            ;
+        }
+
+        if (first) {
+            first = false;
+        } else {
+            appendStringInfoString(&buf, ", ");
+        }
+
+        if (attr->attndims && !attr->attnotnull) {
+            /* chDB doesn't supported a nullable array, so just use a string. */
+            appendStringInfo(
+                &buf, "%s String", quote_identifier(NameStr(attr->attname))
+            );
+        } else {
+            appendStringInfo(
+                &buf,
+                "%s %s%s",
+                quote_identifier(NameStr(attr->attname)),
+                chdb_type_for(attr),
+                attr->attnotnull ? "" : " NULL"
+            );
+        }
+    }
+
+    ctx->structure = buf.data;
 }

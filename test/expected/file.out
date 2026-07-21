@@ -68,7 +68,7 @@ COPY 7
 3	Gates	Bill	Dos\r\nWindows\r\nExplorer
 4	Matrix	Dot	a \f b \f c \f \b
 5	Language	C	\N
-6	Others 	Some	go \\ get  your  mouse @
+6	Others	Some	go \\ get  your  mouse @
 7	Others	Some	go \\ get  your  mouse @
 -- Import it again;
 TRUNCATE people;
@@ -99,6 +99,6 @@ COPY 7
 3	Gates	Bill	Dos\r\nWindows\r\nExplorer
 4	Matrix	Dot	a \f b \f c \f \b
 5	Language	C	\N
-6	Others 	Some	go \\ get  your  mouse @
+6	Others	Some	go \\ get  your  mouse @
 7	Others	Some	go \\ get  your  mouse @
 \! rm -rf test/file.tmp
