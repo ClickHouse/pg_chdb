@@ -57,6 +57,9 @@ static chdb_insert_stream chDBInsertStream = NULL;
 /* Buffer for moving COPY data between Postgres and chDB. */
 static StringInfo CopyBuf = NULL;
 
+/* Bytes to accumulate before pushing to chDB */
+#define CHDB_COPY_CHUNK_SIZE (64 * 1024)
+
 /* Indicates whether streaming is in progress. */
 static bool StreamingInProgress = false;
 
@@ -105,6 +108,10 @@ fetch_chdb_data(void* outbuf, int minread, int maxread);
 /* Copy callback to send data to chDB. */
 static void
 send_chdb_data(void* data, int len);
+
+/* Sends buffered COPY data to chDB and empties the buffer. */
+static void
+flush_chdb_data(void);
 
 /* Memory context callback to free the chDB connection. */
 static void
@@ -343,6 +350,8 @@ chdb_bgw_main(Datum main_arg) {
         StreamingInProgress = true;
         PG_TRY();
         {
+            CopyBuf = makeStringInfo();
+
             CopyToState cstate = BeginCopyTo(
                 NULL,
                 rel,
@@ -357,6 +366,7 @@ chdb_bgw_main(Datum main_arg) {
 
             num_rows = DoCopyTo(cstate);
             EndCopyTo(cstate);
+            flush_chdb_data();
 
             /* Tell chDB the insert is done. */
             chDBStreamingResult = chdb_stream_done(chDBInsertStream);
@@ -827,13 +837,31 @@ fetch_chdb_data(void* outbuf, int minread, int maxread) {
     return bytes_read;
 }
 
-/* Copy callback to stream results from Postgres to chDB. */
+/*
+ * Copy callback to stream results from Postgres to chDB.
+ * Buffers data to chdb in CHDB_COPY_CHUNK_SIZE chunks.
+ */
 static void
 send_chdb_data(void* data, int len) {
     CHECK_FOR_INTERRUPTS();
     // elog(NOTICE, "%s", pnstrdup(data, len));
-    if (chdb_stream_append(chDBInsertStream, data, len) != CHDBSuccess ||
-        chdb_stream_append(chDBInsertStream, "\n", 1) != CHDBSuccess) {
+    appendBinaryStringInfo(CopyBuf, data, len);
+    appendStringInfoChar(CopyBuf, '\n');
+
+    if (CopyBuf->len >= CHDB_COPY_CHUNK_SIZE) {
+        flush_chdb_data();
+    }
+}
+
+/* Pushes the buffered rows to chDB, blocking while chDB applies backpressure. */
+static void
+flush_chdb_data(void) {
+    if (CopyBuf->len == 0) {
+        return;
+    }
+
+    chdb_state rc = chdb_stream_append(chDBInsertStream, CopyBuf->data, CopyBuf->len);
+    if (rc != CHDBSuccess) {
         const char* error = pstrdup(chdb_stream_insert_error(chDBInsertStream));
         chdb_stream_cancel_insert(chDBInsertStream);
         ereport(
@@ -843,6 +871,8 @@ send_chdb_data(void* data, int len) {
             errdetail("chDB Error: %s", error)
         );
     }
+
+    resetStringInfo(CopyBuf);
 }
 
 static const char*
