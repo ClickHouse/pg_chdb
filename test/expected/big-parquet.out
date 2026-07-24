@@ -1,6 +1,4 @@
 LOAD 'chdb';
-SET datestyle = 'ISO';
-SET session timezone = 'UTC'; -- https://github.com/chdb-io/chdb-core/issues/143
 \getenv test_dir PG_ABS_SRCDIR
 \set parquet_file file:// :test_dir /big.tmp/big.parquet
 CREATE TYPE http_method AS ENUM(

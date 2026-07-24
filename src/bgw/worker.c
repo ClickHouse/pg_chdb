@@ -196,6 +196,21 @@ chdb_bgw_main(Datum main_arg) {
 #endif
     );
 
+    /*
+     * Set the client encoding to the database encoding, since that is what
+     * the parent will expect. (We're cheating a bit by not calling
+     * PrepareClientEncoding first. It's okay because this call will always
+     * result in installing a no-op conversion. No error should be possible,
+     * but check anyway.)
+     */
+    if (SetClientEncoding(GetDatabaseEncoding()) < 0) {
+        elog(ERROR, "SetClientEncoding(%d) failed", GetDatabaseEncoding());
+    }
+
+    /* We always want to use ISO date style and UTC time zone. */
+    SetConfigOption("datestyle", "ISO", PGC_BACKEND, PGC_S_SESSION);
+    SetConfigOption("timezone", "UTC", PGC_BACKEND, PGC_S_SESSION);
+
     /* Check our globals. */
     Assert(chDBConnection == NULL);
     Assert(chDBStreamingResult == NULL);
@@ -858,7 +873,12 @@ chdb_type_for(Form_pg_attribute attr) {
     case BITOID:
         return format_ch_type("FixedString", attr);
     case BPCHAROID:
-        return attr->atttypmod < 0 ? "String" : format_ch_type("FixedString", attr);
+        /* For Postgres the typedef is number of characters while for chDB
+         * FixedString it's bytes. Format it as a chDB String to prevent it
+         * from failing on multibyte characters.
+         */
+        return format_ch_type("String", attr);
+        // return attr->atttypmod < 0 ? "String" : format_ch_type("FixedString", attr);
     case INT8OID:
         return "Int64";
     case INT2OID:
@@ -869,39 +889,64 @@ chdb_type_for(Form_pg_attribute attr) {
         return "UInt32";
     case JSONOID:
     case JSONBOID:
-        return "JSON";
+        /* chDB JSON limited to objects, sadly. */
+        // return "JSON";
+        return "String";
     case POINTOID:
         return "Point";
     case LSEGOID:
     case PATHOID:
-        return "LineString";
+        /* chDB uses brackets rather than parens. */
+        // return "LineString";
+        return "String";
     case BOXOID:
     case POLYGONOID:
-        return "Polygon";
+        /* chDB uses brackets rather than parens. */
+        // return "Polygon";
+        return "String";
     case FLOAT4OID:
+        /* Disallows NaN, Infinity, -Infinity. */
         return "Float32";
     case FLOAT8OID:
+        /* Disallows NaN, Infinity, -Infinity. */
         return "Float64";
     case DATEOID:
         return "Date32";
     case TIMEOID:
-    case TIMETZOID:
         /* Don't bother with attr->atttypmod, incompatible syntax. */
-        return "Time64";
+        return "Time64(6)";
+    case TIMETZOID:
+        /*
+         * ClickHouse doesn't support time with time zone, and Postgres
+         * recommends against it anyway. Serialize as a string.
+         */
+        return "String";
     case TIMESTAMPOID:
         /* Until we can specify TZ as part of the type. */
         return "String";
     case TIMESTAMPTZOID:
         /* Don't bother with attr->atttypmod, incompatible syntax. */
-        return "DateTime64";
+        // return format_ch_type("DateTime64", attr);
+        return "DateTime64(6, 'UTC')";
     case NUMERICOID:
-        return format_ch_type("Decimal", attr);
+        /*
+         * Unconstrained numeric potentially much larger than ClickHouse can
+           do; max it out when no precision specified.
+        */
+        return attr->atttypmod < 1 ? "Decimal256(38)" : format_ch_type("Decimal", attr);
     case UUIDOID:
         return "UUID";
     case OID8OID:
         return "UInt64";
+    /*
+     * Arrays: chDB TSV array format differs from Postgres. Perhaps it'd make
+     * sense to adopt the binary format instead and convert things properly,
+     * like pg_clickhouse does. But since output formats like Parquet don't
+     * support arrays, anyway, just always make them strings. Comments with
+     * actual array types left for future reference.
+     */
     case BOOLARRAYOID:
-        return "Array(Bool)";
+        // return "Array(Bool)";
     case BYTEAARRAYOID:
     case NAMEARRAYOID:
     case TEXTARRAYOID:
@@ -918,60 +963,70 @@ chdb_type_for(Form_pg_attribute attr) {
     case CSTRINGARRAYOID:
     case CIRCLEARRAYOID:
     case LINEARRAYOID:
-        return "Array(String)";
+        // return "Array(String)";
     case VARCHARARRAYOID:
     case VARBITARRAYOID:
-        return psprintf("Array(%s)", format_ch_type("String", attr));
+        // return psprintf("Array(%s)", format_ch_type("String", attr));
     case CHARARRAYOID:
     case BITARRAYOID:
     case BPCHARARRAYOID:
-        return psprintf(
-            "Array(%s)",
-            attr->atttypmod < 0 ? "String" : format_ch_type("FixedString", attr)
-        );
+        // return psprintf(
+        //     "Array(%s)",
+        //     attr->atttypmod < 0 ? "String" : format_ch_type("FixedString", attr)
+        // );
     case INT8ARRAYOID:
-        return "Array(Int64)";
+        // return "Array(Int64)";
     case INT2ARRAYOID:
-        return "Array(Int16)";
+        // return "Array(Int16)";
     case INT4ARRAYOID:
-        return "Array(Int32)";
+        // return "Array(Int32)";
     case OIDARRAYOID:
-        return "Array(UInt32)";
+        // return "Array(UInt32)";
     case JSONARRAYOID:
     case JSONBARRAYOID:
-        return "Array(JSON)";
+        // return "Array(JSON)";
     case POINTARRAYOID:
-        return "Array(Point)";
+        // return "Array(Point)";
     case LSEGARRAYOID:
     case PATHARRAYOID:
-        return "Array(LineString)";
+        // return "Array(LineString)";
     case BOXARRAYOID:
     case POLYGONARRAYOID:
-        return "Array(Polygon)";
+        // return "Array(Polygon)";
     case FLOAT4ARRAYOID:
-        return "Array(Float32)";
+        // return "Array(Float32)";
     case FLOAT8ARRAYOID:
-        return "Array(Float64)";
+        // return "Array(Float64)";
     case DATEARRAYOID:
-        return "Array(Date32)";
+        // return "Array(Date32)";
     case TIMEARRAYOID:
     case TIMETZARRAYOID:
         /* Don't bother with attr->atttypmod, incompatible syntax. */
-        return "Array(Time64)";
+        // return "Array(Time64)";
     case TIMESTAMPARRAYOID:
         /* Until we can specify TZ as part of the type. */
-        return "Array(String)";
+        // return "Array(String)";
     case TIMESTAMPTZARRAYOID:
         /* Don't bother with attr->atttypmod, incompatible syntax. */
-        return "Array(DateTime64)";
+        // return "Array(DateTime64)";
     case NUMERICARRAYOID:
-        return psprintf("Array(%s)", format_ch_type("Decimal", attr));
+        // return psprintf(
+        //     "Array(%s)",
+        //     attr->atttypmod < 1 ? "Decimal256(38)" : format_ch_type("Decimal",
+        //     attr)
+        // );
     case UUIDARRAYOID:
-        return "Array(UUID)";
+        // return "Array(UUID)";
     case OID8ARRAYOID:
-        return "Array(UInt64)";
+        /*
+         * Type to use for all arrays for now. Uncomment // lines above and in
+         * default: to specify proper array types once we've managed to make
+         * the compatible.
+         */
+        return "String";
     default:
-        return attr->attndims ? "Array(String)" : "String";
+        // return attr->attndims ? "Array(String)" : "String";
+        return "String";
     }
 }
 
@@ -994,15 +1049,18 @@ format_ch_type(const char* typname, Form_pg_attribute attr) {
 
     if (form->typmodout == InvalidOid) {
         /* Default behavior: just print the integer typmod with parens */
+        ReleaseSysCache(tuple);
         return psprintf("%s(%d)", typname, typemod);
     }
 
     /* Use the type-specific typmodout procedure */
-    return psprintf(
+    char* result = psprintf(
         "%s%s",
         typname,
         DatumGetCString(OidFunctionCall1(form->typmodout, Int32GetDatum(typemod)))
     );
+    ReleaseSysCache(tuple);
+    return result;
 }
 
 /*
@@ -1025,7 +1083,6 @@ setup_structure(chdbCopyContext* ctx, Relation rel) {
         Form_pg_attribute attr = TupleDescAttr(tupDesc, i);
         if (attr->attisdropped || attr->attgenerated) {
             continue;
-            ;
         }
 
         if (first) {
