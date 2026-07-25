@@ -1,0 +1,127 @@
+LOAD 'chdb';
+/****************************************************************************/
+-- Fixed-length strings.
+CREATE TABLE fixies (
+    cr  character(6) NOT NULL,
+    ch  char(12)     NOT NULL,
+    bp  bpchar       NOT NULL,
+    pbn bpchar(8)        NULL
+);
+INSERT INTO fixies
+VALUES ('      ', '            ', ' ', '        ')
+     , ('', '', '', NULL)
+     , ('hi  ', 'hi   ', '', NULL)
+     , ('😃 🐨 🎱', '是无效的命令', '否', '未定义的参数')
+;
+-- Execute round-trip to all supported formats.
+CREATE TABLE fixies2 (LIKE fixies INCLUDING ALL);
+\set output_fle fixies.tmp
+\set from_table fixies
+\set to_table fixies2
+\i test/utils/round-trip-formats.sql
+\set ECHO errors
+t: TabSeparated
+t: TabSeparatedRaw
+t: TabSeparatedWithNames
+t: TabSeparatedWithNamesAndTypes
+t: TabSeparatedRawWithNames
+t: TabSeparatedRawWithNamesAndTypes
+t: CSV
+t: CSVWithNames
+t: CSVWithNames
+t: CSVWithNamesAndTypes
+t: CustomSeparated
+t: CustomSeparatedWithNames
+t: CustomSeparatedWithNamesAndTypes
+t: Values
+t: JSON
+t: JSONColumns
+t: JSONColumnsWithMetadata
+t: JSONCompact
+t: JSONCompactColumns
+t: JSONEachRow
+t: JSONStringsEachRow
+t: JSONCompactEachRow
+t: JSONCompactStringsEachRow
+t: JSONCompactEachRowWithNames
+t: JSONCompactEachRowWithNamesAndTypes
+t: JSONCompactStringsEachRowWithNames
+t: JSONCompactStringsEachRowWithNamesAndTypes
+t: JSONObjectEachRow
+t: TSKV
+t: Native
+t: RowBinary
+t: RowBinaryWithNames
+t: RowBinaryWithNamesAndTypes
+t: Parquet
+t: Arrow
+t: ArrowStream
+t: ORC
+t: Avro
+t: Protobuf
+t: ProtobufList
+t: MsgPack
+t: BSONEachRow
+/****************************************************************************/
+-- Fixed-length string Arrays.
+CREATE TABLE fixie_arrays (
+    cr  character(6)[] NOT NULL,
+    ch  char(12)[]     NOT NULL,
+    bp  bpchar[]       NOT NULL,
+    pbn bpchar(8)[]    NOT NULL
+);
+INSERT INTO fixie_arrays
+VALUES ('{"      "}', '{"            "}', '{" "}', '{"        "}')
+     , ('{""}', '{""}', '{""}', '{""}')
+     , ('{😃 🐨 🎱, NULL}', '{NULL, 是无效的命令}', '{NULL}', '{未定义的参数, NULL}')
+     , ('{"Bøwie", "\"GO\""}', '{否,模板}', '{x,y,z,NULL}', '{"ALL CAPS"}')
+;
+-- Execute round-trip to all supported formats.
+CREATE TABLE fixie_arrays2 (LIKE fixie_arrays INCLUDING ALL);
+\set from_table fixie_arrays
+\set to_table fixie_arrays2
+\i test/utils/round-trip-formats.sql
+\set ECHO errors
+t: TabSeparated
+t: TabSeparatedRaw
+t: TabSeparatedWithNames
+t: TabSeparatedWithNamesAndTypes
+t: TabSeparatedRawWithNames
+t: TabSeparatedRawWithNamesAndTypes
+t: CSV
+t: CSVWithNames
+t: CSVWithNames
+t: CSVWithNamesAndTypes
+t: CustomSeparated
+t: CustomSeparatedWithNames
+t: CustomSeparatedWithNamesAndTypes
+t: Values
+t: JSON
+t: JSONColumns
+t: JSONColumnsWithMetadata
+t: JSONCompact
+t: JSONCompactColumns
+t: JSONEachRow
+t: JSONStringsEachRow
+t: JSONCompactEachRow
+t: JSONCompactStringsEachRow
+t: JSONCompactEachRowWithNames
+t: JSONCompactEachRowWithNamesAndTypes
+t: JSONCompactStringsEachRowWithNames
+t: JSONCompactStringsEachRowWithNamesAndTypes
+t: JSONObjectEachRow
+t: TSKV
+t: Native
+t: RowBinary
+t: RowBinaryWithNames
+t: RowBinaryWithNamesAndTypes
+t: Parquet
+t: Arrow
+t: ArrowStream
+t: ORC
+t: Avro
+t: Protobuf
+t: ProtobufList
+t: MsgPack
+t: BSONEachRow
+\! rm -rf test/fixies.tmp

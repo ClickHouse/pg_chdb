@@ -1,0 +1,164 @@
+LOAD 'chdb';
+/****************************************************************************/
+-- Structured types as strings.
+CREATE TABLE structures (
+    jp   jsonpath NOT NULL,
+    xml  XML      NOT NULL,
+    j  JSON       NOT NULL,
+    jb JSONB          NULL
+);
+INSERT INTO structures
+VALUES ('$.x', '<html>hi</html>', '{"x": true}', '{"y": false}')
+     , ('$', '', 'null', 'null')
+     , ('$.x.y[2]', '<p></p>', '42', '42')
+     , ('$["😀 😕"]', '<x>😍 😌</x>', '"😝 🤩"', '"🤓 🧐"')
+     , ('$', '', '98.6', '98.6')
+     , ('$', '', 'true', 'true')
+     , ('$', '', '[1, "🖲️", null]', '[1, "🖲️", null]')
+;
+-- Execute round-trip to all supported formats.
+CREATE TABLE structures2 (LIKE structures INCLUDING ALL);
+\set from_table structures
+\set to_table structures2
+\set output_fle structures.tmp
+\set columns 'jp::text, xml::text, j::text, jb::text'
+\i test/utils/round-trip-formats.sql
+\set ECHO errors
+t: TabSeparated
+t: TabSeparatedRaw
+t: TabSeparatedWithNames
+t: TabSeparatedWithNamesAndTypes
+t: TabSeparatedRawWithNames
+t: TabSeparatedRawWithNamesAndTypes
+t: CSV
+t: CSVWithNames
+t: CSVWithNames
+t: CSVWithNamesAndTypes
+t: CustomSeparated
+t: CustomSeparatedWithNames
+t: CustomSeparatedWithNamesAndTypes
+t: Values
+t: JSON
+t: JSONColumns
+t: JSONColumnsWithMetadata
+t: JSONCompact
+t: JSONCompactColumns
+t: JSONEachRow
+psql:test/utils/round-trip-formats.sql:171: ERROR:  invalid input syntax for type json
+DETAIL:  The input string ended unexpectedly.
+CONTEXT:  JSON data, line 1: 
+COPY structures2, line 2, column j: ""
+psql:test/utils/round-trip-formats.sql:171: STATEMENT:  COPY "structures2" FROM 'file:///Users/david/dev/pgxn/pg_chdb/test/structures.tmp' (format 'JSONStringsEachRow');
+f: JSONStringsEachRow
+t: JSONCompactEachRow
+psql:test/utils/round-trip-formats.sql:185: ERROR:  invalid input syntax for type json
+DETAIL:  The input string ended unexpectedly.
+CONTEXT:  JSON data, line 1: 
+COPY structures2, line 2, column j: ""
+psql:test/utils/round-trip-formats.sql:185: STATEMENT:  COPY "structures2" FROM 'file:///Users/david/dev/pgxn/pg_chdb/test/structures.tmp' (format 'JSONCompactStringsEachRow');
+f: JSONCompactStringsEachRow
+t: JSONCompactEachRowWithNames
+t: JSONCompactEachRowWithNamesAndTypes
+psql:test/utils/round-trip-formats.sql:206: ERROR:  invalid input syntax for type json
+DETAIL:  The input string ended unexpectedly.
+CONTEXT:  JSON data, line 1: 
+COPY structures2, line 2, column j: ""
+psql:test/utils/round-trip-formats.sql:206: STATEMENT:  COPY "structures2" FROM 'file:///Users/david/dev/pgxn/pg_chdb/test/structures.tmp' (format 'JSONCompactStringsEachRowWithNames');
+f: JSONCompactStringsEachRowWithNames
+psql:test/utils/round-trip-formats.sql:213: ERROR:  invalid input syntax for type json
+DETAIL:  The input string ended unexpectedly.
+CONTEXT:  JSON data, line 1: 
+COPY structures2, line 2, column j: ""
+psql:test/utils/round-trip-formats.sql:213: STATEMENT:  COPY "structures2" FROM 'file:///Users/david/dev/pgxn/pg_chdb/test/structures.tmp' (format 'JSONCompactStringsEachRowWithNamesAndTypes');
+f: JSONCompactStringsEachRowWithNamesAndTypes
+t: JSONObjectEachRow
+t: TSKV
+t: Native
+t: RowBinary
+t: RowBinaryWithNames
+t: RowBinaryWithNamesAndTypes
+t: Parquet
+t: Arrow
+t: ArrowStream
+t: ORC
+t: Avro
+t: Protobuf
+t: ProtobufList
+t: MsgPack
+t: BSONEachRow
+-- Alas, these formats fail:
+-- JSONStringsEachRow
+-- JSONCompactStringsEachRow
+-- JSONCompactStringsEachRowWithNames
+-- JSONCompactStringsEachRowWithNamesAndTypes
+-- Details:
+-- https://github.com/ClickHouse/ClickHouse/issues/68428#issuecomment-5074490421
+/****************************************************************************/
+-- Structured types as string arrays.
+CREATE TABLE structure_arrays (
+    jp   jsonpath[] NOT NULL,
+    xml  XML[]      NOT NULL,
+    j  JSON[]       NOT NULL,
+    jb JSONB[]      NOT NULL
+);
+INSERT INTO structure_arrays
+VALUES ('{$.x}', '{<html>hi</html>}', '{NULL, "{\"x\": true}"}', '{"{\"y\": false}", NULL}')
+     , ('{$}', '{0}', '{42, 98.6, []}', '{42, 98.6, []}')
+     , ('{$}', '{0}', '{null}', '{null}')
+     , ('{}', '{}', '{}', '{}')
+     , ('{$, NULL}', '{NULL}', '{"[1, \"🖲️\", null]"}', '{"[1, \"🖲️\", null]"}')
+     , ('{$.x.💿[2], $}', '{"<a id=\"🦁\"/>", ""}', '{"true, {\"x\": 1}"}, ''{"true, {\"x\": 1}"}')
+;
+ERROR:  VALUES lists must all be the same length
+LINE 7:      , ('{$.x.💿[2], $}', '{"<a id=\"🦁\"/>", ""}', '{"true,...
+                ^
+-- Execute round-trip to all supported formats.
+CREATE TABLE structure_arrays2 (LIKE structure_arrays INCLUDING ALL);
+\set from_table structure_arrays
+\set to_table structure_arrays2
+\set columns 'jp::text[], xml::text[], j::text[], jb::text[]'
+\i test/utils/round-trip-formats.sql
+\set ECHO errors
+t: TabSeparated
+t: TabSeparatedRaw
+t: TabSeparatedWithNames
+t: TabSeparatedWithNamesAndTypes
+t: TabSeparatedRawWithNames
+t: TabSeparatedRawWithNamesAndTypes
+t: CSV
+t: CSVWithNames
+t: CSVWithNames
+t: CSVWithNamesAndTypes
+t: CustomSeparated
+t: CustomSeparatedWithNames
+t: CustomSeparatedWithNamesAndTypes
+t: Values
+t: JSON
+t: JSONColumns
+t: JSONColumnsWithMetadata
+t: JSONCompact
+t: JSONCompactColumns
+t: JSONEachRow
+t: JSONStringsEachRow
+t: JSONCompactEachRow
+t: JSONCompactStringsEachRow
+t: JSONCompactEachRowWithNames
+t: JSONCompactEachRowWithNamesAndTypes
+t: JSONCompactStringsEachRowWithNames
+t: JSONCompactStringsEachRowWithNamesAndTypes
+t: JSONObjectEachRow
+t: TSKV
+t: Native
+t: RowBinary
+t: RowBinaryWithNames
+t: RowBinaryWithNamesAndTypes
+t: Parquet
+t: Arrow
+t: ArrowStream
+t: ORC
+t: Avro
+t: Protobuf
+t: ProtobufList
+t: MsgPack
+t: BSONEachRow
+\! rm -rf test/structures.tmp

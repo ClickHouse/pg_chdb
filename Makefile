@@ -5,11 +5,12 @@ EXTVERSION   = $(shell grep -m 1 'default_version' chdb.control | \
 DISTVERSION  = $(shell grep -m 1 '^[[:space:]]\{2\}"version":' META.json | \
                sed -e 's/[[:space:]]*"version":[[:space:]]*"\([^"]*\)",\{0,1\}/\1/')
 
+MAX_CONCURRENT_TESTS ?= 8
 DATA         = $(sort $(wildcard sql/$(EXTENSION)--*.sql) sql/$(EXTENSION)--$(EXTVERSION).sql)
 DOCS         = $(wildcard doc/*.md)
 TESTS        ?= $(wildcard test/sql/*.sql)
 REGRESS      = --schedule test/schedule
-REGRESS_OPTS = --inputdir=test --load-extension=$(EXTENSION)
+REGRESS_OPTS = --inputdir=test --load-extension=$(EXTENSION) --max-concurrent-tests $(MAX_CONCURRENT_TESTS)
 MODULE_big   = $(EXTENSION)
 PG_CONFIG   ?= pg_config
 TAP_TESTS   ?= 1
@@ -59,7 +60,7 @@ uninstall: uninstall-bgw
 
 .PHONY: test/schedule # Depends on $(TESTS), so always rebuild.
 test/schedule:
-	@echo "test: $(patsubst test/sql/%.sql,%,$(TESTS))" > $@
+	@perl -E 'say "test: ", join " ", splice @ARGV, 0, $(MAX_CONCURRENT_TESTS) while @ARGV' $(patsubst test/sql/%.sql,%,$(TESTS)) > $@
 
 installcheck: test/schedule
 

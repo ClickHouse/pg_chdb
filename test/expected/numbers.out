@@ -1,0 +1,147 @@
+LOAD 'chdb';
+/****************************************************************************/
+-- Numbers.
+CREATE TABLE numbers (
+    u   UUID           NOT NULL,
+    i2  INT2           NOT NULL,
+    i4  INT4           NOT NULL,
+    i8  INT8               NULL,
+    num numeric            NULL,
+    np  numeric(32)        NULL,
+    nps numeric(12, 6)     NULL,
+    f4  float4         NOT NULL,
+    f8  float8             NULL,
+    b   bool           NOT NULL,
+    o   OID            NOT NULL,
+    o8  OID8           NOT NULL
+);
+INSERT INTO numbers
+VALUES ('00000000-0000-0000-0000-000000000000', 0, 0, 0, 0, 0, 0, 0, 0, false, 0, 0)
+     , ('6ba7b810-9dad-11d1-80b4-00c04fd430c8', 0, 0, NULL, NULL, NULL, NULL, 0, NULL, false, 0, 0)
+     , ('B82601F4-2FF0-4F05-99E4-2CAAC200BA0F', -32768, -2147483648, -9223372036854775808, -987654321.123456789, -987654321, -123456.545675, -1.1, -98.68, false, 0, 0)
+     , ('A411B3DC-76c7-4D5D-92B2-3ab802504f1f', 32767, 2147483647, 9223372036854775807, 987654321.123456789, 987654321, 123456.545675, 1.1, 98.68, true, 0, 0)
+    -- chDB doesn't support NaN or Infinity.
+    --  , ('00000000-0000-0000-0000-000000000000', 42, 42, 42, 'nan', 'nan', 'nan', 'nan', 'nan', true, 0, 0)
+    --  , ('00000000-0000-0000-0000-000000000000', -42, -42, -42, '-infinity', 0, 0, '-infinity', '-infinity', true, 0, 0)
+    --  , ('00000000-0000-0000-0000-000000000000', 42, 42, 42, 'infinity', 0, 0, 'infinity', 'infinity', true, 0, 0)
+;
+-- Execute round-trip to all supported formats.
+-- Protobuf currently fails: https://github.com/chdb-io/chdb-core/issues/152
+CREATE TABLE numbers2 (LIKE numbers INCLUDING ALL);
+\set from_table numbers
+\set to_table numbers2
+\set output_fle numbers.tmp
+\i test/utils/round-trip-formats.sql
+\set ECHO errors
+t: TabSeparated
+t: TabSeparatedRaw
+t: TabSeparatedWithNames
+t: TabSeparatedWithNamesAndTypes
+t: TabSeparatedRawWithNames
+t: TabSeparatedRawWithNamesAndTypes
+t: CSV
+t: CSVWithNames
+t: CSVWithNames
+t: CSVWithNamesAndTypes
+t: CustomSeparated
+t: CustomSeparatedWithNames
+t: CustomSeparatedWithNamesAndTypes
+t: Values
+t: JSON
+t: JSONColumns
+t: JSONColumnsWithMetadata
+t: JSONCompact
+t: JSONCompactColumns
+t: JSONEachRow
+t: JSONStringsEachRow
+t: JSONCompactEachRow
+t: JSONCompactStringsEachRow
+t: JSONCompactEachRowWithNames
+t: JSONCompactEachRowWithNamesAndTypes
+t: JSONCompactStringsEachRowWithNames
+t: JSONCompactStringsEachRowWithNamesAndTypes
+t: JSONObjectEachRow
+t: TSKV
+t: Native
+t: RowBinary
+t: RowBinaryWithNames
+t: RowBinaryWithNamesAndTypes
+t: Parquet
+t: Arrow
+t: ArrowStream
+t: ORC
+t: Avro
+f: Protobuf
+f: ProtobufList
+t: MsgPack
+t: BSONEachRow
+/****************************************************************************/
+-- Number Arrays.
+CREATE TABLE number_arrays (
+    u   UUID[]           NOT NULL,
+    i2  INT2[]           NOT NULL,
+    i4  INT4[]           NOT NULL,
+    i8  INT8[]           NOT NULL,
+    num numeric[]        NOT NULL,
+    np  numeric(32)[]    NOT NULL,
+    nps numeric(12, 6)[] NOT NULL,
+    f4  float4[]         NOT NULL,
+    f8  float8[]         NOT NULL,
+    b   bool[]           NOT NULL,
+    o   OID[]            NOT NULL,
+    o8  OID8[]           NOT NULL
+);
+INSERT INTO number_arrays
+VALUES ('{00000000-0000-0000-0000-000000000000}', '{0}', '{0}', '{0}', '{0}', '{0}', '{0}', '{0}', '{0}', '{false}', '{0}', '{0}')
+     , ('{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}')
+     , ('{6ba7b810-9dad-11d1-80b4-00c04fd430c8, NULL}', '{-32768,32767}', '{-2147483648,2147483647}', '{-9223372036854775808,9223372036854775807}', '{-987654321.123456789,987654321.123456789}', '{-987654321,987654321}', '{-123456.545675,123456.545675}', '{-1.1,1.1}', '{-98.68,98.68}', '{false,true}', '{0, 0}', '{0,0}')
+     , ('{B82601F4-2FF0-4F05-99E4-2CAAC200BA0F, A411B3DC-76c7-4D5D-92B2-3ab802504f1f}', '{0, NULL}', '{NULL, 0}', '{NULL}', '{0, NULL}', '{NULL, 0}', '{NULL}', '{0,NULL}', '{NULL,0}', '{false,NULL}', '{NULL}', '{0,NULL}')
+;
+CREATE TABLE number_arrays2 (LIKE number_arrays INCLUDING ALL);
+\set from_table number_arrays
+\set to_table number_arrays2
+\i test/utils/round-trip-formats.sql
+\set ECHO errors
+t: TabSeparated
+t: TabSeparatedRaw
+t: TabSeparatedWithNames
+t: TabSeparatedWithNamesAndTypes
+t: TabSeparatedRawWithNames
+t: TabSeparatedRawWithNamesAndTypes
+t: CSV
+t: CSVWithNames
+t: CSVWithNames
+t: CSVWithNamesAndTypes
+t: CustomSeparated
+t: CustomSeparatedWithNames
+t: CustomSeparatedWithNamesAndTypes
+t: Values
+t: JSON
+t: JSONColumns
+t: JSONColumnsWithMetadata
+t: JSONCompact
+t: JSONCompactColumns
+t: JSONEachRow
+t: JSONStringsEachRow
+t: JSONCompactEachRow
+t: JSONCompactStringsEachRow
+t: JSONCompactEachRowWithNames
+t: JSONCompactEachRowWithNamesAndTypes
+t: JSONCompactStringsEachRowWithNames
+t: JSONCompactStringsEachRowWithNamesAndTypes
+t: JSONObjectEachRow
+t: TSKV
+t: Native
+t: RowBinary
+t: RowBinaryWithNames
+t: RowBinaryWithNamesAndTypes
+t: Parquet
+t: Arrow
+t: ArrowStream
+t: ORC
+t: Avro
+t: Protobuf
+t: ProtobufList
+t: MsgPack
+t: BSONEachRow
+\! rm -rf test/numbers.tmp

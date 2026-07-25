@@ -65,7 +65,7 @@ static bool StreamingInProgress = false;
 
 /* Returns the ClickHouse type name that corresponds to the `attr` type. */
 static const char*
-chdb_type_for(Form_pg_attribute attr);
+chdb_type_for(chdbCopyContext* ctx, Form_pg_attribute attr);
 
 /* Returns typname, possibly with a typemod. */
 static const char*
@@ -264,9 +264,6 @@ chdb_bgw_main(Datum main_arg) {
     const char* error;
     uint64_t num_rows = 0;
 
-    /* [Complete List of
-     * Formats](https://github.com/chdb-io/chdb/blob/main/refs/clickhouse-formats-settings.md#complete-format-names-table)
-     */
     if (ctx->extra.is_from) {
         /* Start streaming the chDB query. */
         chDBStreamingResult = chdb_stream_query_with_params(
@@ -876,7 +873,7 @@ flush_chdb_data(void) {
 }
 
 static const char*
-chdb_type_for(Form_pg_attribute attr) {
+chdb_type_for(chdbCopyContext* ctx, Form_pg_attribute attr) {
     switch (attr->atttypid) {
     case BOOLOID:
         return "Bool";
@@ -923,6 +920,14 @@ chdb_type_for(Form_pg_attribute attr) {
         // return "JSON";
         return "String";
     case POINTOID:
+        /* Work around https://github.com/ClickHouse/ClickHouse/issues/111917. */
+        if (strlen(ctx->format) >= 4) {
+            char prefix[5];
+            strlcpy(prefix, ctx->format, 4);
+            if (pg_strcasecmp(prefix, "json") == 0) {
+                return "String";
+            }
+        }
         return "Point";
     case LSEGOID:
     case PATHOID:
@@ -943,7 +948,23 @@ chdb_type_for(Form_pg_attribute attr) {
     case DATEOID:
         return "Date32";
     case TIMEOID:
-        /* Don't bother with attr->atttypmod, incompatible syntax. */
+        /*
+         * Sadly, chDB doesn't automatically treat a UUID as a string for
+         * formats that don't provide native UUID support.
+         */
+        return pg_strcasecmp(ctx->format, "Parquet") == 0 ||
+                       pg_strcasecmp(ctx->format, "Arrow") == 0 ||
+                       pg_strcasecmp(ctx->format, "ArrowStream") == 0 ||
+                       pg_strcasecmp(ctx->format, "ORC") == 0 ||
+                       pg_strcasecmp(ctx->format, "Avro") == 0 ||
+                       pg_strcasecmp(ctx->format, "Protobuf") == 0 ||
+                       pg_strcasecmp(ctx->format, "ProtobufList") == 0 ||
+                       pg_strcasecmp(ctx->format, "MsgPack") == 0 ||
+                       pg_strcasecmp(ctx->format, "BSONEachRow") == 0
+                   /* Sadly these formats don't support a string type */
+                   ? "String"
+                   /* Don't bother with attr->atttypmod, incompatible syntax. */
+                   : "Time64(6)";
         return "Time64(6)";
     case TIMETZOID:
         /*
@@ -965,7 +986,8 @@ chdb_type_for(Form_pg_attribute attr) {
         */
         return attr->atttypmod < 1 ? "Decimal256(38)" : format_ch_type("Decimal", attr);
     case UUIDOID:
-        return "UUID";
+        /* Sadly, chDB doesn't automatically treat a UUID as an ORC string. */
+        return pg_strcasecmp(ctx->format, "ORC") == 0 ? "String" : "UUID";
     case OID8OID:
         return "UInt64";
     /*
@@ -1131,7 +1153,7 @@ setup_structure(chdbCopyContext* ctx, Relation rel) {
                 &buf,
                 "%s %s%s",
                 quote_identifier(NameStr(attr->attname)),
-                chdb_type_for(attr),
+                chdb_type_for(ctx, attr),
                 attr->attnotnull ? "" : " NULL"
             );
         }
