@@ -31,14 +31,14 @@ VALUES ('00000000-0000-0000-0000-000000000000', 0, 0, 0, 0, 0, 0, 0, 0, false, 0
      , ('6ba7b810-9dad-11d1-80b4-00c04fd430c8', 0, 0, NULL, NULL, NULL, NULL, 0, NULL, false, 0, 0)
      , ('B82601F4-2FF0-4F05-99E4-2CAAC200BA0F', -32768, -2147483648, -9223372036854775808, -987654321.123456789, -987654321, -123456.545675, -1.1, -98.68, false, 0, 0)
      , ('A411B3DC-76c7-4D5D-92B2-3ab802504f1f', 32767, 2147483647, 9223372036854775807, 987654321.123456789, 987654321, 123456.545675, 1.1, 98.68, true, 0, 0)
-    -- chDB doesn't support NaN or Infinity.
-    --  , ('00000000-0000-0000-0000-000000000000', 42, 42, 42, 'nan', 'nan', 'nan', 'nan', 'nan', true, 0, 0)
-    --  , ('00000000-0000-0000-0000-000000000000', -42, -42, -42, '-infinity', 0, 0, '-infinity', '-infinity', true, 0, 0)
-    --  , ('00000000-0000-0000-0000-000000000000', 42, 42, 42, 'infinity', 0, 0, 'infinity', 'infinity', true, 0, 0)
+     , ('00000000-0000-0000-0000-000000000000', 42, 42, 42, NULL, NULL, NULL, 'nan', 'nan', true, 0, 0)
+     , ('00000000-0000-0000-0000-000000000000', -42, -42, -42, NULL, NULL, NULL, '-infinity', '-infinity', true, 0, 0)
+     , ('00000000-0000-0000-0000-000000000000', 42, 42, 42, NULL, NULL, NULL, 'infinity', 'infinity', true, 0, 0)
 ;
 
--- Execute round-trip to all supported formats.
--- Protobuf currently fails: https://github.com/chdb-io/chdb-core/issues/152
+-- Execute round-trip to all supported formats. Protobuf reads a Nullable
+-- field holding zero back as NULL, so the zeroed int8 and float8 do not
+-- survive: https://github.com/chdb-io/chdb-core/issues/152
 CREATE TABLE numbers2 (LIKE numbers INCLUDING ALL);
 \set from_table numbers
 \set to_table numbers2
@@ -69,6 +69,8 @@ VALUES ('{00000000-0000-0000-0000-000000000000}', '{0}', '{0}', '{0}', '{0}', '{
      , ('{B82601F4-2FF0-4F05-99E4-2CAAC200BA0F, A411B3DC-76c7-4D5D-92B2-3ab802504f1f}', '{0, NULL}', '{NULL, 0}', '{NULL}', '{0, NULL}', '{NULL, 0}', '{NULL}', '{0,NULL}', '{NULL,0}', '{false,NULL}', '{NULL}', '{0,NULL}')
 ;
 
+-- Execute round-trip to all supported formats. Protobuf has no null in a
+-- repeated field, so the arrays carrying one come back short.
 CREATE TABLE number_arrays2 (LIKE number_arrays INCLUDING ALL);
 \set from_table number_arrays
 \set to_table number_arrays2

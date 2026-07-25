@@ -6,6 +6,14 @@ DISTVERSION  = $(shell grep -m 1 '^[[:space:]]\{2\}"version":' META.json | \
                sed -e 's/[[:space:]]*"version":[[:space:]]*"\([^"]*\)",\{0,1\}/\1/')
 
 MAX_CONCURRENT_TESTS ?= 6
+
+# Header-only dependencies, vendored as submodules. Absolute so the recursive
+# make in src/bgw resolves them. clickhouse-c comes from pg-clickhouse-c's own
+# pin, its signatures naming clickhouse-c types, so a second checkout on the
+# include path would silently win.
+PGCH_DIR     = $(CURDIR)/vendor/pg-clickhouse-c
+CH_C_DIR     = $(PGCH_DIR)/clickhouse-c
+
 DATA         = $(sort $(wildcard sql/$(EXTENSION)--*.sql) sql/$(EXTENSION)--$(EXTVERSION).sql)
 DOCS         = $(wildcard doc/*.md)
 TESTS        ?= $(wildcard test/sql/*.sql)
@@ -47,8 +55,12 @@ src/version.h: META.json
 	@printf '#define PGCHCB_VERSION "%s"\n' "$(DISTVERSION)" > $@
 
 # Background worker.
-src/bgw/chdb_bgw$(DLSUFFIX): $(wildcard src/bgw/*.c)
-	@$(MAKE) -C $(dir $@) all -j $$(nproc)
+src/bgw/chdb_bgw$(DLSUFFIX): $(wildcard src/bgw/*.c src/bgw/*.h) $(wildcard $(PGCH_DIR)/*.h $(CH_C_DIR)/*.h)
+	@$(MAKE) -C $(dir $@) all -j $$(nproc) CH_C_DIR=$(CH_C_DIR) PGCH_DIR=$(PGCH_DIR)
+
+# Fail with something more useful than a missing include.
+$(CH_C_DIR)/clickhouse.h:
+	@echo "$@ missing; run: git submodule update --init --recursive" >&2; exit 1
 
 # Install the chdb_bgw library.
 install-bgw: src/bgw/chdb_bgw$(DLSUFFIX)

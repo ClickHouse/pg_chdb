@@ -16,7 +16,9 @@ VALUES ('      ', '            ', ' ', '        ')
      , ('😃 🐨 🎱', '是无效的命令', '否', '未定义的参数')
 ;
 
--- Execute round-trip to all supported formats.
+-- Execute round-trip to all supported formats. Protobuf reads a Nullable
+-- field holding the empty string back as NULL, so the blank bpchar(8) does
+-- not survive: https://github.com/chdb-io/chdb-core/issues/152
 CREATE TABLE fixies2 (LIKE fixies INCLUDING ALL);
 \set output_file fixies.tmp
 \set from_table fixies
@@ -39,7 +41,8 @@ VALUES ('{"      "}', '{"            "}', '{" "}', '{"        "}')
      , ('{"Bøwie", "\"GO\""}', '{否,模板}', '{x,y,z,NULL}', '{"ALL CAPS"}')
 ;
 
--- Execute round-trip to all supported formats.
+-- Execute round-trip to all supported formats. Protobuf has no null in a
+-- repeated field, so the arrays carrying one come back short.
 CREATE TABLE fixie_arrays2 (LIKE fixie_arrays INCLUDING ALL);
 \set from_table fixie_arrays
 \set to_table fixie_arrays2

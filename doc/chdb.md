@@ -303,49 +303,62 @@ extension automatically maps Postgres types to reasonable chDB equivalents.
 When they don't match your use case, specify the [structure](#structure) to
 get the types you need.
 
-| Postgres    | chDB          | Notes                                                                  |
-| ----------- | ------------- | ---------------------------------------------------------------------- |
-| boolean     | Bool          |                                                                        |
-| name        | String        |                                                                        |
-| text        | String        |                                                                        |
-| inet        | String        | Override with `IPv4` or `IPv6` if data contains only one or the other. |
-| cidr        | String        |                                                                        |
-| macaddr     | String        |                                                                        |
-| macaddr8    | String        |                                                                        |
-| interval    | String        |                                                                        |
-| tsvector    | String        |                                                                        |
-| tsquery     | String        |                                                                        |
-| jsonpath    | String        |                                                                        |
-| money       | String        |                                                                        |
-| circle      | String        |                                                                        |
-| enum        | String        |                                                                        |
-| line        | String        |                                                                        |
-| varchar     | String        |                                                                        |
-| varbit      | String        |                                                                        |
-| char        | FixedString   |                                                                        |
-| bit         | FixedString   |                                                                        |
-| bpchar      | String        |                                                                        |
-| int2        | Int16         |                                                                        |
-| int4        | Int32         |                                                                        |
-| int8        | Int64         |                                                                        |
-| oid         | UInt32        |                                                                        |
-| oid8        | UInt64        |                                                                        |
-| json        | String        | Override with `JSON` if data contains only objects.                    |
-| jsonb       | String        | Override with `JSON` if data contains only objects.                    |
-| point       | String        |                                                                        |
-| lseg        | String        |                                                                        |
-| path        | String        |                                                                        |
-| box         | String        |                                                                        |
-| polygon     | String        |                                                                        |
-| float4      | Float32       |                                                                        |
-| float8      | Float64       |                                                                        |
-| date        | Date32        |                                                                        |
-| time        | Time64(6)     | Override with `String` for formats that don't support dates.           |
-| timetz      | String        |                                                                        |
-| timestamp   | DateTime64(6) |                                                                        |
-| timestamptz | DateTime64(6) |                                                                        |
-| numeric     | Decimal       |                                                                        |
-| uuid        | UUID          |                                                                        |
+| Postgres    | chDB                                     | Notes                                                                  |
+| ----------- | ---------------------------------------- | ---------------------------------------------------------------------- |
+| boolean     | Bool                                     |                                                                        |
+| name        | String                                   |                                                                        |
+| text        | String                                   |                                                                        |
+| inet        | String                                   | Override with `IPv4` or `IPv6` if data contains only one or the other. |
+| cidr        | String                                   |                                                                        |
+| macaddr     | String                                   |                                                                        |
+| macaddr8    | String                                   |                                                                        |
+| interval    | String                                   |                                                                        |
+| tsvector    | String                                   |                                                                        |
+| tsquery     | String                                   |                                                                        |
+| jsonpath    | String                                   |                                                                        |
+| money       | String                                   |                                                                        |
+| enum        | String                                   |                                                                        |
+| varchar     | String                                   |                                                                        |
+| varbit      | String                                   |                                                                        |
+| char        | FixedString                              |                                                                        |
+| bit         | FixedString                              |                                                                        |
+| bpchar      | String                                   |                                                                        |
+| int2        | Int16                                    |                                                                        |
+| int4        | Int32                                    |                                                                        |
+| int8        | Int64                                    |                                                                        |
+| oid         | UInt32                                   |                                                                        |
+| oid8        | UInt64                                   |                                                                        |
+| json        | String                                   | Override with `JSON` if data contains only objects.                    |
+| jsonb       | String                                   | Override with `JSON` if data contains only objects.                    |
+| float4      | Float32                                  |                                                                        |
+| float8      | Float64                                  |                                                                        |
+| date        | Date32                                   |                                                                        |
+| time        | Time64(6)                                | Override with `String` for formats that don't support dates.           |
+| timetz      | String                                   |                                                                        |
+| timestamp   | DateTime64(6)                            | Declared with the `UTC` time zone; values cross as UTC instants.       |
+| timestamptz | DateTime64(6)                            | Declared with the `UTC` time zone; values cross as UTC instants.       |
+| numeric     | Decimal                                  |                                                                        |
+| uuid        | UUID                                     |                                                                        |
+| point       | `Point`                                  | Same two coordinates as Postgres.                                     |
+| lseg        | `LineString`                             | A line of exactly two points.                                         |
+| path        | `LineString`                             | A closed path repeats its first point.                                |
+| polygon     | `Ring`                                   | A ring closes implicitly, as a polygon does.                          |
+| box         | `Tuple(high Point, low Point)`           | The two corners, sorted as Postgres sorts.                            |
+| circle      | `Tuple(center Point, radius Float64)`    |                                                                        |
+| line        | `Tuple(a Float64, b Float64, c Float64)` | The equation `Ax + By + C = 0`.                                       |
+
+Array types map to `Array` of the mapped element type. ClickHouse constrains
+nullability per column while Postgres constrains it per array, so elements are
+always `Nullable`.
+
+#### Conversion Loss
+
+*   NULL array comes back as an empty array. ClickHouse has no NULL array, so
+    `COPY TO` stores `[]` for a NULL and `COPY FROM` reads `{}` back.
+*   NULL `lseg`, `path` or `polygon` comes back empty for similar reasons, as
+    they're represented as arrays in ClickHouse.
+*   Open `path` whose last point equals its first comes back closed, closed
+    being what a repeated first point means.
 
 ## Versioning Policy
 

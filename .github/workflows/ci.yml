@@ -21,6 +21,7 @@ jobs:
     steps:
       - name: Checkout the Repository
         uses: actions/checkout@v7
+        with: { submodules: recursive }
       - name: Start Postgres ${{ matrix.pg }}
         uses: ./.github/actions/setup-pg
         with:

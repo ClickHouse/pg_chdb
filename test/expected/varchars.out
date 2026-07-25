@@ -28,7 +28,6 @@ t: TabSeparatedRawWithNames
 t: TabSeparatedRawWithNamesAndTypes
 t: CSV
 t: CSVWithNames
-t: CSVWithNames
 t: CSVWithNamesAndTypes
 t: CustomSeparated
 t: CustomSeparatedWithNames
@@ -76,6 +75,8 @@ VALUES ('{}', '{}', '{}', '{}')
      , ('{hi there, NULL}', '{NULL, hi you}', '{NULL, 0, 1}', '{0101, 0011}')
      , ('{😃 🐨 🎱}', '{是无效的命令}', '{1, NULL}', '{1100}')
 ;
+-- Execute round-trip to all supported formats. Protobuf has no null in a
+-- repeated field, so the arrays carrying one come back short.
 CREATE TABLE varchar_arrays2 (LIKE varchar_arrays INCLUDING ALL);
 \set from_table varchar_arrays
 \set to_table varchar_arrays2
@@ -88,7 +89,6 @@ t: TabSeparatedWithNamesAndTypes
 t: TabSeparatedRawWithNames
 t: TabSeparatedRawWithNamesAndTypes
 t: CSV
-t: CSVWithNames
 t: CSVWithNames
 t: CSVWithNamesAndTypes
 t: CustomSeparated
@@ -119,8 +119,8 @@ t: Arrow
 t: ArrowStream
 t: ORC
 t: Avro
-t: Protobuf
-t: ProtobufList
+f: Protobuf
+f: ProtobufList
 t: MsgPack
 t: BSONEachRow
 \set ECHO errors

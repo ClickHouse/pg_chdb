@@ -37,7 +37,8 @@ VALUES ('{1.2.6.4/16}', '{121.111.63.82}', '{22:00:5c:08:55:08}', '{08:00:2b:01:
      , ('{::4:3:2:0/24, 126::1}', '{1.2.6.4, 126::1}', '{01:02:03:04:05:06, 02:03:04:05:06:07}', '{00:01:03:86:1c:ba, 08002b-010203}')
 ;
 
--- Execute round-trip to all supported formats.
+-- Execute round-trip to all supported formats. Protobuf has no null in a
+-- repeated field, so the arrays carrying one come back short.
 CREATE TABLE net_arrays2 (LIKE net_arrays INCLUDING ALL);
 \set from_table net_arrays
 \set to_table net_arrays2

@@ -34,7 +34,8 @@ VALUES ('{1}', '{111}', '{111111}')
      , ('{0,1,NULL}', '{000,001,111,110}', '{000000,111001,101010}')
 ;
 
--- Execute round-trip to all supported formats.
+-- Execute round-trip to all supported formats. Protobuf has no null in a
+-- repeated field, so the arrays carrying one come back short.
 CREATE TABLE bit_arrays2 (LIKE bit_arrays INCLUDING ALL);
 \set from_table bit_arrays
 \set to_table bit_arrays2

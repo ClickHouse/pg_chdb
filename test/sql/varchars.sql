@@ -39,6 +39,8 @@ VALUES ('{}', '{}', '{}', '{}')
      , ('{😃 🐨 🎱}', '{是无效的命令}', '{1, NULL}', '{1100}')
 ;
 
+-- Execute round-trip to all supported formats. Protobuf has no null in a
+-- repeated field, so the arrays carrying one come back short.
 CREATE TABLE varchar_arrays2 (LIKE varchar_arrays INCLUDING ALL);
 \set from_table varchar_arrays
 \set to_table varchar_arrays2

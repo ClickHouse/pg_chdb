@@ -44,8 +44,7 @@ NUMBERS: {
         qq{COPY numbers FROM 'file://$dir/nonesuch.csv'},
         qr/nonesuch.csv doesn't exist/,
         qr[\QSELECT * FROM file],
-        qr[\Q structure: "i2 Int16, i4 Int32, i8 Int64 NULL, num Decimal256(38) NULL, np Decimal(32,0) NULL, nps Decimal(12,6) NULL, f4 Float32, f8 Float64 NULL, b Bool, o UInt32, o8 $uint64" }],
-        # qr[\Q structure: "i2 Int16, i4 Int32, i8 Int64 NULL, num Decimal256(38) NULL, np Decimal(32,0) NULL, nps Decimal(12,6) NULL, f4 Float32, f8 Float64 NULL, b Bool, o UInt32, o8 UInt64" }],
+        qr[\Q structure: "i2 Int16, i4 Int32, i8 Nullable(Int64), num Nullable(Decimal256(38)), np Nullable(Decimal(32,0)), nps Nullable(Decimal(12,6)), f4 Float32, f8 Nullable(Float64), b Bool, o UInt32, o8 $uint64" }],
     );
 
     $node->psql(postgres => qq{
@@ -68,8 +67,7 @@ NUMBERS: {
         qq{COPY number_arrays FROM 'file://$dir/nonesuch.csv'},
         qr/nonesuch.csv doesn't exist/,
         qr[\QSELECT * FROM file],
-        qr[\Q structure: "i2 String, i4 String, i8 String, num String, np String, nps String, f4 String, f8 String, b String, o String, o8 String" }],
-        # qr[\Q structure: "i2 Array(Int16), i4 Array(Int32), i8 Array(Int64), num Array(Decimal256(38)), np Array(Decimal(32,0)), nps Array(Decimal(12,6)), f4 Array(Float32), f8 Array(Float64), b Array(Bool), o Array(UInt32), o8 Array(UInt64)" }],
+        qr[\Q structure: "i2 Array(Nullable(Int16)), i4 Array(Nullable(Int32)), i8 Array(Nullable(Int64)), num Array(Nullable(Decimal256(38))), np Array(Nullable(Decimal(32,0))), nps Array(Nullable(Decimal(12,6))), f4 Array(Nullable(Float32)), f8 Array(Nullable(Float64)), b Array(Nullable(Bool)), o Array(Nullable(UInt32)), o8 Array(Nullable($uint64))" }],
     );
 }
 
@@ -86,7 +84,7 @@ STRINGS: {
         qq{COPY strings FROM 'file://$dir/nonesuch.csv'},
         qr/nonesuch.csv doesn't exist/,
         qr[\QSELECT * FROM file],
-        qr[\Q structure: "t String, ba String, n String NULL" }],
+        qr[\Q structure: "t String, ba String, n Nullable(String)" }],
     );
 
     $node->psql(postgres => q{
@@ -101,8 +99,7 @@ STRINGS: {
         qq{COPY string_arrays FROM 'file://$dir/nonesuch.csv'},
         qr/nonesuch.csv doesn't exist/,
         qr[\QSELECT * FROM file],
-        qr[\Q structure: "t String, ba String, n String" }],
-        # qr[\Q structure: "t Array(String), ba Array(String), n Array(String)" }],
+        qr[\Q structure: "t Array(Nullable(String)), ba Array(Nullable(String)), n Array(Nullable(String))" }],
     );
 }
 
@@ -120,8 +117,7 @@ FIXIES: {
         qq{COPY fixies FROM 'file://$dir/nonesuch.csv'},
         qr/nonesuch.csv doesn't exist/,
         qr[\QSELECT * FROM file],
-        qr[\Q structure: "cr String(6), ch String(12), bp String, pbn String(8)" }],
-        # qr[\Q structure: "cr FixedString(6), ch FixedString(12), bp String, pbn FixedString(8)" }],
+        qr[\Q structure: "cr String, ch String, bp String, pbn String" }],
     );
 
     $node->psql(postgres => q{
@@ -137,8 +133,7 @@ FIXIES: {
         qq{COPY fixie_arrays FROM 'file://$dir/nonesuch.csv'},
         qr/nonesuch.csv doesn't exist/,
         qr[\QSELECT * FROM file],
-        qr[\Q structure: "cr String, ch String, bp String, pbn String" }],
-        # qr[\Q structure: "cr Array(FixedString(6)), ch Array(FixedString(12)), bp Array(String), pbn Array(FixedString(8))" }],
+        qr[\Q structure: "cr Array(Nullable(String)), ch Array(Nullable(String)), bp Array(Nullable(String)), pbn Array(Nullable(String))" }],
     );
 }
 
@@ -151,7 +146,6 @@ AS_STRINGS: {
             jp   jsonpath NOT NULL,
             mon  money    NOT NULL,
             xml  XML      NOT NULL,
-            cir  circle   NOT NULL,
             na   int[]       NULL
         )
     });
@@ -160,7 +154,7 @@ AS_STRINGS: {
         qq{COPY non_strings FROM 'file://$dir/nonesuch.csv'},
         qr/nonesuch.csv doesn't exist/,
         qr[\QSELECT * FROM file],
-        qr[\Q structure: "ival String, tsv String, tsq String, jp String, mon String, xml String, cir String, na String" }],
+        qr[\Q structure: "ival String, tsv String, tsq String, jp String, mon String, xml String, na Array(Nullable(Int32))" }],
     );
 
     $node->psql(postgres => q{
@@ -171,7 +165,6 @@ AS_STRINGS: {
             jp   jsonpath[] NOT NULL,
             mon  money[]    NOT NULL,
             xml  XML[]      NOT NULL,
-            cir  circle[]   NOT NULL,
             na   int[]          NULL
         )
     });
@@ -180,8 +173,7 @@ AS_STRINGS: {
         qq{COPY non_string_arrays FROM 'file://$dir/nonesuch.csv'},
         qr/nonesuch.csv doesn't exist/,
         qr[\QSELECT * FROM file],
-        qr[\Q structure: "ival String, tsv String, tsq String, jp String, mon String, xml String, cir String, na String" }],
-        # qr[\Q structure: "ival Array(String), tsv Array(String), tsq Array(String), jp Array(String), mon Array(String), xml Array(String), cir Array(String), na String" }],
+        qr[\Q structure: "ival Array(Nullable(String)), tsv Array(Nullable(String)), tsq Array(Nullable(String)), jp Array(Nullable(String)), mon Array(Nullable(String)), xml Array(Nullable(String)), na Array(Nullable(Int32))" }],
     );
 }
 
@@ -199,7 +191,7 @@ VARCHAR: {
         qq{COPY varchars FROM 'file://$dir/nonesuch.csv'},
         qr/nonesuch.csv doesn't exist/,
         qr[\QSELECT * FROM file],
-        qr[\Q structure: "vc String, vcn String(8), bc String, bcn String(4)" }],
+        qr[\Q structure: "vc String, vcn String, bc String, bcn String" }],
     );
 
     $node->psql(postgres => q{
@@ -215,8 +207,7 @@ VARCHAR: {
         qq{COPY varchar_arrays FROM 'file://$dir/nonesuch.csv'},
         qr/nonesuch.csv doesn't exist/,
         qr[\QSELECT * FROM file],
-        qr[\Q structure: "vc String, vcn String, bc String, bcn String" }],
-        # qr[\Q structure: "vc Array(String), vcn Array(String(8)), bc Array(String), bcn Array(String(4))" }],
+        qr[\Q structure: "vc Array(Nullable(String)), vcn Array(Nullable(String)), bc Array(Nullable(String)), bcn Array(Nullable(String))" }],
     );
 }
 
@@ -233,7 +224,7 @@ JSON_UUID: {
         qq{COPY json_uuid FROM 'file://$dir/nonesuch.csv'},
         qr/nonesuch.csv doesn't exist/,
         qr[\QSELECT * FROM file],
-        qr[\Q structure: "u UUID, j String, jb String NULL" }],
+        qr[\Q structure: "u UUID, j String, jb Nullable(String)" }],
     );
 
     $node->psql(postgres => q{
@@ -248,8 +239,7 @@ JSON_UUID: {
         qq{COPY json_uuid_arrays FROM 'file://$dir/nonesuch.csv'},
         qr/nonesuch.csv doesn't exist/,
         qr[\QSELECT * FROM file],
-        qr[\Q structure: "u String, j String, jb String" }],
-        # qr[\Q structure: "u Array(UUID), j Array(JSON), jb Array(JSON)" }],
+        qr[\Q structure: "u Array(Nullable(UUID)), j Array(Nullable(String)), jb Array(Nullable(String))" }],
     );
 }
 
@@ -270,7 +260,7 @@ GEO: {
         qq{COPY geos FROM 'file://$dir/nonesuch.csv'},
         qr/nonesuch.csv doesn't exist/,
         qr[\QSELECT * FROM file],
-        qr[\Q structure: "p Point, line String, lseg String, box String, path String, poly String, cir String" }],
+        qr[\Q structure: "p Point, line Tuple(a Float64, b Float64, c Float64), lseg LineString, box Tuple(high Point, low Point), path LineString, poly Ring, cir Tuple(center Point, radius Float64)" }],
     );
 
     $node->psql(postgres => q{
@@ -289,8 +279,7 @@ GEO: {
         qq{COPY geo_arrays FROM 'file://$dir/nonesuch.csv'},
         qr/nonesuch.csv doesn't exist/,
         qr[\QSELECT * FROM file],
-        qr[\Q structure: "p String, line String, lseg String, box String, path String, poly String, cir String" }],
-        # qr[\Q structure: "p Array(Point), line Array(String), lseg Array(LineString), box Array(Polygon), path Array(LineString), poly Array(Polygon), cir Array(String)" }],
+        qr[\Q structure: "p Array(Nullable(Point)), line Array(Nullable(Tuple(a Float64, b Float64, c Float64))), lseg Array(LineString), box Array(Nullable(Tuple(high Point, low Point))), path Array(LineString), poly Array(Ring), cir Array(Nullable(Tuple(center Point, radius Float64)))" }],
     );
 }
 
@@ -314,7 +303,7 @@ DATETIME: {
         qq{COPY datetime FROM 'file://$dir/nonesuch.csv'},
         qr/nonesuch.csv doesn't exist/,
         qr[\QSELECT * FROM file],
-        qr[\Q structure: "ts String NULL, tsn String NULL, tstz DateTime64(6, 'UTC'), tstzn DateTime64(6, 'UTC'), date Date32, "time" Time64(6), timen Time64(6), ttz String, ttzn String, ival String" }],
+        qr[\Q structure: "ts Nullable(DateTime64(6, 'UTC')), tsn Nullable(DateTime64(6, 'UTC')), tstz DateTime64(6, 'UTC'), tstzn DateTime64(6, 'UTC'), date Date32, time Time64(6), timen Time64(6), ttz String, ttzn String, ival String" }],
     );
 
     $node->psql(postgres => q{
@@ -336,8 +325,7 @@ DATETIME: {
         qq{COPY datetime_arrays FROM 'file://$dir/nonesuch.csv'},
         qr/nonesuch.csv doesn't exist/,
         qr[\QSELECT * FROM file],
-        qr[\Q structure: "ts String, tsn String, tstz String, tstzn String, date String, "time" String, timen String, ttz String, ttzn String, ival String" }],
-        # qr[\Q structure: "ts Array(String), tsn Array(String), tstz Array(DateTime64(6, 'UTC')), tstzn Array(DateTime64(6, 'UTC')), date Array(Date32), "time" Array(Time64(6)), timen Array(Time64(6)), ttz Array(Time64(6)), ttzn Array(Time64(6)), ival Array(String)" }],
+        qr[\Q structure: "ts Array(Nullable(DateTime64(6, 'UTC'))), tsn Array(Nullable(DateTime64(6, 'UTC'))), tstz Array(Nullable(DateTime64(6, 'UTC'))), tstzn Array(Nullable(DateTime64(6, 'UTC'))), date Array(Nullable(Date32)), time Array(Nullable(Time64(6))), timen Array(Nullable(Time64(6))), ttz Array(Nullable(String)), ttzn Array(Nullable(String)), ival Array(Nullable(String))" }],
     );
 }
 
@@ -374,8 +362,7 @@ ENUMS: {
         qq{COPY enum_arrays FROM 'file://$dir/nonesuch.csv'},
         qr/nonesuch.csv doesn't exist/,
         qr[\QSELECT * FROM file],
-        qr[\Q structure: "mood String, dow String" }],
-        # qr[\Q structure: "mood Array(String), dow Array(String)" }],
+        qr[\Q structure: "mood Array(Nullable(String)), dow Array(Nullable(String))" }],
     );
 }
 
@@ -409,8 +396,7 @@ NETS: {
         qq{COPY net_arrays FROM 'file://$dir/nonesuch.csv'},
         qr/nonesuch.csv doesn't exist/,
         qr[\QSELECT * FROM file],
-        qr[\Q structure: "inet String, cidr String, mac String, mac8 String" }],
-        # qr[\Q structure: "inet Array(String), cidr Array(String), mac Array(String), mac8 Array(String)" }],
+        qr[\Q structure: "inet Array(Nullable(String)), cidr Array(Nullable(String)), mac Array(Nullable(String)), mac8 Array(Nullable(String))" }],
     );
 }
 
@@ -427,7 +413,7 @@ BITS: {
         qq{COPY bits FROM 'file://$dir/nonesuch.csv'},
         qr/nonesuch.csv doesn't exist/,
         qr[\QSELECT * FROM file],
-        qr[\Q structure: "b FixedString(1), bn FixedString(3), vb String(6)" }],
+        qr[\Q structure: "b String, bn String, vb String" }],
     );
 
     $node->psql(postgres => q{
@@ -443,8 +429,7 @@ BITS: {
         qq{COPY bit_arrays FROM 'file://$dir/nonesuch.csv'},
         qr/nonesuch.csv doesn't exist/,
         qr[\QSELECT * FROM file],
-        qr[\Q structure: "b String, bn String, vb String" }],
-        # qr[\Q structure: "b Array(FixedString(1)), bn Array(FixedString(3)), vb Array(String(6))" }],
+        qr[\Q structure: "b Array(Nullable(String)), bn Array(Nullable(String)), vb Array(Nullable(String))" }],
     );
 }
 
@@ -461,7 +446,7 @@ NAMING: {
         qq{COPY "Namings" FROM 'file://$dir/nonesuch.csv'},
         qr/nonesuch.csv doesn't exist/,
         qr[\QSELECT * FROM file],
-        qr[\Q structure: ""ID" Int32, "Full Name" String" }],
+        qr[\Q structure: "ID Int32, "Full Name" String" }],
     );
 }
 

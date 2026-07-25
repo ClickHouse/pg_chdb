@@ -6,6 +6,9 @@
 -- output, listed here:
 --
 -- https://github.com/chdb-io/chdb/blob/main/refs/clickhouse-formats-settings.md#complete-format-names-table)
+--
+-- The `f` lines name the formats whose round trip does not return the rows it
+-- was given. Each one has a comment in the calling test naming the reason.
 
 \set test_url file:///tmp/ :output_file
 \pset tuples_only on
@@ -17,6 +20,8 @@
 \set columns *
 \endif
 
+TRUNCATE :"to_table";
+COPY :"to_table" TO :'test_url' (format 'TabSeparated');
 COPY :"from_table" TO :'test_url' (format 'TabSeparated');
 COPY :"to_table" FROM :'test_url' (format 'TabSeparated');
 WITH x AS (
@@ -24,6 +29,7 @@ WITH x AS (
 ) SELECT COUNT(*) = 0, 'TabSeparated' FROM x;
 
 TRUNCATE :"to_table";
+COPY :"to_table" TO :'test_url' (format 'TabSeparated');
 COPY :"from_table" TO :'test_url' (format 'TabSeparatedRaw');
 COPY :"to_table" FROM :'test_url' (format 'TabSeparatedRaw');
 WITH x AS (
@@ -31,6 +37,7 @@ WITH x AS (
 ) SELECT COUNT(*) = 0, 'TabSeparatedRaw' FROM x;
 
 TRUNCATE :"to_table";
+COPY :"to_table" TO :'test_url' (format 'TabSeparated');
 COPY :"from_table" TO :'test_url' (format 'TabSeparatedWithNames');
 COPY :"to_table" FROM :'test_url' (format 'TabSeparatedWithNames');
 WITH x AS (
@@ -38,6 +45,7 @@ WITH x AS (
 ) SELECT COUNT(*) = 0, 'TabSeparatedWithNames' FROM x;
 
 TRUNCATE :"to_table";
+COPY :"to_table" TO :'test_url' (format 'TabSeparated');
 COPY :"from_table" TO :'test_url' (format 'TabSeparatedWithNamesAndTypes');
 COPY :"to_table" FROM :'test_url' (format 'TabSeparatedWithNamesAndTypes');
 WITH x AS (
@@ -45,6 +53,7 @@ WITH x AS (
 ) SELECT COUNT(*) = 0, 'TabSeparatedWithNamesAndTypes' FROM x;
 
 TRUNCATE :"to_table";
+COPY :"to_table" TO :'test_url' (format 'TabSeparated');
 COPY :"from_table" TO :'test_url' (format 'TabSeparatedRawWithNames');
 COPY :"to_table" FROM :'test_url' (format 'TabSeparatedRawWithNames');
 WITH x AS (
@@ -52,6 +61,7 @@ WITH x AS (
 ) SELECT COUNT(*) = 0, 'TabSeparatedRawWithNames' FROM x;
 
 TRUNCATE :"to_table";
+COPY :"to_table" TO :'test_url' (format 'TabSeparated');
 COPY :"from_table" TO :'test_url' (format 'TabSeparatedRawWithNamesAndTypes');
 COPY :"to_table" FROM :'test_url' (format 'TabSeparatedRawWithNamesAndTypes');
 WITH x AS (
@@ -59,6 +69,7 @@ WITH x AS (
 ) SELECT COUNT(*) = 0, 'TabSeparatedRawWithNamesAndTypes' FROM x;
 
 TRUNCATE :"to_table";
+COPY :"to_table" TO :'test_url' (format 'TabSeparated');
 COPY :"from_table" TO :'test_url' (format 'CSV');
 COPY :"to_table" FROM :'test_url' (format 'CSV');
 WITH x AS (
@@ -66,6 +77,7 @@ WITH x AS (
 ) SELECT COUNT(*) = 0, 'CSV' FROM x;
 
 TRUNCATE :"to_table";
+COPY :"to_table" TO :'test_url' (format 'TabSeparated');
 COPY :"from_table" TO :'test_url' (format 'CSVWithNames');
 COPY :"to_table" FROM :'test_url' (format 'CSVWithNames');
 WITH x AS (
@@ -73,13 +85,7 @@ WITH x AS (
 ) SELECT COUNT(*) = 0, 'CSVWithNames' FROM x;
 
 TRUNCATE :"to_table";
-COPY :"from_table" TO :'test_url' (format 'CSVWithNames');
-COPY :"to_table" FROM :'test_url' (format 'CSVWithNames');
-WITH x AS (
-    SELECT :columns FROM :"from_table" EXCEPT ALL SELECT :columns FROM :"to_table"
-) SELECT COUNT(*) = 0, 'CSVWithNames' FROM x;
-
-TRUNCATE :"to_table";
+COPY :"to_table" TO :'test_url' (format 'TabSeparated');
 COPY :"from_table" TO :'test_url' (format 'CSVWithNamesAndTypes');
 COPY :"to_table" FROM :'test_url' (format 'CSVWithNamesAndTypes');
 WITH x AS (
@@ -87,6 +93,7 @@ WITH x AS (
 ) SELECT COUNT(*) = 0, 'CSVWithNamesAndTypes' FROM x;
 
 TRUNCATE :"to_table";
+COPY :"to_table" TO :'test_url' (format 'TabSeparated');
 COPY :"from_table" TO :'test_url' (format 'CustomSeparated');
 COPY :"to_table" FROM :'test_url' (format 'CustomSeparated');
 WITH x AS (
@@ -94,6 +101,7 @@ WITH x AS (
 ) SELECT COUNT(*) = 0, 'CustomSeparated' FROM x;
 
 TRUNCATE :"to_table";
+COPY :"to_table" TO :'test_url' (format 'TabSeparated');
 COPY :"from_table" TO :'test_url' (format 'CustomSeparatedWithNames');
 COPY :"to_table" FROM :'test_url' (format 'CustomSeparatedWithNames');
 WITH x AS (
@@ -101,6 +109,7 @@ WITH x AS (
 ) SELECT COUNT(*) = 0, 'CustomSeparatedWithNames' FROM x;
 
 TRUNCATE :"to_table";
+COPY :"to_table" TO :'test_url' (format 'TabSeparated');
 COPY :"from_table" TO :'test_url' (format 'CustomSeparatedWithNamesAndTypes');
 COPY :"to_table" FROM :'test_url' (format 'CustomSeparatedWithNamesAndTypes');
 WITH x AS (
@@ -108,6 +117,7 @@ WITH x AS (
 ) SELECT COUNT(*) = 0, 'CustomSeparatedWithNamesAndTypes' FROM x;
 
 TRUNCATE :"to_table";
+COPY :"to_table" TO :'test_url' (format 'TabSeparated');
 COPY :"from_table" TO :'test_url' (format 'Values');
 COPY :"to_table" FROM :'test_url' (format 'Values');
 WITH x AS (
@@ -115,6 +125,7 @@ WITH x AS (
 ) SELECT COUNT(*) = 0, 'Values' FROM x;
 
 TRUNCATE :"to_table";
+COPY :"to_table" TO :'test_url' (format 'TabSeparated');
 COPY :"from_table" TO :'test_url' (format 'JSON');
 COPY :"to_table" FROM :'test_url' (format 'JSON');
 WITH x AS (
@@ -123,6 +134,7 @@ WITH x AS (
 
 /* ERROR: Format JSONStrings is not suitable for input
 TRUNCATE :"to_table";
+COPY :"to_table" TO :'test_url' (format 'TabSeparated');
 COPY :"from_table" TO :'test_url' (format 'JSONStrings');
 COPY :"to_table" FROM :'test_url' (format 'JSONStrings');
 WITH x AS (
@@ -131,6 +143,7 @@ WITH x AS (
 */
 
 TRUNCATE :"to_table";
+COPY :"to_table" TO :'test_url' (format 'TabSeparated');
 COPY :"from_table" TO :'test_url' (format 'JSONColumns');
 COPY :"to_table" FROM :'test_url' (format 'JSONColumns');
 WITH x AS (
@@ -138,6 +151,7 @@ WITH x AS (
 ) SELECT COUNT(*) = 0, 'JSONColumns' FROM x;
 
 TRUNCATE :"to_table";
+COPY :"to_table" TO :'test_url' (format 'TabSeparated');
 COPY :"from_table" TO :'test_url' (format 'JSONColumnsWithMetadata');
 COPY :"to_table" FROM :'test_url' (format 'JSONColumnsWithMetadata');
 WITH x AS (
@@ -145,6 +159,7 @@ WITH x AS (
 ) SELECT COUNT(*) = 0, 'JSONColumnsWithMetadata' FROM x;
 
 TRUNCATE :"to_table";
+COPY :"to_table" TO :'test_url' (format 'TabSeparated');
 COPY :"from_table" TO :'test_url' (format 'JSONCompact');
 COPY :"to_table" FROM :'test_url' (format 'JSONCompact');
 WITH x AS (
@@ -152,6 +167,7 @@ WITH x AS (
 ) SELECT COUNT(*) = 0, 'JSONCompact' FROM x;
 
 TRUNCATE :"to_table";
+COPY :"to_table" TO :'test_url' (format 'TabSeparated');
 COPY :"from_table" TO :'test_url' (format 'JSONCompactColumns');
 COPY :"to_table" FROM :'test_url' (format 'JSONCompactColumns');
 WITH x AS (
@@ -159,6 +175,7 @@ WITH x AS (
 ) SELECT COUNT(*) = 0, 'JSONCompactColumns' FROM x;
 
 TRUNCATE :"to_table";
+COPY :"to_table" TO :'test_url' (format 'TabSeparated');
 COPY :"from_table" TO :'test_url' (format 'JSONEachRow');
 COPY :"to_table" FROM :'test_url' (format 'JSONEachRow');
 WITH x AS (
@@ -166,6 +183,7 @@ WITH x AS (
 ) SELECT COUNT(*) = 0, 'JSONEachRow' FROM x;
 
 TRUNCATE :"to_table";
+COPY :"to_table" TO :'test_url' (format 'TabSeparated');
 COPY :"from_table" TO :'test_url' (format 'JSONStringsEachRow');
 COPY :"to_table" FROM :'test_url' (format 'JSONStringsEachRow');
 WITH x AS (
@@ -173,6 +191,7 @@ WITH x AS (
 ) SELECT COUNT(*) = 0, 'JSONStringsEachRow' FROM x;
 
 TRUNCATE :"to_table";
+COPY :"to_table" TO :'test_url' (format 'TabSeparated');
 COPY :"from_table" TO :'test_url' (format 'JSONCompactEachRow');
 COPY :"to_table" FROM :'test_url' (format 'JSONCompactEachRow');
 WITH x AS (
@@ -180,6 +199,7 @@ WITH x AS (
 ) SELECT COUNT(*) = 0, 'JSONCompactEachRow' FROM x;
 
 TRUNCATE :"to_table";
+COPY :"to_table" TO :'test_url' (format 'TabSeparated');
 COPY :"from_table" TO :'test_url' (format 'JSONCompactStringsEachRow');
 COPY :"to_table" FROM :'test_url' (format 'JSONCompactStringsEachRow');
 WITH x AS (
@@ -187,6 +207,7 @@ WITH x AS (
 ) SELECT COUNT(*) = 0, 'JSONCompactStringsEachRow' FROM x;
 
 TRUNCATE :"to_table";
+COPY :"to_table" TO :'test_url' (format 'TabSeparated');
 COPY :"from_table" TO :'test_url' (format 'JSONCompactEachRowWithNames');
 COPY :"to_table" FROM :'test_url' (format 'JSONCompactEachRowWithNames');
 WITH x AS (
@@ -194,6 +215,7 @@ WITH x AS (
 ) SELECT COUNT(*) = 0, 'JSONCompactEachRowWithNames' FROM x;
 
 TRUNCATE :"to_table";
+COPY :"to_table" TO :'test_url' (format 'TabSeparated');
 COPY :"from_table" TO :'test_url' (format 'JSONCompactEachRowWithNamesAndTypes');
 COPY :"to_table" FROM :'test_url' (format 'JSONCompactEachRowWithNamesAndTypes');
 WITH x AS (
@@ -201,6 +223,7 @@ WITH x AS (
 ) SELECT COUNT(*) = 0, 'JSONCompactEachRowWithNamesAndTypes' FROM x;
 
 TRUNCATE :"to_table";
+COPY :"to_table" TO :'test_url' (format 'TabSeparated');
 COPY :"from_table" TO :'test_url' (format 'JSONCompactStringsEachRowWithNames');
 COPY :"to_table" FROM :'test_url' (format 'JSONCompactStringsEachRowWithNames');
 WITH x AS (
@@ -208,6 +231,7 @@ WITH x AS (
 ) SELECT COUNT(*) = 0, 'JSONCompactStringsEachRowWithNames' FROM x;
 
 TRUNCATE :"to_table";
+COPY :"to_table" TO :'test_url' (format 'TabSeparated');
 COPY :"from_table" TO :'test_url' (format 'JSONCompactStringsEachRowWithNamesAndTypes');
 COPY :"to_table" FROM :'test_url' (format 'JSONCompactStringsEachRowWithNamesAndTypes');
 WITH x AS (
@@ -215,6 +239,7 @@ WITH x AS (
 ) SELECT COUNT(*) = 0, 'JSONCompactStringsEachRowWithNamesAndTypes' FROM x;
 
 TRUNCATE :"to_table";
+COPY :"to_table" TO :'test_url' (format 'TabSeparated');
 COPY :"from_table" TO :'test_url' (format 'JSONObjectEachRow');
 COPY :"to_table" FROM :'test_url' (format 'JSONObjectEachRow');
 WITH x AS (
@@ -222,6 +247,7 @@ WITH x AS (
 ) SELECT COUNT(*) = 0, 'JSONObjectEachRow' FROM x;
 
 TRUNCATE :"to_table";
+COPY :"to_table" TO :'test_url' (format 'TabSeparated');
 COPY :"from_table" TO :'test_url' (format 'TSKV');
 COPY :"to_table" FROM :'test_url' (format 'TSKV');
 WITH x AS (
@@ -230,6 +256,7 @@ WITH x AS (
 
 /* ERROR: The format Template requires a schema
 TRUNCATE :"to_table";
+COPY :"to_table" TO :'test_url' (format 'TabSeparated');
 COPY :"from_table" TO :'test_url' (format 'Template');
 COPY :"to_table" FROM :'test_url' (format 'Template');
 WITH x AS (
@@ -239,6 +266,7 @@ WITH x AS (
 
 /* ERROR: The format Template requires a schema
 TRUNCATE :"to_table";
+COPY :"to_table" TO :'test_url' (format 'TabSeparated');
 COPY :"from_table" TO :'test_url' (format 'TemplateIgnoreSpaces');
 COPY :"to_table" FROM :'test_url' (format 'TemplateIgnoreSpaces');
 WITH x AS (
@@ -248,6 +276,7 @@ WITH x AS (
 
 /* ERROR: This input format is only suitable for tables with a single column of type String
 TRUNCATE :"to_table";
+COPY :"to_table" TO :'test_url' (format 'TabSeparated');
 COPY :"from_table" TO :'test_url' (format 'LineAsString');
 COPY :"to_table" FROM :'test_url' (format 'LineAsString');
 WITH x AS (
@@ -257,6 +286,7 @@ WITH x AS (
 
 /* This input format is only suitable for tables with a single column of type String
 TRUNCATE :"to_table";
+COPY :"to_table" TO :'test_url' (format 'TabSeparated');
 COPY :"from_table" TO :'test_url' (format 'RawBLOB');
 COPY :"to_table" FROM :'test_url' (format 'RawBLOB');
 WITH x AS (
@@ -266,6 +296,7 @@ WITH x AS (
 
 /* ERROR: There is no INSERT queries in MySQL dump file
 TRUNCATE :"to_table";
+COPY :"to_table" TO :'test_url' (format 'TabSeparated');
 COPY :"from_table" TO :'test_url' (format 'MySQLDump');
 COPY :"to_table" FROM :'test_url' (format 'MySQLDump');
 WITH x AS (
@@ -274,6 +305,7 @@ WITH x AS (
 */
 
 TRUNCATE :"to_table";
+COPY :"to_table" TO :'test_url' (format 'TabSeparated');
 COPY :"from_table" TO :'test_url' (format 'Native');
 COPY :"to_table" FROM :'test_url' (format 'Native');
 WITH x AS (
@@ -281,6 +313,7 @@ WITH x AS (
 ) SELECT COUNT(*) = 0, 'Native' FROM x;
 
 TRUNCATE :"to_table";
+COPY :"to_table" TO :'test_url' (format 'TabSeparated');
 COPY :"from_table" TO :'test_url' (format 'RowBinary');
 COPY :"to_table" FROM :'test_url' (format 'RowBinary');
 WITH x AS (
@@ -288,6 +321,7 @@ WITH x AS (
 ) SELECT COUNT(*) = 0, 'RowBinary' FROM x;
 
 TRUNCATE :"to_table";
+COPY :"to_table" TO :'test_url' (format 'TabSeparated');
 COPY :"from_table" TO :'test_url' (format 'RowBinaryWithNames');
 COPY :"to_table" FROM :'test_url' (format 'RowBinaryWithNames');
 WITH x AS (
@@ -295,6 +329,7 @@ WITH x AS (
 ) SELECT COUNT(*) = 0, 'RowBinaryWithNames' FROM x;
 
 TRUNCATE :"to_table";
+COPY :"to_table" TO :'test_url' (format 'TabSeparated');
 COPY :"from_table" TO :'test_url' (format 'RowBinaryWithNamesAndTypes');
 COPY :"to_table" FROM :'test_url' (format 'RowBinaryWithNamesAndTypes');
 WITH x AS (
@@ -303,6 +338,7 @@ WITH x AS (
 
 /* ERROR: Failed to receive table structure
 TRUNCATE :"to_table";
+COPY :"to_table" TO :'test_url' (format 'TabSeparated');
 COPY :"from_table" TO :'test_url' (format 'RowBinaryWithDefaults');
 COPY :"to_table" FROM :'test_url' (format 'RowBinaryWithDefaults');
 WITH x AS (
@@ -311,6 +347,7 @@ WITH x AS (
 */
 
 TRUNCATE :"to_table";
+COPY :"to_table" TO :'test_url' (format 'TabSeparated');
 COPY :"from_table" TO :'test_url' (format 'Parquet');
 COPY :"to_table" FROM :'test_url' (format 'Parquet');
 WITH x AS (
@@ -318,6 +355,7 @@ WITH x AS (
 ) SELECT COUNT(*) = 0, 'Parquet' FROM x;
 
 TRUNCATE :"to_table";
+COPY :"to_table" TO :'test_url' (format 'TabSeparated');
 COPY :"from_table" TO :'test_url' (format 'Arrow');
 COPY :"to_table" FROM :'test_url' (format 'Arrow');
 WITH x AS (
@@ -325,6 +363,7 @@ WITH x AS (
 ) SELECT COUNT(*) = 0, 'Arrow' FROM x;
 
 TRUNCATE :"to_table";
+COPY :"to_table" TO :'test_url' (format 'TabSeparated');
 COPY :"from_table" TO :'test_url' (format 'ArrowStream');
 COPY :"to_table" FROM :'test_url' (format 'ArrowStream');
 WITH x AS (
@@ -332,6 +371,7 @@ WITH x AS (
 ) SELECT COUNT(*) = 0, 'ArrowStream' FROM x;
 
 TRUNCATE :"to_table";
+COPY :"to_table" TO :'test_url' (format 'TabSeparated');
 COPY :"from_table" TO :'test_url' (format 'ORC');
 COPY :"to_table" FROM :'test_url' (format 'ORC');
 WITH x AS (
@@ -339,6 +379,7 @@ WITH x AS (
 ) SELECT COUNT(*) = 0, 'ORC' FROM x;
 
 TRUNCATE :"to_table";
+COPY :"to_table" TO :'test_url' (format 'TabSeparated');
 COPY :"from_table" TO :'test_url' (format 'Avro');
 COPY :"to_table" FROM :'test_url' (format 'Avro');
 WITH x AS (
@@ -347,6 +388,7 @@ WITH x AS (
 
 /* ERROR: Empty Schema Registry URL
 TRUNCATE :"to_table";
+COPY :"to_table" TO :'test_url' (format 'TabSeparated');
 COPY :"from_table" TO :'test_url' (format 'AvroConfluent');
 COPY :"to_table" FROM :'test_url' (format 'AvroConfluent');
 WITH x AS (
@@ -356,6 +398,7 @@ WITH x AS (
 
 /* Round-trip fails for some types. :-( */
 TRUNCATE :"to_table";
+COPY :"to_table" TO :'test_url' (format 'TabSeparated');
 COPY :"from_table" TO :'test_url' (format 'Protobuf');
 COPY :"to_table" FROM :'test_url' (format 'Protobuf');
 WITH x AS (
@@ -364,6 +407,7 @@ WITH x AS (
 
 /* ERROR: The ProtobufSingle format can't be used to write multiple rows because this format doesn't have any row delimiter
 TRUNCATE :"to_table";
+COPY :"to_table" TO :'test_url' (format 'TabSeparated');
 COPY :"from_table" TO :'test_url' (format 'ProtobufSingle');
 COPY :"to_table" FROM :'test_url' (format 'ProtobufSingle');
 WITH x AS (
@@ -373,6 +417,7 @@ WITH x AS (
 
 /* Round-trip fails for some types. :-( */
 TRUNCATE :"to_table";
+COPY :"to_table" TO :'test_url' (format 'TabSeparated');
 COPY :"from_table" TO :'test_url' (format 'ProtobufList');
 COPY :"to_table" FROM :'test_url' (format 'ProtobufList');
 WITH x AS (
@@ -381,6 +426,7 @@ WITH x AS (
 
 /* ERROR: Unknown format CapnProto
 TRUNCATE :"to_table";
+COPY :"to_table" TO :'test_url' (format 'TabSeparated');
 COPY :"from_table" TO :'test_url' (format 'CapnProto');
 COPY :"to_table" FROM :'test_url' (format 'CapnProto');
 WITH x AS (
@@ -389,6 +435,7 @@ WITH x AS (
 */
 
 TRUNCATE :"to_table";
+COPY :"to_table" TO :'test_url' (format 'TabSeparated');
 COPY :"from_table" TO :'test_url' (format 'MsgPack');
 COPY :"to_table" FROM :'test_url' (format 'MsgPack');
 WITH x AS (
@@ -396,6 +443,7 @@ WITH x AS (
 ) SELECT COUNT(*) = 0, 'MsgPack' FROM x;
 
 TRUNCATE :"to_table";
+COPY :"to_table" TO :'test_url' (format 'TabSeparated');
 COPY :"from_table" TO :'test_url' (format 'BSONEachRow');
 COPY :"to_table" FROM :'test_url' (format 'BSONEachRow');
 WITH x AS (
@@ -404,6 +452,7 @@ WITH x AS (
 
 /* ERROR: Unexpected number of columns for Npy input format
 TRUNCATE :"to_table";
+COPY :"to_table" TO :'test_url' (format 'TabSeparated');
 COPY :"from_table" TO :'test_url' (format 'Npy');
 COPY :"to_table" FROM :'test_url' (format 'Npy');
 WITH x AS (
@@ -413,6 +462,7 @@ WITH x AS (
 
 /* ERROR: Unknown format DWARF
 TRUNCATE :"to_table";
+COPY :"to_table" TO :'test_url' (format 'TabSeparated');
 COPY :"from_table" TO :'test_url' (format 'DWARF');
 COPY :"to_table" FROM :'test_url' (format 'DWARF');
 WITH x AS (

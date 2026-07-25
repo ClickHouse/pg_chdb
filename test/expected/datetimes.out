@@ -16,9 +16,9 @@ CREATE TABLE datetimes (
 INSERT INTO datetimes
 VALUES ('2026-07-23 20:43:10', '2026-07-23 20:43:27', '2026-07-23 20:43:50+00', '2026-07-23 13:44:46-07', '2026-07-23', '13:45:15', '13:45:24', '13:45:35.306886-07', '13:45:49.17-07', '1 day');
 ;
--- Execute round-trip to all supported formats.
--- Protobuf truncates timestamps to the second, so they won't match, but
--- otherwise work.
+-- Execute round-trip to all supported formats. Parquet, Arrow, ArrowStream,
+-- ORC, Avro, Protobuf, ProtobufList, MsgPack and BSONEachRow have no column
+-- type for a Time64, so those declare the time columns String.
 CREATE TABLE datetimes2 (LIKE datetimes INCLUDING ALL);
 \set from_table datetimes
 \set to_table datetimes2
@@ -32,7 +32,6 @@ t: TabSeparatedWithNamesAndTypes
 t: TabSeparatedRawWithNames
 t: TabSeparatedRawWithNamesAndTypes
 t: CSV
-t: CSVWithNames
 t: CSVWithNames
 t: CSVWithNamesAndTypes
 t: CustomSeparated
@@ -81,7 +80,6 @@ t: TabSeparatedRawWithNames
 t: TabSeparatedRawWithNamesAndTypes
 t: CSV
 t: CSVWithNames
-t: CSVWithNames
 t: CSVWithNamesAndTypes
 t: CustomSeparated
 t: CustomSeparatedWithNames
@@ -129,7 +127,6 @@ t: TabSeparatedRawWithNames
 t: TabSeparatedRawWithNamesAndTypes
 t: CSV
 t: CSVWithNames
-t: CSVWithNames
 t: CSVWithNamesAndTypes
 t: CustomSeparated
 t: CustomSeparatedWithNames
@@ -157,10 +154,9 @@ t: RowBinaryWithNamesAndTypes
 t: Parquet
 t: Arrow
 t: ArrowStream
-psql:test/utils/round-trip-formats.sql:336: ERROR:  error fetching chDB query result
-DETAIL:  Code: 321. DB::Exception: Timestamp value in column "tstz" is out of range for DateTime64: seconds=10413791999, nanoseconds=999999000: (in file/uri /tmp/datetimes.tmp): While executing ORCBlockInputFormat: While executing File. (VALUE_IS_OUT_OF_RANGE_OF_DATA_TYPE)
-CONTEXT:  COPY datetimes2, line 1
-psql:test/utils/round-trip-formats.sql:336: STATEMENT:  COPY "datetimes2" FROM 'file:///tmp/datetimes.tmp' (format 'ORC');
+psql:test/utils/round-trip-formats.sql:376: ERROR:  chdb: error fetching chDB query result
+DETAIL:  Code: 321. DB::Exception: Timestamp value in column "tstz" is out of range for DateTime64: seconds=10413791999, nanoseconds=999999000: (in file/uri /tmp/datetimes.tmp): While executing ORCBlockInputFormat: While executing File. (VALUE_IS_OUT_OF_RANGE_OF_D
+psql:test/utils/round-trip-formats.sql:376: STATEMENT:  COPY "datetimes2" FROM 'file:///tmp/datetimes.tmp' (format 'ORC');
 f: ORC
 t: Avro
 f: Protobuf
@@ -185,7 +181,9 @@ INSERT INTO datetime_arrays
 VALUES ('{2026-07-23 20:43:10.836612}', '{2026-07-23 20:43:27.363}', '{2026-07-23 20:43:50.944042+00}', '{2026-07-23 13:44:46.8445-07}', '{2026-07-23}', '{13:45:15.416013}', '{13:45:24.282}', '{13:45:35.306886-07}', '{13:45:49.17-07}', '{1 day}')
      , ('{1900-01-01 00:00:00, 2299-12-31 23:59:59.999999}', '{}', '{1900-01-01 00:00:00Z, 2299-12-31 23:59:59.999999Z}', '{NULL}', '{1900-01-01, 2299-12-31}', '{00:00:00, 24:00:00}', '{NULL}', '{00:00:00+1559, 24:00:00-1559}', '{09:23:23Z}', '{-178000000 years, NULL}')
 ;
--- Execute round-trip to all supported formats.
+-- Execute round-trip to all supported formats. ORC reads a year 2299 timestamp
+-- back out of DateTime64's range and Protobuf overflows converting one, as
+-- above, and Protobuf has no null in a repeated field either.
 CREATE TABLE datetime_arrays2 (LIKE datetime_arrays INCLUDING ALL);
 \set from_table datetime_arrays
 \set to_table datetime_arrays2
@@ -198,7 +196,6 @@ t: TabSeparatedWithNamesAndTypes
 t: TabSeparatedRawWithNames
 t: TabSeparatedRawWithNamesAndTypes
 t: CSV
-t: CSVWithNames
 t: CSVWithNames
 t: CSVWithNamesAndTypes
 t: CustomSeparated
@@ -227,10 +224,21 @@ t: RowBinaryWithNamesAndTypes
 t: Parquet
 t: Arrow
 t: ArrowStream
-t: ORC
+psql:test/utils/round-trip-formats.sql:376: ERROR:  chdb: error fetching chDB query result
+DETAIL:  Code: 321. DB::Exception: Timestamp value in column "ts" is out of range for DateTime64: seconds=10413791999, nanoseconds=999999000: (in file/uri /tmp/datetimes.tmp): While executing ORCBlockInputFormat: While executing File. (VALUE_IS_OUT_OF_RANGE_OF_DAT
+psql:test/utils/round-trip-formats.sql:376: STATEMENT:  COPY "datetime_arrays2" FROM 'file:///tmp/datetimes.tmp' (format 'ORC');
+f: ORC
 t: Avro
-t: Protobuf
-t: ProtobufList
+psql:test/utils/round-trip-formats.sql:402: ERROR:  chdb: error finishing chDB query
+DETAIL:  chDB Error: Code: 407. DB::Exception: Convert overflow. (DECIMAL_OVERFLOW)
+CONTEXT:  query: INSERT INTO FUNCTION file({path:String}, {format:String}, {structure:String}) SETTINGS allow_experimental_nullable_tuple_type=1, date_time_output_format='iso', output_format_json_quote_denormals=1, engine_file_truncate_on_insert=1, output_format_native_encode_types_in_binary_format=0,output_format_native_write_json_as_string=1
+psql:test/utils/round-trip-formats.sql:402: STATEMENT:  COPY "datetime_arrays" TO 'file:///tmp/datetimes.tmp' (format 'Protobuf');
+f: Protobuf
+psql:test/utils/round-trip-formats.sql:421: ERROR:  chdb: error finishing chDB query
+DETAIL:  chDB Error: Code: 407. DB::Exception: Convert overflow. (DECIMAL_OVERFLOW)
+CONTEXT:  query: INSERT INTO FUNCTION file({path:String}, {format:String}, {structure:String}) SETTINGS allow_experimental_nullable_tuple_type=1, date_time_output_format='iso', output_format_json_quote_denormals=1, engine_file_truncate_on_insert=1, output_format_native_encode_types_in_binary_format=0,output_format_native_write_json_as_string=1
+psql:test/utils/round-trip-formats.sql:421: STATEMENT:  COPY "datetime_arrays" TO 'file:///tmp/datetimes.tmp' (format 'ProtobufList');
+f: ProtobufList
 t: MsgPack
 t: BSONEachRow
 \set ECHO errors

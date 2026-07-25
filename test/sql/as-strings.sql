@@ -39,7 +39,8 @@ VALUES ('{02:00:00}', '{a fat cat}', '{fat & rat}', '{100}')
      , ('{10d, 5s}', '{fat cat, ❄️ party}', '{fat:AB & cat, ❄️}', '{-20}')
 ;
 
--- Execute round-trip to all supported formats.
+-- Execute round-trip to all supported formats. Protobuf has no null in a
+-- repeated field, so the arrays carrying one come back short.
 CREATE TABLE as_string_arrays2 (LIKE as_string_arrays INCLUDING ALL);
 \set from_table as_string_arrays
 \set to_table as_string_arrays2

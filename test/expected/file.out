@@ -68,7 +68,7 @@ SELECT * FROM people ORDER BY id;
 
 -- Export back out.
 \set people_out :temp_base /people.tsv
-COPY people TO :'people_out' (structure 'i Int32, f String, g String, n String NULL');
+COPY people TO :'people_out' (structure 'i Int32, f String, g String, n Nullable(String)');
 COPY 7
 -- Import it again;
 TRUNCATE people;
@@ -91,7 +91,7 @@ SELECT * FROM people ORDER BY id;
 (7 rows)
 
 -- Export it again, should replace previous.
-COPY people TO :'people_out' (structure 'i Int32, f String, g String, n String NULL');
+COPY people TO :'people_out' (structure 'i Int32, f String, g String, n Nullable(String)');
 COPY 7
 TRUNCATE people;
 TRUNCATE TABLE

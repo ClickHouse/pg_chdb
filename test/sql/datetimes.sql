@@ -19,9 +19,9 @@ INSERT INTO datetimes
 VALUES ('2026-07-23 20:43:10', '2026-07-23 20:43:27', '2026-07-23 20:43:50+00', '2026-07-23 13:44:46-07', '2026-07-23', '13:45:15', '13:45:24', '13:45:35.306886-07', '13:45:49.17-07', '1 day');
 ;
 
--- Execute round-trip to all supported formats.
--- Protobuf truncates timestamps to the second, so they won't match, but
--- otherwise work.
+-- Execute round-trip to all supported formats. Parquet, Arrow, ArrowStream,
+-- ORC, Avro, Protobuf, ProtobufList, MsgPack and BSONEachRow have no column
+-- type for a Time64, so those declare the time columns String.
 CREATE TABLE datetimes2 (LIKE datetimes INCLUDING ALL);
 \set from_table datetimes
 \set to_table datetimes2
@@ -60,7 +60,9 @@ VALUES ('{2026-07-23 20:43:10.836612}', '{2026-07-23 20:43:27.363}', '{2026-07-2
      , ('{1900-01-01 00:00:00, 2299-12-31 23:59:59.999999}', '{}', '{1900-01-01 00:00:00Z, 2299-12-31 23:59:59.999999Z}', '{NULL}', '{1900-01-01, 2299-12-31}', '{00:00:00, 24:00:00}', '{NULL}', '{00:00:00+1559, 24:00:00-1559}', '{09:23:23Z}', '{-178000000 years, NULL}')
 ;
 
--- Execute round-trip to all supported formats.
+-- Execute round-trip to all supported formats. ORC reads a year 2299 timestamp
+-- back out of DateTime64's range and Protobuf overflows converting one, as
+-- above, and Protobuf has no null in a repeated field either.
 CREATE TABLE datetime_arrays2 (LIKE datetime_arrays INCLUDING ALL);
 \set from_table datetime_arrays
 \set to_table datetime_arrays2

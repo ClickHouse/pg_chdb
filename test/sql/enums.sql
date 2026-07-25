@@ -34,7 +34,8 @@ VALUES ('{Sun, NULL, Thu}', '{ok, NULL, ok}')
      , ('{Mon, Tue, Wed}', '{sad, NULL, happy}')
 ;
 
--- Execute round-trip to all supported formats.
+-- Execute round-trip to all supported formats. Protobuf has no null in a
+-- repeated field, so the arrays carrying one come back short.
 CREATE TABLE enum_arrays2 (LIKE enum_arrays INCLUDING ALL);
 \set from_table enum_arrays
 \set to_table enum_arrays2

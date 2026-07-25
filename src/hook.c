@@ -216,8 +216,8 @@ contextualize_options(chdbCopyContext* ctx, List* options) {
         } else if (strcmp(elem->defname, "compression") == 0) {
             ctx->compression = defGetString(elem);
         } else if (strcmp(elem->defname, "timeout") == 0) {
-            uint64_t timeout = defGetInt64(elem);
-            if (timeout < 0) {
+            int64 timeout = defGetInt64(elem);
+            if (timeout < 0 || timeout > UINT32_MAX) {
                 ereport(
                     ERROR,
                     errcode(ERRCODE_INVALID_PARAMETER_VALUE),
@@ -236,7 +236,7 @@ contextualize_options(chdbCopyContext* ctx, List* options) {
 }
 
 /*
- * PgLakeCommonProcessUtility modifies the behaviour of DDL commands.
+ * chDBProcessUtilityHook modifies the behaviour of DDL commands.
  */
 static void
 chDBProcessUtilityHook(
@@ -436,10 +436,16 @@ LaunchWorker(chdbCopyContext* ctx, QueryCompletion* qc) {
     /* Wait for it to finish. */
     PG_TRY();
     { ProcessMessages(mqh, qc); }
-    PG_FINALLY();
-    { dsm_detach(seg); }
+    PG_CATCH();
+    {
+        dsm_detach(seg);
+        TerminateBackgroundWorker(handle);
+        WaitForBackgroundWorkerShutdown(handle);
+        PG_RE_THROW();
+    }
     PG_END_TRY();
 
+    dsm_detach(seg);
     WaitForBackgroundWorkerShutdown(handle);
 }
 

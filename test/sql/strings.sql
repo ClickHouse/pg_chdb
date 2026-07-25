@@ -16,8 +16,12 @@ VALUES ('', '', '')
      , ('"Bøwie"', '\x9a60f295bcb186a729d04e76377b7f122b2a1dd9', '"ALL CAPS"')
 ;
 
--- Execute round-trip to all supported formats.
--- Protobuf currently fails: https://github.com/chdb-io/chdb-core/issues/152
+-- Execute round-trip to all supported formats. JSON, JSONCompact and
+-- JSONColumnsWithMetadata always validate UTF-8, whatever
+-- output_format_json_validate_utf8 says, so the bytea columns come back with
+-- replacement characters. Protobuf reads a Nullable field holding the empty
+-- string back as NULL, so the empty name does not survive:
+-- https://github.com/chdb-io/chdb-core/issues/152
 CREATE TABLE strings2 (LIKE strings INCLUDING ALL);
 \set from_table strings
 \set to_table strings2
@@ -39,7 +43,8 @@ VALUES ('{}', '{}', '{}')
      , ('{😃 🐨 🎱,"\"GO\""}', '{\xdeadbeef, \x83c2815f9018eb2d4c26dac9d69c4c93ddc7a284}', '{big fat name,NULL}')
 ;
 
--- Execute round-trip to all supported formats.
+-- Execute round-trip to all supported formats. Protobuf has no null in a
+-- repeated field, so the arrays carrying one come back short.
 CREATE TABLE string_arrays2 (LIKE string_arrays INCLUDING ALL);
 \set from_table string_arrays
 \set to_table string_arrays2

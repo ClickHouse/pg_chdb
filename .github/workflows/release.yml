@@ -13,6 +13,7 @@ jobs:
     steps:
       - name: Check out the repo
         uses: actions/checkout@v7
+        with: { submodules: recursive }
       - name: Start Postgres
         run: pg-start ${{ env.pg }} libkrb5-dev
       - name: Tweak Permissions # for cache restore
