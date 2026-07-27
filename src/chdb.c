@@ -21,6 +21,15 @@ PG_MODULE_MAGIC_EXT(.name = "chdb", .version = PGCHCB_VERSION);
 PG_MODULE_MAGIC;
 #endif
 
+/*
+ * Function returns the full chdb extension library version.
+ */
+PG_FUNCTION_INFO_V1(pgchdb_version);
+Datum
+pgchdb_version(PG_FUNCTION_ARGS) {
+    PG_RETURN_TEXT_P(cstring_to_text(PGCHCB_VERSION));
+}
+
 void
 _PG_init(void);
 
