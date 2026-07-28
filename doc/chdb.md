@@ -79,12 +79,35 @@ S3, for example, create the table then call `COPY` with an `s3://` URL:
 
 ```sql
 CREATE TABLE times (
-    id    INT PRIMARY KEY,
+    id     INT PRIMARY KEY,
     months INT NOT NULL,
     days   INT NOT NULL
 );
 
 COPY times FROM 's3://datasets-documentation/my-test-bucket-768/some_prefix/some_file_1.csv';
+```
+
+### Background Worker
+
+When the chdb extension library detects a `COPY` command it can handle, it
+starts a [background worker] to handle it. The background worker keeps the
+resource consumption of [chDB] separate from the main Postgres process, an
+advantage for an occasionally-used workflow such as loading data from a data
+lake.
+
+As a consequence, execution may fail if the Postgres server has too many
+background workers loaded already. In that situation, the `COPY` will fail
+with this error:
+
+```
+ERROR:  out of background worker slots
+```
+
+To solve this problem, increase the [max_worker_processes] setting to allow
+more background workers and restart the service:
+
+```sql
+ALTER SYSTEM SET max_worker_processes = 12;
 ```
 
 ### Privileges
@@ -378,6 +401,10 @@ Copyright (c) 2026, ClickHouse
   [ALTER ROLE]: https://www.postgresql.org/docs/18/sql-alterrole.html "Postgres Docs: ALTER ROLE"
   [AWS S3]: https://aws.amazon.com/s3/ "Cloud Object Storage - Amazon S3 - Amazon Web Services"
   [Google Cloud Storage]: https://cloud.google.com/storage "Cloud Storage - Google Cloud"
+  [background worker]: https://www.postgresql.org/docs/current/bgworker.html
+    "Postgres Docs: Background Worker Processes"
+  [max_worker_processes]: https://www.postgresql.org/docs/current/runtime-config-resource.html#GUC-MAX-WORKER-PROCESSES
+    "Postgres Docs: max_worker_processes"
   [`file()`]: https://clickhouse.com/docs/sql-reference/table-functions/file
     "ClickHouse Docs: file Table Function"
   [`url()`]: https://clickhouse.com/docs/sql-reference/table-functions/url
