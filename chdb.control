@@ -1,5 +1,7 @@
 # chdb extension
-comment = 'Execute queries in chDB'
+comment = 'Execute queries in chDB and copy data to and from cloud storage.'
 default_version = '0.1'
 module_pathname = 'chdb'
 relocatable = true
+superuser = true
+trusted = false

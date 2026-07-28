@@ -5,7 +5,8 @@ chdb Postgres Extension
 [![Build Status](https://github.com/ClickHouse/pg_chdb/actions/workflows/ci.yml/badge.svg)](https://github.com/ClickHouse/pg_chdb/actions/workflows/ci.yml)
 
 This library contains a single PostgreSQL extension, `chdb`, which provides a
-background worker to execute [chDB] queries.
+background worker to execute [chDB] queries. It currently only supports [COPY]
+to a URL.
 
 To build chdb, just do this:
 
@@ -120,4 +121,6 @@ Copyright (c) 2026, ClickHouse
 
   [chDB]: https://clickhouse.com/chdb
     "chDB - fast, reliable, and scalable in-process database"
+  [COPY]: https://www.postgresql.org/docs/current/sql-copy.html "Postgres Docs: COPY"
   [lib.chdb.io]: https://lib.chdb.io "curl -sL https://lib.chdb.io | bash"
+  [`postgresql.conf` parameters]: https://www.postgresql.org/docs/devel/runtime-config-client.html#RUNTIME-CONFIG-CLIENT-OTHER
