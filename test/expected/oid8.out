@@ -1,0 +1,136 @@
+LOAD 'chdb';
+/****************************************************************************/
+-- oid8. Values above int8 range need quoting, else Postgres reads them as
+-- numeric, which has no implicit cast to oid8.
+CREATE TABLE oid8s (
+    o8  OID8 NOT NULL,
+    n8  OID8     NULL
+);
+INSERT INTO oid8s
+VALUES (0, 0)
+     , (0, NULL)
+     , (4294967295, 4294967296)
+     , ('18446744073709551615', '18446744073709551615')
+;
+-- Guard against an empty table round-tripping vacuously.
+SELECT COUNT(*) FROM oid8s;
+ count 
+-------
+     4
+(1 row)
+
+-- Execute round-trip to all supported formats.
+-- Protobuf currently fails: https://github.com/chdb-io/chdb-core/issues/152
+CREATE TABLE oid8s2 (LIKE oid8s INCLUDING ALL);
+\set from_table oid8s
+\set to_table oid8s2
+\set output_fle oid8s.tmp
+\i test/utils/round-trip-formats.sql
+\set ECHO errors
+t: TabSeparated
+t: TabSeparatedRaw
+t: TabSeparatedWithNames
+t: TabSeparatedWithNamesAndTypes
+t: TabSeparatedRawWithNames
+t: TabSeparatedRawWithNamesAndTypes
+t: CSV
+t: CSVWithNames
+t: CSVWithNames
+t: CSVWithNamesAndTypes
+t: CustomSeparated
+t: CustomSeparatedWithNames
+t: CustomSeparatedWithNamesAndTypes
+t: Values
+t: JSON
+t: JSONColumns
+t: JSONColumnsWithMetadata
+t: JSONCompact
+t: JSONCompactColumns
+t: JSONEachRow
+t: JSONStringsEachRow
+t: JSONCompactEachRow
+t: JSONCompactStringsEachRow
+t: JSONCompactEachRowWithNames
+t: JSONCompactEachRowWithNamesAndTypes
+t: JSONCompactStringsEachRowWithNames
+t: JSONCompactStringsEachRowWithNamesAndTypes
+t: JSONObjectEachRow
+t: TSKV
+t: Native
+t: RowBinary
+t: RowBinaryWithNames
+t: RowBinaryWithNamesAndTypes
+t: Parquet
+t: Arrow
+t: ArrowStream
+t: ORC
+t: Avro
+f: Protobuf
+f: ProtobufList
+t: MsgPack
+t: BSONEachRow
+/****************************************************************************/
+-- oid8 Arrays.
+CREATE TABLE oid8_arrays (
+    o8  OID8[] NOT NULL
+);
+INSERT INTO oid8_arrays
+VALUES ('{0}')
+     , ('{}')
+     , ('{4294967295,4294967296}')
+     , ('{18446744073709551615, NULL}')
+;
+SELECT COUNT(*) FROM oid8_arrays;
+ count 
+-------
+     4
+(1 row)
+
+CREATE TABLE oid8_arrays2 (LIKE oid8_arrays INCLUDING ALL);
+\set from_table oid8_arrays
+\set to_table oid8_arrays2
+\i test/utils/round-trip-formats.sql
+\set ECHO errors
+t: TabSeparated
+t: TabSeparatedRaw
+t: TabSeparatedWithNames
+t: TabSeparatedWithNamesAndTypes
+t: TabSeparatedRawWithNames
+t: TabSeparatedRawWithNamesAndTypes
+t: CSV
+t: CSVWithNames
+t: CSVWithNames
+t: CSVWithNamesAndTypes
+t: CustomSeparated
+t: CustomSeparatedWithNames
+t: CustomSeparatedWithNamesAndTypes
+t: Values
+t: JSON
+t: JSONColumns
+t: JSONColumnsWithMetadata
+t: JSONCompact
+t: JSONCompactColumns
+t: JSONEachRow
+t: JSONStringsEachRow
+t: JSONCompactEachRow
+t: JSONCompactStringsEachRow
+t: JSONCompactEachRowWithNames
+t: JSONCompactEachRowWithNamesAndTypes
+t: JSONCompactStringsEachRowWithNames
+t: JSONCompactStringsEachRowWithNamesAndTypes
+t: JSONObjectEachRow
+t: TSKV
+t: Native
+t: RowBinary
+t: RowBinaryWithNames
+t: RowBinaryWithNamesAndTypes
+t: Parquet
+t: Arrow
+t: ArrowStream
+t: ORC
+t: Avro
+t: Protobuf
+t: ProtobufList
+t: MsgPack
+t: BSONEachRow
+\! rm -rf test/oid8s.tmp

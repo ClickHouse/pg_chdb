@@ -27,6 +27,10 @@ EXTRA_CLEAN  = src/version.h sql/$(EXTENSION)--$(EXTVERSION).sql src/bgw/chdb_bg
 PGXS := $(shell $(PG_CONFIG) --pgxs)
 include $(PGXS)
 
+ifeq ($(shell test $(VERSION_NUM) -lt 190000 && echo yes),yes)
+TESTS := $(filter-out test/sql/oid8.sql,$(TESTS))
+endif
+
 # Set default prove flags.
 ifeq ($(PROVE_FLAGS),)
 PROVE_FLAGS = -fwj $(shell nproc)

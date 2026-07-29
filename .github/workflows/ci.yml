@@ -35,8 +35,15 @@ jobs:
       - run: |
           ls -lah /usr/local/lib/libchdb.so /usr/local/include/chdb.*
           md5sum /usr/local/lib/libchdb.so /usr/local/include/chdb.h
+      - name: Build
+        run: make -j $(nproc)
+      - name: Install
+        run: sudo make install PG_CONFIG=$(command -v pg_config)
       - name: Test
-        run: make -j $(nproc) && make install && make installcheck || find . -name regression.diffs -exec cat {} +
+        run: make installcheck
+      - name: Show Diffs
+        if: failure()
+        run: find . -name regression.diffs -exec cat {} +
       - name: Upload Diffs
         if: failure()
         uses: actions/upload-artifact@v7

@@ -988,8 +988,10 @@ chdb_type_for(chdbCopyContext* ctx, Form_pg_attribute attr) {
     case UUIDOID:
         /* Sadly, chDB doesn't automatically treat a UUID as an ORC string. */
         return pg_strcasecmp(ctx->format, "ORC") == 0 ? "String" : "UUID";
+#if PG_VERSION_NUM >= 190000
     case OID8OID:
         return "UInt64";
+#endif
     /*
      * Arrays: chDB TSV array format differs from Postgres. Perhaps it'd make
      * sense to adopt the binary format instead and convert things properly,
@@ -1069,7 +1071,9 @@ chdb_type_for(chdbCopyContext* ctx, Form_pg_attribute attr) {
         // );
     case UUIDARRAYOID:
         // return "Array(UUID)";
+#if PG_VERSION_NUM >= 190000
     case OID8ARRAYOID:
+#endif
         /*
          * Type to use for all arrays for now. Uncomment // lines above and in
          * default: to specify proper array types once we've managed to make
