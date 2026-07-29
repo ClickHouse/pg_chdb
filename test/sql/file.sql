@@ -10,10 +10,10 @@ CREATE TABLE requests (
 \pset null '#null#'
 \set QUIET false
 
--- directory paths are passed to us in environment variables
-\getenv test_dir PG_ABS_SRCDIR
-\set file_base file:// :test_dir /corpus
-\set temp_base file:// :test_dir /file.tmp
+-- Set up paths we'll use.
+\! cp -rf test/corpus /tmp/chdb-corpus
+\set file_base file:///tmp/chdb-corpus
+\set temp_base file:///tmp/file.tmp
 
 \set requests_csv :file_base /requests.csv
 COPY requests FROM :'requests_csv';
@@ -21,7 +21,10 @@ SELECT * FROM requests ORDER BY req_id;
 
 \set requests_out :temp_base /requests.csv
 COPY requests TO :'requests_out' (structure 'id UInt64, name String, path String');
-\! cat test/file.tmp/requests.csv
+
+TRUNCATE requests;
+COPY requests FROM :'requests_out';
+SELECT * FROM requests ORDER BY req_id;
 
 -- Test importing from ClickHouse with all possible backslash escapes.
 -- https://clickhouse.com/docs/interfaces/formats/TabSeparated
@@ -39,7 +42,6 @@ SELECT * FROM people ORDER BY id;
 -- Export back out.
 \set people_out :temp_base /people.tsv
 COPY people TO :'people_out' (structure 'i Int32, f String, g String, n String NULL');
-\! cat test/file.tmp/people.tsv
 
 -- Import it again;
 TRUNCATE people;
@@ -48,6 +50,15 @@ SELECT * FROM people ORDER BY id;
 
 -- Export it again, should replace previous.
 COPY people TO :'people_out' (structure 'i Int32, f String, g String, n String NULL');
-\! cat test/file.tmp/people.tsv
+TRUNCATE people;
+COPY people FROM :'people_out';
+SELECT * FROM people ORDER BY id;
 
-\! rm -rf test/file.tmp
+\set ECHO errors
+\set ci ''
+\getenv ci CI
+SELECT :'ci' = '' AS not_ci \gset
+\if :not_ci
+\! rm -rf /tmp/chdb-corpus
+\! rm -rf /tmp/file.tmp
+\endif

@@ -5,7 +5,7 @@ EXTVERSION   = $(shell grep -m 1 'default_version' chdb.control | \
 DISTVERSION  = $(shell grep -m 1 '^[[:space:]]\{2\}"version":' META.json | \
                sed -e 's/[[:space:]]*"version":[[:space:]]*"\([^"]*\)",\{0,1\}/\1/')
 
-MAX_CONCURRENT_TESTS ?= 8
+MAX_CONCURRENT_TESTS ?= 6
 DATA         = $(sort $(wildcard sql/$(EXTENSION)--*.sql) sql/$(EXTENSION)--$(EXTVERSION).sql)
 DOCS         = $(wildcard doc/*.md)
 TESTS        ?= $(wildcard test/sql/*.sql)
@@ -29,7 +29,7 @@ include $(PGXS)
 
 # Set default prove flags.
 ifeq ($(PROVE_FLAGS),)
-PROVE_FLAGS = -fwj $(shell nproc)
+PROVE_FLAGS = -fwvj $(shell nproc)
 endif
 
 # Require the versioned SQL script.

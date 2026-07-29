@@ -1,5 +1,14 @@
 LOAD 'chdb';
 
+\set ECHO errors
+\set oid8 OID8
+SELECT current_setting('server_version_num')::int < 190000 AS pg18 \gset
+\if :pg18
+-- Use OID instead of OID8 prior to Postgres 19.
+\set oid8 OID
+\endif
+\set ECHO all
+
 /****************************************************************************/
 -- Numbers.
 CREATE TABLE numbers (
@@ -14,7 +23,7 @@ CREATE TABLE numbers (
     f8  float8             NULL,
     b   bool           NOT NULL,
     o   OID            NOT NULL,
-    o8  OID8           NOT NULL
+    o8  :oid8          NOT NULL
 );
 
 INSERT INTO numbers
@@ -50,7 +59,7 @@ CREATE TABLE number_arrays (
     f8  float8[]         NOT NULL,
     b   bool[]           NOT NULL,
     o   OID[]            NOT NULL,
-    o8  OID8[]           NOT NULL
+    o8  :oid8[]          NOT NULL
 );
 
 INSERT INTO number_arrays
@@ -64,4 +73,11 @@ CREATE TABLE number_arrays2 (LIKE number_arrays INCLUDING ALL);
 \set from_table number_arrays
 \set to_table number_arrays2
 \i test/utils/round-trip-formats.sql
-\! rm -rf test/numbers.tmp
+
+\set ECHO errors
+\set ci ''
+\getenv ci CI
+SELECT :'ci' = '' AS not_ci \gset
+\if :not_ci
+\! rm -rf /tmp/numbers.tmp
+\endif

@@ -157,10 +157,10 @@ t: RowBinaryWithNamesAndTypes
 t: Parquet
 t: Arrow
 t: ArrowStream
-psql:test/utils/round-trip-formats.sql:337: ERROR:  error fetching chDB query result
-DETAIL:  Code: 321. DB::Exception: Timestamp value in column "tstz" is out of range for DateTime64: seconds=10413791999, nanoseconds=999999000: (in file/uri /Users/david/dev/pgxn/pg_chdb/test/datetimes.tmp): While executing ORCBlockInputFormat: While executing File. (VALUE_IS_OUT_OF_RANGE_OF_DATA_TYPE)
+psql:test/utils/round-trip-formats.sql:336: ERROR:  error fetching chDB query result
+DETAIL:  Code: 321. DB::Exception: Timestamp value in column "tstz" is out of range for DateTime64: seconds=10413791999, nanoseconds=999999000: (in file/uri /tmp/datetimes.tmp): While executing ORCBlockInputFormat: While executing File. (VALUE_IS_OUT_OF_RANGE_OF_DATA_TYPE)
 CONTEXT:  COPY datetimes2, line 1
-psql:test/utils/round-trip-formats.sql:337: STATEMENT:  COPY "datetimes2" FROM 'file:///Users/david/dev/pgxn/pg_chdb/test/datetimes.tmp' (format 'ORC');
+psql:test/utils/round-trip-formats.sql:336: STATEMENT:  COPY "datetimes2" FROM 'file:///tmp/datetimes.tmp' (format 'ORC');
 f: ORC
 t: Avro
 f: Protobuf
@@ -233,4 +233,4 @@ t: Protobuf
 t: ProtobufList
 t: MsgPack
 t: BSONEachRow
-\! rm -rf test/datetimes.tmp
+\set ECHO errors

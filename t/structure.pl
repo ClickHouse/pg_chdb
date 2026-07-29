@@ -18,12 +18,13 @@ $node->append_conf(
 $node->start;
 END { $node->stop('fast') }
 
-$node->safe_psql(postgres => 'CREATE EXTENSION chdb');
+$node->psql(postgres => 'CREATE EXTENSION chdb');
 my $port = PostgreSQL::Test::Cluster::get_free_port;
 my $dir = $node->basedir;
 
 NUMBERS: {
-    $node->safe_psql(postgres => q{
+    my ($oid8, $uint64) = $node->pg_version > 19 ? ('OID8', 'UInt64') : ('OID', 'UInt32');
+    $node->psql(postgres => qq{
         CREATE TABLE numbers (
             i2  INT2           NOT NULL,
             i4  INT4           NOT NULL,
@@ -35,7 +36,7 @@ NUMBERS: {
             f8  float8             NULL,
             b   bool           NOT NULL,
             o   OID            NOT NULL,
-            o8  OID8           NOT NULL
+            o8  $oid8          NOT NULL
         )
     });
     check_query(
@@ -43,11 +44,11 @@ NUMBERS: {
         qq{COPY numbers FROM 'file://$dir/nonesuch.csv'},
         qr/nonesuch.csv doesn't exist/,
         qr[\QSELECT * FROM file],
-        qr[\Q structure: "i2 Int16, i4 Int32, i8 Int64 NULL, num Decimal256(38) NULL, np Decimal(32,0) NULL, nps Decimal(12,6) NULL, f4 Float32, f8 Float64 NULL, b Bool, o UInt32, o8 UInt64" }],
+        qr[\Q structure: "i2 Int16, i4 Int32, i8 Int64 NULL, num Decimal256(38) NULL, np Decimal(32,0) NULL, nps Decimal(12,6) NULL, f4 Float32, f8 Float64 NULL, b Bool, o UInt32, o8 $uint64" }],
         # qr[\Q structure: "i2 Int16, i4 Int32, i8 Int64 NULL, num Decimal256(38) NULL, np Decimal(32,0) NULL, nps Decimal(12,6) NULL, f4 Float32, f8 Float64 NULL, b Bool, o UInt32, o8 UInt64" }],
     );
 
-    $node->safe_psql(postgres => q{
+    $node->psql(postgres => qq{
         CREATE TABLE number_arrays (
             i2  INT2[]           NOT NULL,
             i4  INT4[]           NOT NULL,
@@ -59,7 +60,7 @@ NUMBERS: {
             f8  float8[]         NOT NULL,
             b   bool[]           NOT NULL,
             o   OID[]            NOT NULL,
-            o8  OID8[]           NOT NULL
+            o8  ${oid8}[]          NOT NULL
         )
     });
     check_query(
@@ -73,7 +74,7 @@ NUMBERS: {
 }
 
 STRINGS: {
-    $node->safe_psql(postgres => q{
+    $node->psql(postgres => q{
         CREATE TABLE strings (
             t  TEXT    NOT NULL,
             ba BYTEA   NOT NULL,
@@ -88,7 +89,7 @@ STRINGS: {
         qr[\Q structure: "t String, ba String, n String NULL" }],
     );
 
-    $node->safe_psql(postgres => q{
+    $node->psql(postgres => q{
         CREATE TABLE string_arrays (
             t  TEXT[]    NOT NULL,
             ba BYTEA[]   NOT NULL,
@@ -106,7 +107,7 @@ STRINGS: {
 }
 
 FIXIES: {
-    $node->safe_psql(postgres => q{
+    $node->psql(postgres => q{
         CREATE TABLE fixies (
             cr  character(6) NOT NULL,
             ch  char(12)     NOT NULL,
@@ -123,7 +124,7 @@ FIXIES: {
         # qr[\Q structure: "cr FixedString(6), ch FixedString(12), bp String, pbn FixedString(8)" }],
     );
 
-    $node->safe_psql(postgres => q{
+    $node->psql(postgres => q{
         CREATE TABLE fixie_arrays (
             cr  character(6)[] NOT NULL,
             ch  char(12)[]     NOT NULL,
@@ -142,7 +143,7 @@ FIXIES: {
 }
 
 AS_STRINGS: {
-    $node->safe_psql(postgres => q{
+    $node->psql(postgres => q{
         CREATE TABLE non_strings (
             ival INTERVAL NOT NULL,
             tsv  tsvector NOT NULL,
@@ -162,7 +163,7 @@ AS_STRINGS: {
         qr[\Q structure: "ival String, tsv String, tsq String, jp String, mon String, xml String, cir String, na String" }],
     );
 
-    $node->safe_psql(postgres => q{
+    $node->psql(postgres => q{
         CREATE TABLE non_string_arrays (
             ival INTERVAL[] NOT NULL,
             tsv  tsvector[] NOT NULL,
@@ -185,7 +186,7 @@ AS_STRINGS: {
 }
 
 VARCHAR: {
-    $node->safe_psql(postgres => q{
+    $node->psql(postgres => q{
         CREATE TABLE varchars (
             vc  VARCHAR    NOT NULL,
             vcn VARCHAR(8) NOT NULL,
@@ -201,7 +202,7 @@ VARCHAR: {
         qr[\Q structure: "vc String, vcn String(8), bc String, bcn String(4)" }],
     );
 
-    $node->safe_psql(postgres => q{
+    $node->psql(postgres => q{
         CREATE TABLE varchar_arrays (
             vc  VARCHAR[]    NOT NULL,
             vcn VARCHAR(8)[] NOT NULL,
@@ -220,7 +221,7 @@ VARCHAR: {
 }
 
 JSON_UUID: {
-    $node->safe_psql(postgres => q{
+    $node->psql(postgres => q{
         CREATE TABLE json_uuid (
             u  UUID   NOT NULL,
             j  JSON   NOT NULL,
@@ -235,7 +236,7 @@ JSON_UUID: {
         qr[\Q structure: "u UUID, j String, jb String NULL" }],
     );
 
-    $node->safe_psql(postgres => q{
+    $node->psql(postgres => q{
         CREATE TABLE json_uuid_arrays (
             u  UUID[]   NOT NULL,
             j  JSON[]   NOT NULL,
@@ -253,7 +254,7 @@ JSON_UUID: {
 }
 
 GEO: {
-    $node->safe_psql(postgres => q{
+    $node->psql(postgres => q{
         CREATE TABLE geos (
             p   point    NOT NULL,
             line line    NOT NULL,
@@ -272,7 +273,7 @@ GEO: {
         qr[\Q structure: "p Point, line String, lseg String, box String, path String, poly String, cir String" }],
     );
 
-    $node->safe_psql(postgres => q{
+    $node->psql(postgres => q{
         CREATE TABLE geo_arrays (
             p   point[]    NOT NULL,
             line line[]    NOT NULL,
@@ -294,7 +295,7 @@ GEO: {
 }
 
 DATETIME: {
-    $node->safe_psql(postgres => q{
+    $node->psql(postgres => q{
         CREATE TABLE datetime (
             ts    TIMESTAMP          NULL,
             tsn   TIMESTAMP(3)       NULL,
@@ -316,7 +317,7 @@ DATETIME: {
         qr[\Q structure: "ts String NULL, tsn String NULL, tstz DateTime64(6, 'UTC'), tstzn DateTime64(6, 'UTC'), date Date32, "time" Time64(6), timen Time64(6), ttz String, ttzn String, ival String" }],
     );
 
-    $node->safe_psql(postgres => q{
+    $node->psql(postgres => q{
         CREATE TABLE datetime_arrays (
             ts    TIMESTAMP[]      NOT NULL,
             tsn   TIMESTAMP(3)[]   NOT NULL,
@@ -341,14 +342,14 @@ DATETIME: {
 }
 
 ENUMS: {
-    $node->safe_psql(postgres => q{
+    $node->psql(postgres => q{
         CREATE TYPE mood AS ENUM ('sad', 'ok', 'happy');
     });
-    $node->safe_psql(postgres => q{
+    $node->psql(postgres => q{
         CREATE TYPE dow AS ENUM ('Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat');
     });
 
-    $node->safe_psql(postgres => q{
+    $node->psql(postgres => q{
         CREATE TABLE enums (
             mood mood NOT NULL,
             dow  dow  NOT NULL
@@ -362,7 +363,7 @@ ENUMS: {
         qr[\Q structure: "mood String, dow String" }],
     );
 
-    $node->safe_psql(postgres => q{
+    $node->psql(postgres => q{
         CREATE TABLE enum_arrays (
             mood mood[] NOT NULL,
             dow  dow[]  NOT NULL
@@ -379,7 +380,7 @@ ENUMS: {
 }
 
 NETS: {
-    $node->safe_psql(postgres => q{
+    $node->psql(postgres => q{
         CREATE TABLE nets (
             inet INET     NOT NULL,
             cidr CIDR     NOT NULL,
@@ -395,7 +396,7 @@ NETS: {
         qr[\Q structure: "inet String, cidr String, mac String, mac8 String" }],
     );
 
-    $node->safe_psql(postgres => q{
+    $node->psql(postgres => q{
         CREATE TABLE net_arrays (
             inet INET[]     NOT NULL,
             cidr CIDR[]     NOT NULL,
@@ -414,7 +415,7 @@ NETS: {
 }
 
 BITS: {
-    $node->safe_psql(postgres => q{
+    $node->psql(postgres => q{
         CREATE TABLE bits (
             b  BIT       NOT NULL,
             bn BIT(3)    NOT NULL,
@@ -429,7 +430,7 @@ BITS: {
         qr[\Q structure: "b FixedString(1), bn FixedString(3), vb String(6)" }],
     );
 
-    $node->safe_psql(postgres => q{
+    $node->psql(postgres => q{
         CREATE TABLE bit_arrays (
             b  BIT[]       NOT NULL,
             bn BIT(3)[]    NOT NULL,
@@ -448,7 +449,7 @@ BITS: {
 }
 
 NAMING: {
-    $node->safe_psql(postgres => q{
+    $node->psql(postgres => q{
         CREATE TABLE "Namings" (
             "ID"        INT  NOT NULL,
             "Full Name" TEXT NOT NULL

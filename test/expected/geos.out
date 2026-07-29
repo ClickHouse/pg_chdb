@@ -130,4 +130,4 @@ t: Protobuf
 t: ProtobufList
 t: MsgPack
 t: BSONEachRow
-\! rm -rf test/geos.tmp
+\set ECHO errors

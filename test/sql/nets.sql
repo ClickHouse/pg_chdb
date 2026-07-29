@@ -42,4 +42,11 @@ CREATE TABLE net_arrays2 (LIKE net_arrays INCLUDING ALL);
 \set from_table net_arrays
 \set to_table net_arrays2
 \i test/utils/round-trip-formats.sql
-\! rm -rf test/nets.tmp
+
+\set ECHO errors
+\set ci ''
+\getenv ci CI
+SELECT :'ci' = '' AS not_ci \gset
+\if :not_ci
+\! rm -rf /tmp/nets.tmp
+\endif

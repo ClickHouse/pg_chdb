@@ -7,8 +7,7 @@
 --
 -- https://github.com/chdb-io/chdb/blob/main/refs/clickhouse-formats-settings.md#complete-format-names-table)
 
-\getenv test_dir PG_ABS_SRCDIR
-\set test_url file:// :test_dir / :output_fle
+\set test_url file:///tmp/ :output_fle
 \pset tuples_only on
 \pset format unaligned
 \pset fieldsep ': '

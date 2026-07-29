@@ -44,4 +44,11 @@ CREATE TABLE fixie_arrays2 (LIKE fixie_arrays INCLUDING ALL);
 \set from_table fixie_arrays
 \set to_table fixie_arrays2
 \i test/utils/round-trip-formats.sql
-\! rm -rf test/fixies.tmp
+
+\set ECHO errors
+\set ci ''
+\getenv ci CI
+SELECT :'ci' = '' AS not_ci \gset
+\if :not_ci
+\! rm -rf /tmp/fixies.tmp
+\endif

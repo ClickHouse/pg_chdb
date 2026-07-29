@@ -7,10 +7,10 @@ CREATE TABLE requests (
 -- Disable quiet to emit COPY numbers and make NULLs show up
 \pset null '#null#'
 \set QUIET false
--- directory paths are passed to us in environment variables
-\getenv test_dir PG_ABS_SRCDIR
-\set file_base file:// :test_dir /corpus
-\set temp_base file:// :test_dir /file.tmp
+-- Set up paths we'll use.
+\! cp -rf test/corpus /tmp/chdb-corpus
+\set file_base file:///tmp/chdb-corpus
+\set temp_base file:///tmp/file.tmp
 \set requests_csv :file_base /requests.csv
 COPY requests FROM :'requests_csv';
 COPY 4
@@ -26,11 +26,19 @@ SELECT * FROM requests ORDER BY req_id;
 \set requests_out :temp_base /requests.csv
 COPY requests TO :'requests_out' (structure 'id UInt64, name String, path String');
 COPY 4
-\! cat test/file.tmp/requests.csv
-1,"page_view","/users/profile"
-2,"Page_View","/users/settings"
-3,"PAGE_VIEW","/admin/dashboard"
-4,"add_to_cart","/products/shoes"
+TRUNCATE requests;
+TRUNCATE TABLE
+COPY requests FROM :'requests_out';
+COPY 4
+SELECT * FROM requests ORDER BY req_id;
+ req_id |    name     |       path       
+--------+-------------+------------------
+      1 | page_view   | /users/profile
+      2 | Page_View   | /users/settings
+      3 | PAGE_VIEW   | /admin/dashboard
+      4 | add_to_cart | /products/shoes
+(4 rows)
+
 -- Test importing from ClickHouse with all possible backslash escapes.
 -- https://clickhouse.com/docs/interfaces/formats/TabSeparated
 CREATE TABLE people (
@@ -62,14 +70,6 @@ SELECT * FROM people ORDER BY id;
 \set people_out :temp_base /people.tsv
 COPY people TO :'people_out' (structure 'i Int32, f String, g String, n String NULL');
 COPY 7
-\! cat test/file.tmp/people.tsv
-1	Obama	Barack	\'Bama to his friends
-2	Clinton	William	Hillary\tChelsea\tSocks\n
-3	Gates	Bill	Dos\r\nWindows\r\nExplorer
-4	Matrix	Dot	a \f b \f c \f \b
-5	Language	C	\N
-6	Others	Some	go \\ get  your  mouse @
-7	Others	Some	go \\ get  your  mouse @
 -- Import it again;
 TRUNCATE people;
 TRUNCATE TABLE
@@ -93,12 +93,23 @@ SELECT * FROM people ORDER BY id;
 -- Export it again, should replace previous.
 COPY people TO :'people_out' (structure 'i Int32, f String, g String, n String NULL');
 COPY 7
-\! cat test/file.tmp/people.tsv
-1	Obama	Barack	\'Bama to his friends
-2	Clinton	William	Hillary\tChelsea\tSocks\n
-3	Gates	Bill	Dos\r\nWindows\r\nExplorer
-4	Matrix	Dot	a \f b \f c \f \b
-5	Language	C	\N
-6	Others	Some	go \\ get  your  mouse @
-7	Others	Some	go \\ get  your  mouse @
-\! rm -rf test/file.tmp
+TRUNCATE people;
+TRUNCATE TABLE
+COPY people FROM :'people_out';
+COPY 7
+SELECT * FROM people ORDER BY id;
+ id | family_name | given_name |              notes              
+----+-------------+------------+---------------------------------
+  1 | Obama       | Barack     | 'Bama to his friends
+  2 | Clinton     | William    | Hillary Chelsea Socks          +
+    |             |            | 
+  3 | Gates       | Bill       | Dos\r                          +
+    |             |            | Windows\r                      +
+    |             |            | Explorer
+  4 | Matrix      | Dot        | a \x0C b \x0C c \x0C \x08
+  5 | Language    | C          | #null#
+  6 | Others      | Some       | go \ get \x07 your \x0B mouse @
+  7 | Others      | Some       | go \ get \x07 your \x0B mouse @
+(7 rows)
+
+\set ECHO errors

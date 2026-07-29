@@ -61,4 +61,11 @@ CREATE TABLE structure_arrays2 (LIKE structure_arrays INCLUDING ALL);
 \set to_table structure_arrays2
 \set columns 'jp::text[], xml::text[], j::text[], jb::text[]'
 \i test/utils/round-trip-formats.sql
-\! rm -rf test/structures.tmp
+
+\set ECHO errors
+\set ci ''
+\getenv ci CI
+SELECT :'ci' = '' AS not_ci \gset
+\if :not_ci
+\! rm -rf /tmp/structures.tmp
+\endif

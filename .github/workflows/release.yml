@@ -15,6 +15,8 @@ jobs:
         uses: actions/checkout@v7
       - name: Start Postgres
         run: pg-start ${{ env.pg }} libkrb5-dev
+      - name: Tweak Permissions # for cache restore
+        run: sudo chmod a+rwx /usr/local/lib /usr/local/include
       - name: Cache chDB
         id: cache-chdb
         uses: actions/cache@v6
@@ -24,11 +26,8 @@ jobs:
             /usr/local/lib/libchdb.so
             /usr/local/include/chdb.*
       - name: Install chDB
-        run: ${{ steps.cache-chdb.outputs.cache-hit != 'true' && 'curl -sL https://lib.chdb.io | bash' || 'ldconfig' }}
+        run: ${{ steps.cache-chdb.outputs.cache-hit != 'true' && 'curl -sL https://lib.chdb.io | sudo bash' || 'sudo ldconfig' }}
         env: { INSTALL_VERSION: "${{ env.chdb_version }}" }
-      - run: |
-          ls -lah /usr/local/lib/libchdb.so /usr/local/include/chdb.*
-          md5sum /usr/local/lib/libchdb.so /usr/local/include/chdb.h
       - name: Bundle the Release
         id: bundle
         run: pgxn-bundle

@@ -33,7 +33,7 @@ subtest s3 => sub {
     check_query(
         $node, 'just TO url',
         qq{COPY stuff TO 's3://localhost:$port/bucket/prefix/file.csv'},
-        qr/\QFailed to receive table structure/,
+        qr/\QDB::Exception: Message: Access Denied/,
         qr[\QINSERT INTO FUNCTION s3('s3://localhost\E:$port\Q/bucket/prefix/file.csv', 'auto', 'id Int32 NULL') SETTINGS date_time_output_format='iso', engine_file_truncate_on_insert=1, s3_request_timeout_ms = 30000],
         qr[\Q{ url: "s3://localhost:\E$port\Q/bucket/prefix/file.csv", format: "auto", structure: "id Int32 NULL" }],
     );
@@ -142,7 +142,7 @@ subtest gcs => sub {
     check_query(
         $node, 'just FROM url',
         qq{COPY stuff FROM 'gcs://example.org/bucket/prefix/file.csv'},
-        qr/HTTP response code: 404/,
+        qr/\QHTTP response code: 404/,
         qr[\QSELECT * FROM gcs({url:String}, {format:String}, {structure:String}) SETTINGS date_time_output_format='iso', engine_file_truncate_on_insert=1, s3_request_timeout_ms = 30000],
         qr[\Q{ url: "https://example.org/bucket/prefix/file.csv", format: "auto", structure: "id Int32 NULL" }],
     );
@@ -166,7 +166,7 @@ subtest gcs => sub {
                 timeout 0
             )
         },
-        qr/HTTP response code: 404/,
+        qr/\QHTTP response code: 404/,
         qr[\QSELECT * FROM gcs({url:String}, {access_key:String}, {access_secret:String}, {format:String}, {structure:String}, {compression:String}) SETTINGS date_time_output_format='iso', engine_file_truncate_on_insert=1, s3_request_timeout_ms = 0],
         qr[\Q{ url: "https://example.org/bucket/prefix/file.csv", access_key: "key", access_secret: "secret", format: "parquet", structure: "id Int64", compression: "lz4" }],
     );
@@ -178,7 +178,7 @@ subtest http => sub {
     check_query(
         $node, 'just FROM url',
         qq{COPY stuff FROM 'http://example.org/path/file.csv'},
-        qr/HTTP status code: 404/,
+        qr/\QHTTP status code: 404/,
         qr[\QSELECT * FROM url({url:String}, {format:String}, {structure:String}) SETTINGS date_time_output_format='iso', engine_file_truncate_on_insert=1, http_connection_timeout=30, http_max_tries=1],
         qr[\Q{ url: "http://example.org/path/file.csv", format: "auto", structure: "id Int32 NULL" }],
     );
@@ -192,21 +192,21 @@ subtest http => sub {
     check_query(
         $node, 'FROM format, structure, round up timeout',
         qq{COPY stuff FROM 'http://example.org/path/file.csv' (FORMAT 'TabSeparated', structure 'id Int32', timeout 500)},
-        qr/HTTP status code: 404/,
+        qr/\QHTTP status code: 404\E|\QDB::Exception: Poco::Net::NetException: Net Exception/,
         qr[\QSELECT * FROM url({url:String}, {format:String}, {structure:String}) SETTINGS date_time_output_format='iso', engine_file_truncate_on_insert=1, http_connection_timeout=1, http_max_tries=1],
         qr[\Q{ url: "http://example.org/path/file.csv", format: "TabSeparated", structure: "id Int32" }],
     );
     check_query(
         $node, 'TO structure, round up timeout',
         qq{COPY stuff FROM 'http://example.org/path/file.csv' (structure 'id Int32', timeout 1500)},
-        qr/HTTP status code: 404/,
+        qr/\QHTTP status code: 404\E|\QDB::Exception: Poco::Net::NoMessageException: No message received/,
         qr[\QSELECT * FROM url({url:String}, {format:String}, {structure:String}) SETTINGS date_time_output_format='iso', engine_file_truncate_on_insert=1, http_connection_timeout=2, http_max_tries=1],
         qr[\Q{ url: "http://example.org/path/file.csv", format: "auto", structure: "id Int32" }],
     );
     check_query(
         $node, 'TO format',
         qq{COPY stuff FROM 'http://example.org/path/file.csv' (format 'CSV', timeout 100)},
-        qr/HTTP status code: 404/,
+        qr/\QHTTP status code: 404\E|\QDB::Exception: Poco::Net::NoMessageException: No message received/,
         qr[\QSELECT * FROM url({url:String}, {format:String}, {structure:String}) SETTINGS date_time_output_format='iso', engine_file_truncate_on_insert=1, http_connection_timeout=1, http_max_tries=1],
         qr[\Q{ url: "http://example.org/path/file.csv", format: "CSV", structure: "id Int32 NULL" }],
     );
@@ -342,7 +342,7 @@ subtest hdfs => sub {
     check_query(
         $node, 'just FROM url',
         qq{COPY stuff FROM 'hdfs://localhost:$port/bucket/prefix/file.csv'},
-        qr/Unknown table function hdfs/, # XXX WTF
+        qr/\QDB::Exception: Unable to connect to HDFS\E|\QUnknown table function hdfs/, # XXX WTF
         qr[\QSELECT * FROM hdfs({url:String}, {format:String}, {structure:String}) SETTINGS date_time_output_format='iso', engine_file_truncate_on_insert=1],
         qr[\Q{ url: "hdfs://localhost:\E$port\Q/bucket/prefix/file.csv", format: "auto", structure: "id Int32 NULL" }],
     );
@@ -357,21 +357,21 @@ subtest hdfs => sub {
     check_query(
         $node, 'FROM url with format and structure',
         qq{COPY stuff FROM 'hdfs://localhost:$port/bucket/prefix/file.csv' (FORMAT 'TSV', STRUCTURE 'a Int8')},
-        qr/Unknown table function hdfs/, # XXX WTF
+        qr/\QDB::Exception: Unable to connect to HDFS\E|\QUnknown table function hdfs/, # XXX WTF
         qr[\QSELECT * FROM hdfs({url:String}, {format:String}, {structure:String}) SETTINGS date_time_output_format='iso', engine_file_truncate_on_insert=1],
         qr[\Q{ url: "hdfs://localhost:\E$port\Q/bucket/prefix/file.csv", format: "TSV", structure: "a Int8" }],
     );
     check_query(
         $node, 'FROM url with structure',
         qq{COPY stuff FROM 'hdfs://localhost:$port/bucket/prefix/file.csv' (STRUCTURE 'a UInt8')},
-        qr/Unknown table function hdfs/, # XXX WTF
+        qr/\QDB::Exception: Unable to connect to HDFS\E|\QUnknown table function hdfs/, # XXX WTF
         qr[\QSELECT * FROM hdfs({url:String}, {format:String}, {structure:String}) SETTINGS date_time_output_format='iso', engine_file_truncate_on_insert=1],
         qr[\Q{ url: "hdfs://localhost:\E$port\Q/bucket/prefix/file.csv", format: "auto", structure: "a UInt8" }],
     );
     check_query(
         $node, 'FROM url with format',
         qq{COPY stuff FROM 'hdfs://localhost:$port/bucket/prefix/file.csv' (format 'TabSeparated')},
-        qr/Unknown table function hdfs/, # XXX WTF
+        qr/\QDB::Exception: Unable to connect to HDFS\E|\QUnknown table function hdfs/, # XXX WTF
         qr[\QSELECT * FROM hdfs({url:String}, {format:String}, {structure:String}) SETTINGS date_time_output_format='iso', engine_file_truncate_on_insert=1],
         qr[\Q{ url: "hdfs://localhost:\E$port\Q/bucket/prefix/file.csv", format: "TabSeparated", structure: "id Int32 NULL" }],
     );

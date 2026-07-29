@@ -123,4 +123,4 @@ t: Protobuf
 t: ProtobufList
 t: MsgPack
 t: BSONEachRow
-\! rm -rf test/varchars.tmp
+\set ECHO errors

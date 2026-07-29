@@ -4,6 +4,7 @@ SELECT pgchdb_version() ~ '^\d+\.\d+\.\d+$';
  t
 (1 row)
 
+\set ECHO errors
 SELECT version = pgchdb_version() 
   FROM pg_get_loaded_modules()
  WHERE module_name = 'chdb';

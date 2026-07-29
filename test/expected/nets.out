@@ -122,4 +122,4 @@ t: Protobuf
 t: ProtobufList
 t: MsgPack
 t: BSONEachRow
-\! rm -rf test/nets.tmp
+\set ECHO errors

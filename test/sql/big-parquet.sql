@@ -1,7 +1,6 @@
 LOAD 'chdb';
 
-\getenv test_dir PG_ABS_SRCDIR
-\set parquet_file file:// :test_dir /big.tmp/big.parquet
+\set parquet_file file:///tmp/big.tmp/big.parquet
 
 CREATE TYPE http_method AS ENUM(
   'GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'CONNECT',
@@ -36,7 +35,7 @@ SELECT random(0, +9223372036854775807),
        (WITH x(a) AS (select random(x-x+1, 100)) SELECT CASE WHEN a < 91 THEN 'GET' WHEN a < 97 THEN 'POST' WHEN a < 99 THEN 'PUT' ELSE (ARRAY['HEAD', 'DELETE', 'CONNECT', 'OPTIONS', 'TRACE', 'PATCH', 'QUERY'])[random(x-x+1, 7)] END FROM x)::http_method,
        random(1, 8) AS node_id,
        (WITH x(a) AS (select random(x-x+1, 100)) SELECT CASE WHEN a < 95 THEN 200 WHEN a < 97 THEN 201 WHEN a < 99 THEN 204 ELSE (ARRAY[308, 400, 401, 403, 500])[random(x-x+1, 5)] END FROM x)
--- FROM generate_series(1, 10) x;
+-- FROM generate_series(1, 1000) x;
 FROM generate_series(1, 1260000) x;
 
 SELECT pg_size_pretty(pg_total_relation_size('logs'));
@@ -57,8 +56,16 @@ CREATE TABLE imported_logs (LIKE logs INCLUDING ALL);
 COPY imported_logs FROM :'parquet_file';
 
 -- They should be the same
-SELECT * FROM logs
-EXCEPT ALL
-SELECT * FROM imported_logs;
+WITH x AS (
+    SELECT * FROM logs
+    EXCEPT ALL
+    SELECT * FROM imported_logs
+) SELECT * FROM x LIMIT 10;
 
-\! rm -rf test/big.tmp
+\set ECHO errors
+\set ci ''
+\getenv ci CI
+SELECT :'ci' = '' AS not_ci \gset
+\if :not_ci
+\! rm -rf /tmp/big.tmp
+\endif

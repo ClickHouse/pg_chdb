@@ -44,32 +44,32 @@ t: JSONColumnsWithMetadata
 t: JSONCompact
 t: JSONCompactColumns
 t: JSONEachRow
-psql:test/utils/round-trip-formats.sql:171: ERROR:  invalid input syntax for type json
+psql:test/utils/round-trip-formats.sql:170: ERROR:  invalid input syntax for type json
 DETAIL:  The input string ended unexpectedly.
 CONTEXT:  JSON data, line 1: 
 COPY structures2, line 2, column j: ""
-psql:test/utils/round-trip-formats.sql:171: STATEMENT:  COPY "structures2" FROM 'file:///Users/david/dev/pgxn/pg_chdb/test/structures.tmp' (format 'JSONStringsEachRow');
+psql:test/utils/round-trip-formats.sql:170: STATEMENT:  COPY "structures2" FROM 'file:///tmp/structures.tmp' (format 'JSONStringsEachRow');
 f: JSONStringsEachRow
 t: JSONCompactEachRow
-psql:test/utils/round-trip-formats.sql:185: ERROR:  invalid input syntax for type json
+psql:test/utils/round-trip-formats.sql:184: ERROR:  invalid input syntax for type json
 DETAIL:  The input string ended unexpectedly.
 CONTEXT:  JSON data, line 1: 
 COPY structures2, line 2, column j: ""
-psql:test/utils/round-trip-formats.sql:185: STATEMENT:  COPY "structures2" FROM 'file:///Users/david/dev/pgxn/pg_chdb/test/structures.tmp' (format 'JSONCompactStringsEachRow');
+psql:test/utils/round-trip-formats.sql:184: STATEMENT:  COPY "structures2" FROM 'file:///tmp/structures.tmp' (format 'JSONCompactStringsEachRow');
 f: JSONCompactStringsEachRow
 t: JSONCompactEachRowWithNames
 t: JSONCompactEachRowWithNamesAndTypes
-psql:test/utils/round-trip-formats.sql:206: ERROR:  invalid input syntax for type json
+psql:test/utils/round-trip-formats.sql:205: ERROR:  invalid input syntax for type json
 DETAIL:  The input string ended unexpectedly.
 CONTEXT:  JSON data, line 1: 
 COPY structures2, line 2, column j: ""
-psql:test/utils/round-trip-formats.sql:206: STATEMENT:  COPY "structures2" FROM 'file:///Users/david/dev/pgxn/pg_chdb/test/structures.tmp' (format 'JSONCompactStringsEachRowWithNames');
+psql:test/utils/round-trip-formats.sql:205: STATEMENT:  COPY "structures2" FROM 'file:///tmp/structures.tmp' (format 'JSONCompactStringsEachRowWithNames');
 f: JSONCompactStringsEachRowWithNames
-psql:test/utils/round-trip-formats.sql:213: ERROR:  invalid input syntax for type json
+psql:test/utils/round-trip-formats.sql:212: ERROR:  invalid input syntax for type json
 DETAIL:  The input string ended unexpectedly.
 CONTEXT:  JSON data, line 1: 
 COPY structures2, line 2, column j: ""
-psql:test/utils/round-trip-formats.sql:213: STATEMENT:  COPY "structures2" FROM 'file:///Users/david/dev/pgxn/pg_chdb/test/structures.tmp' (format 'JSONCompactStringsEachRowWithNamesAndTypes');
+psql:test/utils/round-trip-formats.sql:212: STATEMENT:  COPY "structures2" FROM 'file:///tmp/structures.tmp' (format 'JSONCompactStringsEachRowWithNamesAndTypes');
 f: JSONCompactStringsEachRowWithNamesAndTypes
 t: JSONObjectEachRow
 t: TSKV
@@ -161,4 +161,4 @@ t: Protobuf
 t: ProtobufList
 t: MsgPack
 t: BSONEachRow
-\! rm -rf test/structures.tmp
+\set ECHO errors

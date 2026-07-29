@@ -1,0 +1,8 @@
+SELECT pgchdb_version() ~ '^\d+\.\d+\.\d+$';
+ ?column? 
+----------
+ t
+(1 row)
+
+\set ECHO errors
+SKIP: pg_get_loaded_modules() not defined prior to Postgres 18

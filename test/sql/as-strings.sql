@@ -44,4 +44,11 @@ CREATE TABLE as_string_arrays2 (LIKE as_string_arrays INCLUDING ALL);
 \set from_table as_string_arrays
 \set to_table as_string_arrays2
 \i test/utils/round-trip-formats.sql
-\! rm -rf test/as_strings.tmp
+
+\set ECHO errors
+\set ci ''
+\getenv ci CI
+SELECT :'ci' = '' AS not_ci \gset
+\if :not_ci
+\! rm -rf /tmp/as_strings.tmp
+\endif

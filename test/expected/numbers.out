@@ -1,4 +1,5 @@
 LOAD 'chdb';
+\set ECHO errors
 /****************************************************************************/
 -- Numbers.
 CREATE TABLE numbers (
@@ -13,7 +14,7 @@ CREATE TABLE numbers (
     f8  float8             NULL,
     b   bool           NOT NULL,
     o   OID            NOT NULL,
-    o8  OID8           NOT NULL
+    o8  :oid8          NOT NULL
 );
 INSERT INTO numbers
 VALUES ('00000000-0000-0000-0000-000000000000', 0, 0, 0, 0, 0, 0, 0, 0, false, 0, 0)
@@ -89,7 +90,7 @@ CREATE TABLE number_arrays (
     f8  float8[]         NOT NULL,
     b   bool[]           NOT NULL,
     o   OID[]            NOT NULL,
-    o8  OID8[]           NOT NULL
+    o8  :oid8[]          NOT NULL
 );
 INSERT INTO number_arrays
 VALUES ('{00000000-0000-0000-0000-000000000000}', '{0}', '{0}', '{0}', '{0}', '{0}', '{0}', '{0}', '{0}', '{false}', '{0}', '{0}')
@@ -144,4 +145,4 @@ t: Protobuf
 t: ProtobufList
 t: MsgPack
 t: BSONEachRow
-\! rm -rf test/numbers.tmp
+\set ECHO errors

@@ -45,11 +45,19 @@ PG_MODULE_MAGIC_EXT(.name = "chdb_bgw", .version = PGCHCB_VERSION);
 PG_MODULE_MAGIC;
 #endif
 
+/* Define OIDs added in Postgres 19. */
+#if PG_VERSION_NUM <= 190000
+#define OID8OID 6437
+#define OID8ARRAYOID 6442
+#endif
+
 /* Connection to chDB, one per worker. */
 static chdb_connection* chDBConnection = NULL;
 
 /* Streaming result. */
 static chdb_result* chDBStreamingResult = NULL;
+
+static chdb_result* chDBChunkResult = NULL;
 
 /* Insert streaming handle. */
 static chdb_insert_stream chDBInsertStream = NULL;
@@ -498,7 +506,7 @@ make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** value
         }
         appendStringInfo(
             query,
-            ") SETTINGS %s, s3_request_timeout_ms = %u",
+            ") SETTINGS %s, s3_request_timeout_ms = %u, s3_truncate_on_insert = 1",
             settings,
             ctx->extra.timeout
         );
@@ -745,28 +753,29 @@ fetch_chdb_data(void* outbuf, int minread, int maxread) {
     Assert(chDBConnection != NULL);
 
     /* If there are some leftover data from previous read, use it. */
-    if (avail) {
-        if (avail > maxread) {
-            avail = maxread;
-        }
+    while (avail > 0 && maxread > 0 && bytes_read < minread) {
+        avail = Min(avail, maxread);
         memcpy(outbuf, &CopyBuf->data[CopyBuf->cursor], avail);
+        outbuf = (char*)outbuf + avail;
         CopyBuf->cursor += avail;
         maxread -= avail;
         bytes_read += avail;
+        avail = CopyBuf->len - CopyBuf->cursor;
     }
 
-    if (!StreamingInProgress) {
+    if (!StreamingInProgress || avail > 0) {
         return bytes_read;
     }
 
-    chdb_result* chunk;
     while (maxread > 0 && bytes_read < minread) {
+        chdb_destroy_query_result(chDBChunkResult);
         const char* error = NULL;
 
         while (true) {
             CHECK_FOR_INTERRUPTS(); /* Integrate chdb_stream_cancel_query? */
-            chunk = chdb_stream_fetch_result(*chDBConnection, chDBStreamingResult);
-            if (!chunk) {
+            chDBChunkResult =
+                chdb_stream_fetch_result(*chDBConnection, chDBStreamingResult);
+            if (!chDBChunkResult) {
                 chdb_stream_cancel_query(*chDBConnection, chDBStreamingResult);
                 ereport(
                     ERROR,
@@ -775,7 +784,7 @@ fetch_chdb_data(void* outbuf, int minread, int maxread) {
                 );
             }
 
-            if ((error = chdb_result_error(chunk))) {
+            if ((error = chdb_result_error(chDBChunkResult))) {
                 /* Cut out the request ID line if present. */
                 char* rec_id = strstr(error, "Request ID:");
                 if (rec_id) {
@@ -790,7 +799,6 @@ fetch_chdb_data(void* outbuf, int minread, int maxread) {
                 }
 
                 error = pstrdup(error);
-                chdb_destroy_query_result(chunk);
                 ereport(
                     ERROR,
                     errcode(ERRCODE_EXTERNAL_ROUTINE_EXCEPTION),
@@ -800,31 +808,28 @@ fetch_chdb_data(void* outbuf, int minread, int maxread) {
             }
 
             /* Check if we have data in this chunk. */
-            size_t chunk_length = chdb_result_length(chunk);
+            size_t chunk_length = chdb_result_length(chDBChunkResult);
             if (chunk_length == 0) {
                 /* We're done. */
-                chdb_destroy_query_result(chunk);
+                chdb_destroy_query_result(chDBChunkResult);
                 StreamingInProgress = false;
                 return bytes_read; /* End of stream. */
             }
             Assert(chunk_length <= INT_MAX);
+            Assert(avail == 0);
 
             /* Process the data; borrowed from tablesync.c. */
-            CopyBuf->data   = chdb_result_buffer(chunk);
+            CopyBuf->data   = chdb_result_buffer(chDBChunkResult);
             CopyBuf->len    = (int)chunk_length;
             CopyBuf->cursor = 0;
             // elog(NOTICE, "%s", pnstrdup(CopyBuf->data, CopyBuf->len));
 
-            avail = CopyBuf->len - CopyBuf->cursor;
-            if (avail > maxread) {
-                avail = maxread;
-            }
+            avail = Min(CopyBuf->len, maxread);
             memcpy(outbuf, &CopyBuf->data[CopyBuf->cursor], avail);
             outbuf = (char*)outbuf + avail;
             CopyBuf->cursor += avail;
             maxread -= avail;
             bytes_read += avail;
-            chdb_destroy_query_result(chunk);
 
             if (maxread <= 0 || bytes_read >= minread) {
                 return bytes_read;

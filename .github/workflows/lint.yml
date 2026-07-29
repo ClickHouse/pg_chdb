@@ -21,6 +21,8 @@ jobs:
           packages: libkrb5-dev clang-tidy bear
       - name: Install pre-commit
         run: make debian-install-lint
+      - name: Tweak Permissions # for cache restore
+        run: sudo chmod a+rwx /usr/local/lib /usr/local/include
       - name: Cache chDB
         id: cache-chdb
         uses: actions/cache@v6
@@ -30,7 +32,7 @@ jobs:
             /usr/local/lib/libchdb.so
             /usr/local/include/chdb.*
       - name: Install chDB
-        run: ${{ steps.cache-chdb.outputs.cache-hit != 'true' && 'curl -sL https://lib.chdb.io | bash' || 'ldconfig' }}
+        run: ${{ steps.cache-chdb.outputs.cache-hit != 'true' && 'curl -sL https://lib.chdb.io | sudo bash' || 'sudo ldconfig' }}
         env: { INSTALL_VERSION: "${{ env.chdb_version }}" }
       - name: Add Postgres to Path
         run: echo /usr/lib/postgresql/${{ env.pg }}/bin >> "$GITHUB_PATH"

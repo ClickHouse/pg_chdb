@@ -50,4 +50,11 @@ CREATE TABLE geo_arrays2 (LIKE geo_arrays INCLUDING ALL);
 \set to_table geo_arrays2
 \set columns 'p::text[], line::text[], lseg::text[], box::text[], path::text[], poly::text[], cir::text[]'
 \i test/utils/round-trip-formats.sql
-\! rm -rf test/geos.tmp
+
+\set ECHO errors
+\set ci ''
+\getenv ci CI
+SELECT :'ci' = '' AS not_ci \gset
+\if :not_ci
+\! rm -rf /tmp/geos.tmp
+\endif

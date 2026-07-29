@@ -39,4 +39,11 @@ CREATE TABLE bit_arrays2 (LIKE bit_arrays INCLUDING ALL);
 \set from_table bit_arrays
 \set to_table bit_arrays2
 \i test/utils/round-trip-formats.sql
-\! rm -rf test/bits.tmp
+
+\set ECHO errors
+\set ci ''
+\getenv ci CI
+SELECT :'ci' = '' AS not_ci \gset
+\if :not_ci
+\! rm -rf /tmp/bits.tmp
+\endif
