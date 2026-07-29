@@ -42,7 +42,7 @@ VALUES ('00000000-0000-0000-0000-000000000000', 0, 0, 0, 0, 0, 0, 0, 0, false, 0
 CREATE TABLE numbers2 (LIKE numbers INCLUDING ALL);
 \set from_table numbers
 \set to_table numbers2
-\set output_fle numbers.tmp
+\set output_file numbers.tmp
 \i test/utils/round-trip-formats.sql
 
 /****************************************************************************/
@@ -73,11 +73,5 @@ CREATE TABLE number_arrays2 (LIKE number_arrays INCLUDING ALL);
 \set from_table number_arrays
 \set to_table number_arrays2
 \i test/utils/round-trip-formats.sql
-
 \set ECHO errors
-\set ci ''
-\getenv ci CI
-SELECT :'ci' = '' AS not_ci \gset
-\if :not_ci
-\! rm -rf /tmp/numbers.tmp
-\endif
+\! rm -rf /tmp/numbers.tmp 2> /dev/null || true

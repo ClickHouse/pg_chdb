@@ -19,7 +19,7 @@ VALUES ('1.2.6.4/16', '121.111.63.82', '22:00:5c:08:55:08', '08:00:2b:01:02:03:0
 CREATE TABLE nets2 (LIKE nets INCLUDING ALL);
 \set from_table nets
 \set to_table nets2
-\set output_fle nets.tmp
+\set output_file nets.tmp
 \i test/utils/round-trip-formats.sql
 
 /****************************************************************************/
@@ -42,11 +42,5 @@ CREATE TABLE net_arrays2 (LIKE net_arrays INCLUDING ALL);
 \set from_table net_arrays
 \set to_table net_arrays2
 \i test/utils/round-trip-formats.sql
-
 \set ECHO errors
-\set ci ''
-\getenv ci CI
-SELECT :'ci' = '' AS not_ci \gset
-\if :not_ci
-\! rm -rf /tmp/nets.tmp
-\endif
+\! rm -rf /tmp/nets.tmp 2> /dev/null || true

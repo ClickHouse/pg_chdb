@@ -19,7 +19,7 @@ VALUES ('02:00:00', 'a fat cat', 'fat & rat', '100')
 CREATE TABLE as_strings2 (LIKE as_strings INCLUDING ALL);
 \set from_table as_strings
 \set to_table as_strings2
-\set output_fle as_strings.tmp
+\set output_file as_strings.tmp
 \i test/utils/round-trip-formats.sql
 
 /****************************************************************************/
@@ -44,11 +44,5 @@ CREATE TABLE as_string_arrays2 (LIKE as_string_arrays INCLUDING ALL);
 \set from_table as_string_arrays
 \set to_table as_string_arrays2
 \i test/utils/round-trip-formats.sql
-
 \set ECHO errors
-\set ci ''
-\getenv ci CI
-SELECT :'ci' = '' AS not_ci \gset
-\if :not_ci
-\! rm -rf /tmp/as_strings.tmp
-\endif
+\! rm -rf /tmp/as_strings.tmp 2> /dev/null || true

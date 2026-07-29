@@ -21,7 +21,7 @@ VALUES ('', '', '')
 CREATE TABLE strings2 (LIKE strings INCLUDING ALL);
 \set from_table strings
 \set to_table strings2
-\set output_fle strings.tmp
+\set output_file strings.tmp
 \i test/utils/round-trip-formats.sql
 
 /****************************************************************************/
@@ -44,11 +44,5 @@ CREATE TABLE string_arrays2 (LIKE string_arrays INCLUDING ALL);
 \set from_table string_arrays
 \set to_table string_arrays2
 \i test/utils/round-trip-formats.sql
-
 \set ECHO errors
-\set ci ''
-\getenv ci CI
-SELECT :'ci' = '' AS not_ci \gset
-\if :not_ci
-\! rm -rf /tmp/strings.tmp
-\endif
+\! rm -rf /tmp/strings.tmp 2> /dev/null || true

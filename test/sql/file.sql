@@ -53,12 +53,6 @@ COPY people TO :'people_out' (structure 'i Int32, f String, g String, n String N
 TRUNCATE people;
 COPY people FROM :'people_out';
 SELECT * FROM people ORDER BY id;
-
 \set ECHO errors
-\set ci ''
-\getenv ci CI
-SELECT :'ci' = '' AS not_ci \gset
-\if :not_ci
-\! rm -rf /tmp/chdb-corpus
-\! rm -rf /tmp/file.tmp
-\endif
+\! rm -rf /tmp/file.tmp 2> /dev/null || true
+\! rm -rf /tmp/chdb-corpus 2> /dev/null || true

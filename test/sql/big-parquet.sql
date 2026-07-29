@@ -63,9 +63,4 @@ WITH x AS (
 ) SELECT * FROM x LIMIT 10;
 
 \set ECHO errors
-\set ci ''
-\getenv ci CI
-SELECT :'ci' = '' AS not_ci \gset
-\if :not_ci
-\! rm -rf /tmp/big.tmp
-\endif
+\! rm -rf /tmp/big.tmp 2> /dev/null || true

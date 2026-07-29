@@ -23,7 +23,7 @@ VALUES ('$.x', '<html>hi</html>', '{"x": true}', '{"y": false}')
 CREATE TABLE structures2 (LIKE structures INCLUDING ALL);
 \set from_table structures
 \set to_table structures2
-\set output_fle structures.tmp
+\set output_file structures.tmp
 \set columns 'jp::text, xml::text, j::text, jb::text'
 \i test/utils/round-trip-formats.sql
 
@@ -61,11 +61,5 @@ CREATE TABLE structure_arrays2 (LIKE structure_arrays INCLUDING ALL);
 \set to_table structure_arrays2
 \set columns 'jp::text[], xml::text[], j::text[], jb::text[]'
 \i test/utils/round-trip-formats.sql
-
 \set ECHO errors
-\set ci ''
-\getenv ci CI
-SELECT :'ci' = '' AS not_ci \gset
-\if :not_ci
-\! rm -rf /tmp/structures.tmp
-\endif
+\! rm -rf /tmp/structures.tmp 2> /dev/null || true

@@ -16,7 +16,7 @@ VALUES ('02:00:00', 'a fat cat', 'fat & rat', '100')
 CREATE TABLE as_strings2 (LIKE as_strings INCLUDING ALL);
 \set from_table as_strings
 \set to_table as_strings2
-\set output_fle as_strings.tmp
+\set output_file as_strings.tmp
 \i test/utils/round-trip-formats.sql
 \set ECHO errors
 t: TabSeparated

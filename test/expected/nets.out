@@ -16,7 +16,7 @@ VALUES ('1.2.6.4/16', '121.111.63.82', '22:00:5c:08:55:08', '08:00:2b:01:02:03:0
 CREATE TABLE nets2 (LIKE nets INCLUDING ALL);
 \set from_table nets
 \set to_table nets2
-\set output_fle nets.tmp
+\set output_file nets.tmp
 \i test/utils/round-trip-formats.sql
 \set ECHO errors
 t: TabSeparated

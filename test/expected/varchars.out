@@ -17,7 +17,7 @@ VALUES ('', '', '', '')
 CREATE TABLE varchars2 (LIKE varchars INCLUDING ALL);
 \set from_table varchars
 \set to_table varchars2
-\set output_fle varchars.tmp
+\set output_file varchars.tmp
 \i test/utils/round-trip-formats.sql
 \set ECHO errors
 t: TabSeparated

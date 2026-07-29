@@ -20,7 +20,7 @@ VALUES ('$.x', '<html>hi</html>', '{"x": true}', '{"y": false}')
 CREATE TABLE structures2 (LIKE structures INCLUDING ALL);
 \set from_table structures
 \set to_table structures2
-\set output_fle structures.tmp
+\set output_file structures.tmp
 \set columns 'jp::text, xml::text, j::text, jb::text'
 \i test/utils/round-trip-formats.sql
 \set ECHO errors

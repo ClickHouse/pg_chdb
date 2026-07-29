@@ -15,7 +15,7 @@ VALUES ('1', '111', '111111')
 CREATE TABLE bits2 (LIKE bits INCLUDING ALL);
 \set from_table bits
 \set to_table bits2
-\set output_fle bits.tmp
+\set output_file bits.tmp
 \i test/utils/round-trip-formats.sql
 \set ECHO errors
 t: TabSeparated

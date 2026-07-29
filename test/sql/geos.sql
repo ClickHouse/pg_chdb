@@ -22,7 +22,7 @@ VALUES ('0,0', '(1,1),(2,2)', '((11,11),(12,12))', '((11,11),(13,13))', '((11,12
 CREATE TABLE geos2 (LIKE geos INCLUDING ALL);
 \set from_table geos
 \set to_table geos2
-\set output_fle geos.tmp
+\set output_file geos.tmp
 \set columns 'p::text, line::text, lseg::text, box::text, path::text, poly::text, cir::text'
 \i test/utils/round-trip-formats.sql
 
@@ -50,11 +50,5 @@ CREATE TABLE geo_arrays2 (LIKE geo_arrays INCLUDING ALL);
 \set to_table geo_arrays2
 \set columns 'p::text[], line::text[], lseg::text[], box::text[], path::text[], poly::text[], cir::text[]'
 \i test/utils/round-trip-formats.sql
-
 \set ECHO errors
-\set ci ''
-\getenv ci CI
-SELECT :'ci' = '' AS not_ci \gset
-\if :not_ci
-\! rm -rf /tmp/geos.tmp
-\endif
+\! rm -rf /tmp/geos.tmp 2> /dev/null || true

@@ -31,7 +31,7 @@ VALUES ('00000000-0000-0000-0000-000000000000', 0, 0, 0, 0, 0, 0, 0, 0, false, 0
 CREATE TABLE numbers2 (LIKE numbers INCLUDING ALL);
 \set from_table numbers
 \set to_table numbers2
-\set output_fle numbers.tmp
+\set output_file numbers.tmp
 \i test/utils/round-trip-formats.sql
 \set ECHO errors
 t: TabSeparated

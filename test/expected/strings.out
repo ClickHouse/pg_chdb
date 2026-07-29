@@ -18,7 +18,7 @@ VALUES ('', '', '')
 CREATE TABLE strings2 (LIKE strings INCLUDING ALL);
 \set from_table strings
 \set to_table strings2
-\set output_fle strings.tmp
+\set output_file strings.tmp
 \i test/utils/round-trip-formats.sql
 \set ECHO errors
 t: TabSeparated

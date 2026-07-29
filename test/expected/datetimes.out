@@ -22,7 +22,7 @@ VALUES ('2026-07-23 20:43:10', '2026-07-23 20:43:27', '2026-07-23 20:43:50+00', 
 CREATE TABLE datetimes2 (LIKE datetimes INCLUDING ALL);
 \set from_table datetimes
 \set to_table datetimes2
-\set output_fle datetimes.tmp
+\set output_file datetimes.tmp
 \i test/utils/round-trip-formats.sql
 \set ECHO errors
 t: TabSeparated

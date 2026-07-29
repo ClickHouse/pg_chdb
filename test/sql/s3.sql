@@ -40,10 +40,11 @@ VALUES ((random() * 10000)::int, format('thing-%s', (random() * 100)::int), (ran
 ;
 
 \set ECHO errors
--- Create URL path to avoid conflicts between concurrent execution.
+-- Create unique URL path to avoid conflicts between concurrent execution.
+SELECT (random() * 100000)::int AS rand \gset
 \set arch ''
 \getenv arch RUNNER_ARCH
-\set url s3://pg-chdb-ci-248825820370-us-east-2-an/ci/:SERVER_VERSION_NUM :arch /test.csv
+\set url s3://pg-chdb-ci-248825820370-us-east-2-an/ci/:SERVER_VERSION_NUM - :arch - :rand /test.csv
 \set ECHO all
 
 -- Copy the data to AWS.

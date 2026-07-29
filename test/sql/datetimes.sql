@@ -25,7 +25,7 @@ VALUES ('2026-07-23 20:43:10', '2026-07-23 20:43:27', '2026-07-23 20:43:50+00', 
 CREATE TABLE datetimes2 (LIKE datetimes INCLUDING ALL);
 \set from_table datetimes
 \set to_table datetimes2
-\set output_fle datetimes.tmp
+\set output_file datetimes.tmp
 \i test/utils/round-trip-formats.sql
 
 -- Add timestamps with sub-second precision. Protobuf truncates seconds so
@@ -65,11 +65,5 @@ CREATE TABLE datetime_arrays2 (LIKE datetime_arrays INCLUDING ALL);
 \set from_table datetime_arrays
 \set to_table datetime_arrays2
 \i test/utils/round-trip-formats.sql
-
 \set ECHO errors
-\set ci ''
-\getenv ci CI
-SELECT :'ci' = '' AS not_ci \gset
-\if :not_ci
-\! rm -rf /tmp/datetimes.tmp
-\endif
+\! rm -rf /tmp/datetimes.tmp 2> /dev/null || true

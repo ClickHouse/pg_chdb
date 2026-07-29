@@ -18,7 +18,7 @@ VALUES ('1', '111', '111111')
 CREATE TABLE bits2 (LIKE bits INCLUDING ALL);
 \set from_table bits
 \set to_table bits2
-\set output_fle bits.tmp
+\set output_file bits.tmp
 \i test/utils/round-trip-formats.sql
 
 /****************************************************************************/
@@ -39,11 +39,5 @@ CREATE TABLE bit_arrays2 (LIKE bit_arrays INCLUDING ALL);
 \set from_table bit_arrays
 \set to_table bit_arrays2
 \i test/utils/round-trip-formats.sql
-
 \set ECHO errors
-\set ci ''
-\getenv ci CI
-SELECT :'ci' = '' AS not_ci \gset
-\if :not_ci
-\! rm -rf /tmp/bits.tmp
-\endif
+\! rm -rf /tmp/bits.tmp 2> /dev/null || true

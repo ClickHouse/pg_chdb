@@ -19,7 +19,7 @@ VALUES ('Sun', 'ok')
 CREATE TABLE enums2 (LIKE enums INCLUDING ALL);
 \set from_table enums
 \set to_table enums2
-\set output_fle enums.tmp
+\set output_file enums.tmp
 \i test/utils/round-trip-formats.sql
 
 /****************************************************************************/
@@ -39,11 +39,5 @@ CREATE TABLE enum_arrays2 (LIKE enum_arrays INCLUDING ALL);
 \set from_table enum_arrays
 \set to_table enum_arrays2
 \i test/utils/round-trip-formats.sql
-
 \set ECHO errors
-\set ci ''
-\getenv ci CI
-SELECT :'ci' = '' AS not_ci \gset
-\if :not_ci
-\! rm -rf /tmp/enums.tmp
-\endif
+\! rm -rf /tmp/enums.tmp 2> /dev/null || true

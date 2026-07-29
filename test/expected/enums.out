@@ -16,7 +16,7 @@ VALUES ('Sun', 'ok')
 CREATE TABLE enums2 (LIKE enums INCLUDING ALL);
 \set from_table enums
 \set to_table enums2
-\set output_fle enums.tmp
+\set output_file enums.tmp
 \i test/utils/round-trip-formats.sql
 \set ECHO errors
 t: TabSeparated

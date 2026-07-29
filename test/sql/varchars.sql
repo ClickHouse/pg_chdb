@@ -20,7 +20,7 @@ VALUES ('', '', '', '')
 CREATE TABLE varchars2 (LIKE varchars INCLUDING ALL);
 \set from_table varchars
 \set to_table varchars2
-\set output_fle varchars.tmp
+\set output_file varchars.tmp
 \i test/utils/round-trip-formats.sql
 
 /****************************************************************************/
@@ -43,11 +43,5 @@ CREATE TABLE varchar_arrays2 (LIKE varchar_arrays INCLUDING ALL);
 \set from_table varchar_arrays
 \set to_table varchar_arrays2
 \i test/utils/round-trip-formats.sql
-
 \set ECHO errors
-\set ci ''
-\getenv ci CI
-SELECT :'ci' = '' AS not_ci \gset
-\if :not_ci
-\! rm -rf /tmp/varchars.tmp
-\endif
+\! rm -rf /tmp/varchars.tmp 2> /dev/null || true

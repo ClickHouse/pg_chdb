@@ -15,7 +15,7 @@ VALUES ('      ', '            ', ' ', '        ')
 ;
 -- Execute round-trip to all supported formats.
 CREATE TABLE fixies2 (LIKE fixies INCLUDING ALL);
-\set output_fle fixies.tmp
+\set output_file fixies.tmp
 \set from_table fixies
 \set to_table fixies2
 \i test/utils/round-trip-formats.sql
