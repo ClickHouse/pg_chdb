@@ -69,9 +69,6 @@ static StringInfo CopyBuf = NULL;
 /* Bytes to accumulate before pushing to chDB */
 #define CHDB_COPY_CHUNK_SIZE (64 * 1024)
 
-/* Indicates whether streaming is in progress. */
-static bool StreamingInProgress = false;
-
 /* Returns the ClickHouse type name that corresponds to the `attr` type. */
 static const char*
 chdb_type_for(chdbCopyContext* ctx, Form_pg_attribute attr);
@@ -236,7 +233,6 @@ chdb_bgw_main(Datum main_arg) {
     Assert(chDBStreamingResult == NULL);
     Assert(chDBInsertStream == NULL);
     Assert(CopyBuf == NULL);
-    Assert(!StreamingInProgress);
 
     /*
      * Connect to chDB. It will use a temporary directory that it cleans up
@@ -314,7 +310,6 @@ chdb_bgw_main(Datum main_arg) {
         }
 
         /* Process chunks. */
-        StreamingInProgress = true;
         PG_TRY();
         {
             CopyBuf = makeStringInfo();
@@ -338,14 +333,20 @@ chdb_bgw_main(Datum main_arg) {
             PopActiveSnapshot();
             AbortCurrentTransaction();
             chdb_destroy_query_result(chDBStreamingResult);
-            chDBInsertStream    = NULL;
-            StreamingInProgress = false;
+            chDBInsertStream = NULL;
             PG_RE_THROW();
         }
         PG_END_TRY();
     } else {
         /* Start the streaming insert. */
-        chDBInsertStream = chdb_stream_insert(*chDBConnection, ch_query.data, "TSV");
+        chDBInsertStream = chdb_stream_insert_with_params(
+            *chDBConnection,
+            ch_query.data,
+            "TSV",
+            (const char* const*)names,
+            (const char* const*)values,
+            param_count
+        );
 
         /* Check for errors. */
         if ((error = chdb_stream_insert_error(chDBInsertStream))) {
@@ -360,7 +361,6 @@ chdb_bgw_main(Datum main_arg) {
             );
         }
 
-        StreamingInProgress = true;
         PG_TRY();
         {
             CopyBuf = makeStringInfo();
@@ -403,7 +403,6 @@ chdb_bgw_main(Datum main_arg) {
             chdb_destroy_insert_stream(chDBInsertStream);
             chDBStreamingResult = NULL;
             chDBInsertStream    = NULL;
-            StreamingInProgress = false;
             PG_RE_THROW();
         }
         PG_END_TRY();
@@ -413,7 +412,6 @@ chdb_bgw_main(Datum main_arg) {
         chdb_destroy_insert_stream(chDBInsertStream);
         chDBStreamingResult = NULL;
         chDBInsertStream    = NULL;
-        StreamingInProgress = false;
     }
 
     /* Success! Close and commit. */
@@ -438,16 +436,9 @@ chdb_bgw_main(Datum main_arg) {
 
 /* Convenience constant function to append a parameter to a query. */
 /* Using quote_literal_cstr() to work around lack of parameter-supporting insert. */
-static bool isInsert = false;
 #define PARAM(format, name, val)                                                       \
     Assert(i + 1 <= CHDB_MAX_TABLEFUNC_ARGS);                                          \
-    if (isInsert) {                                                                    \
-        appendStringInfo(                                                              \
-            query, "%s%s", *format == ',' ? ", " : "", quote_literal_cstr(val)         \
-        );                                                                             \
-    } else {                                                                           \
-        appendStringInfoString(query, format);                                         \
-    }                                                                                  \
+    appendStringInfoString(query, format);                                             \
     names[i]  = name;                                                                  \
     values[i] = val;                                                                   \
     i++;
@@ -465,8 +456,6 @@ make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** value
         ctx->extra.is_from ? "SELECT * FROM" : "INSERT INTO FUNCTION",
         table_function[ctx->extra.scheme]
     );
-
-    isInsert = !ctx->extra.is_from;
 
     /*
      * TODO: For streaming queries, the buffer is sized to fit one block of
@@ -771,7 +760,7 @@ fetch_chdb_data(void* outbuf, int minread, int maxread) {
         avail = CopyBuf->len - CopyBuf->cursor;
     }
 
-    if (!StreamingInProgress || avail > 0) {
+    if (avail > 0) {
         return bytes_read;
     }
 
@@ -820,7 +809,6 @@ fetch_chdb_data(void* outbuf, int minread, int maxread) {
             if (chunk_length == 0) {
                 /* We're done. */
                 chdb_destroy_query_result(chDBChunkResult);
-                StreamingInProgress = false;
                 return bytes_read; /* End of stream. */
             }
             Assert(chunk_length <= INT_MAX);
@@ -1135,6 +1123,14 @@ format_ch_type(const char* typname, Form_pg_attribute attr) {
 static void
 setup_structure(chdbCopyContext* ctx, Relation rel, List* attnums) {
     if (ctx->structure[0] != '\0') {
+        /* Workaround for https://github.com/chdb-io/chdb-core/issues/158. */
+        char* cursor = ctx->structure;
+        while (*cursor != '\0') {
+            if (*cursor == '\n' || *cursor == '\r') {
+                *cursor = ' ';
+            }
+            cursor++;
+        }
         return;
     }
 

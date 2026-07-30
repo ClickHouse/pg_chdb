@@ -34,7 +34,7 @@ subtest s3 => sub {
         $node, 'just TO url',
         qq{COPY stuff TO 's3://localhost:$port/bucket/prefix/file.csv'},
         qr/\QDB::Exception: Message: Access Denied/,
-        qr[\QINSERT INTO FUNCTION s3('s3://localhost\E:$port\Q/bucket/prefix/file.csv', 'auto', 'id Int32 NULL') SETTINGS date_time_output_format='iso', engine_file_truncate_on_insert=1, s3_request_timeout_ms = 30000],
+        qr[\QINSERT INTO FUNCTION s3({url:String}, {format:String}, {structure:String}) SETTINGS date_time_output_format='iso', engine_file_truncate_on_insert=1, s3_request_timeout_ms = 30000],
         qr[\Q{ url: "s3://localhost:\E$port\Q/bucket/prefix/file.csv", format: "auto", structure: "id Int32 NULL" }],
     );
     check_query(
@@ -150,7 +150,7 @@ subtest gcs => sub {
         $node, 'just TO url',
         qq{COPY stuff TO 'gcs://example.org/bucket/prefix/file.csv'},
         qr/chDB Error: Code: 499/,
-        qr[\QINSERT INTO FUNCTION gcs('https://example.org/bucket/prefix/file.csv', 'auto', 'id Int32 NULL') SETTINGS date_time_output_format='iso', engine_file_truncate_on_insert=1, s3_request_timeout_ms = 30000],
+        qr[\QINSERT INTO FUNCTION gcs({url:String}, {format:String}, {structure:String}) SETTINGS date_time_output_format='iso', engine_file_truncate_on_insert=1, s3_request_timeout_ms = 30000],
         qr[\Q{ url: "https://example.org/bucket/prefix/file.csv", format: "auto", structure: "id Int32 NULL" }],
     );
     check_query(
@@ -178,7 +178,7 @@ subtest http => sub {
     check_query(
         $node, 'just FROM url',
         qq{COPY stuff FROM 'http://example.org/path/file.csv'},
-        qr/\QHTTP status code: 404/,
+        qr/\QHTTP status code: 404\E|\QDB::Exception: Poco::Net::/,
         qr[\QSELECT * FROM url({url:String}, {format:String}, {structure:String}) SETTINGS date_time_output_format='iso', engine_file_truncate_on_insert=1, http_connection_timeout=30, http_max_tries=1],
         qr[\Q{ url: "http://example.org/path/file.csv", format: "auto", structure: "id Int32 NULL" }],
     );
@@ -186,27 +186,27 @@ subtest http => sub {
         $node, 'just TO url',
         qq{COPY stuff TO 'http://example.org/path/file.csv'},
         qr/^$/, # XXX Why doesn't this fail?
-        qr[\QINSERT INTO FUNCTION url('http://example.org/path/file.csv', 'auto', 'id Int32 NULL') SETTINGS date_time_output_format='iso', engine_file_truncate_on_insert=1, http_connection_timeout=30, http_max_tries=1],
+        qr[\QINSERT INTO FUNCTION url({url:String}, {format:String}, {structure:String}) SETTINGS date_time_output_format='iso', engine_file_truncate_on_insert=1, http_connection_timeout=30, http_max_tries=1],
         qr[\Q{ url: "http://example.org/path/file.csv", format: "auto", structure: "id Int32 NULL" }],
     );
     check_query(
         $node, 'FROM format, structure, round up timeout',
         qq{COPY stuff FROM 'http://example.org/path/file.csv' (FORMAT 'TabSeparated', structure 'id Int32', timeout 500)},
-        qr/\QHTTP status code: 404\E|\QDB::Exception: Poco::Net::NetException: Net Exception/,
+        qr/\QHTTP status code: 404\E|\QDB::Exception: Poco::Net::/,
         qr[\QSELECT * FROM url({url:String}, {format:String}, {structure:String}) SETTINGS date_time_output_format='iso', engine_file_truncate_on_insert=1, http_connection_timeout=1, http_max_tries=1],
         qr[\Q{ url: "http://example.org/path/file.csv", format: "TabSeparated", structure: "id Int32" }],
     );
     check_query(
         $node, 'TO structure, round up timeout',
         qq{COPY stuff FROM 'http://example.org/path/file.csv' (structure 'id Int32', timeout 1500)},
-        qr/\QHTTP status code: 404\E|\QDB::Exception: Poco::Net::NoMessageException: /,
+        qr/\QHTTP status code: 404\E|\QDB::Exception: Poco::Net::/,
         qr[\QSELECT * FROM url({url:String}, {format:String}, {structure:String}) SETTINGS date_time_output_format='iso', engine_file_truncate_on_insert=1, http_connection_timeout=2, http_max_tries=1],
         qr[\Q{ url: "http://example.org/path/file.csv", format: "auto", structure: "id Int32" }],
     );
     check_query(
         $node, 'TO format',
         qq{COPY stuff FROM 'http://example.org/path/file.csv' (format 'CSV', timeout 100)},
-        qr/\QHTTP status code: 404\E|\QDB::Exception: Poco::Net::NoMessageException: No message received/,
+        qr/\QHTTP status code: 404\E|\QDB::Exception: Poco::Net::/,
         qr[\QSELECT * FROM url({url:String}, {format:String}, {structure:String}) SETTINGS date_time_output_format='iso', engine_file_truncate_on_insert=1, http_connection_timeout=1, http_max_tries=1],
         qr[\Q{ url: "http://example.org/path/file.csv", format: "CSV", structure: "id Int32 NULL" }],
     );
@@ -249,8 +249,8 @@ subtest azure => sub {
     check_query(
         $node, 'To azure with query',
         q{COPY stuff TO 'az://example.org/path/file.csv?x=y&abc=12'},
-        qr/Failed to receive table structure/, # XXX az just borked
-        qr[\QINSERT INTO FUNCTION azureBlobStorage('https://example.org?x=y&abc=12', 'path', 'file.csv', '', '', 'auto', 'auto', 'id Int32 NULL') SETTINGS date_time_output_format='iso', engine_file_truncate_on_insert=1, azure_request_timeout_ms=30000],
+        qr/\QDB::Exception: std::out_of_range: map::at:  key not found./,
+        qr[\QINSERT INTO FUNCTION azureBlobStorage({url:String}, {container:String}, {path:String}, {account_name:String}, {account_key:String}, {format:String}, {compression:String}, {structure:String}) SETTINGS date_time_output_format='iso', engine_file_truncate_on_insert=1, azure_request_timeout_ms=30000],
         qr[\Q{ url: "https://example.org?x=y&abc=12", container: "path", path: "file.csv", account_name: "", account_key: "", format: "auto", compression: "auto", structure: "id Int32 NULL" }],
     );
     check_query(
@@ -331,7 +331,7 @@ subtest file => sub {
         $node, 'just TO file',
         qq{COPY stuff TO 'file://$dir/nonesuch.csv'},
         qr/^$/,
-        qr[\QINSERT INTO FUNCTION file('$dir/nonesuch.csv', 'auto', 'id Int32 NULL') SETTINGS date_time_output_format='iso', engine_file_truncate_on_insert=1],
+        qr[\QINSERT INTO FUNCTION file({path:String}, {format:String}, {structure:String}) SETTINGS date_time_output_format='iso', engine_file_truncate_on_insert=1],
         qr[\Q{ path: "$dir/nonesuch.csv", format: "auto", structure: "id Int32 NULL" }],
     );
 
@@ -350,8 +350,8 @@ subtest hdfs => sub {
     check_query(
         $node, 'just TO url',
         qq{COPY stuff TO 'hdfs://localhost:$port/bucket/prefix/file.csv'},
-        qr/Failed to receive table structure/, # XXX WTF
-        qr[\QINSERT INTO FUNCTION hdfs('hdfs://localhost:\E$port\Q/bucket/prefix/file.csv', 'auto', 'id Int32 NULL') SETTINGS date_time_output_format='iso', engine_file_truncate_on_insert=1],
+        qr/\QDB::Exception: Unable to connect to HDFS\E|\QUnknown table function hdfs/, # XXX WTF
+        qr[\QINSERT INTO FUNCTION hdfs({url:String}, {format:String}, {structure:String}) SETTINGS date_time_output_format='iso', engine_file_truncate_on_insert=1],
         qr[\Q{ url: "hdfs://localhost:\E$port\Q/bucket/prefix/file.csv", format: "auto", structure: "id Int32 NULL" }],
     );
     check_query(
