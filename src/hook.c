@@ -2,14 +2,25 @@
 
 #include "postgres.h"
 
+#include "access/sysattr.h"
+#include "access/table.h"
 #include "catalog/namespace.h"
+#include "catalog/pg_authid.h"
+#include "commands/copy.h"
 #include "commands/defrem.h"
+#include "executor/executor.h"
 #include "libpq/pqformat.h"
 #include "libpq/pqmq.h"
 #include "miscadmin.h"
+#include "nodes/nodes.h"
+#include "parser/parse_node.h"
+#include "parser/parse_relation.h"
 #include "storage/shm_toc.h"
 #include "tcop/utility.h"
+#include "utils/acl.h"
 #include "utils/builtins.h"
+#include "utils/rel.h"
+#include "utils/rls.h"
 #if PG_VERSION_NUM >= 190000
 #include "storage/proc.h"
 #endif
@@ -43,6 +54,10 @@ void
 LaunchWorker(chdbCopyContext* ctx, QueryCompletion* qc);
 scheme
 scheme_for(const char* str);
+static void
+check_server_file_privileges(bool is_from);
+static Relation
+open_copy_relation(CopyStmt* copy);
 static void
 contextualize_options(chdbCopyContext* ctx, List* options);
 void
@@ -78,6 +93,101 @@ scheme_for(const char* str) {
     }
 
     return no_scheme;
+}
+
+/*
+ * A file:// URL reads and writes files on the server, which Postgres gates on
+ * membership in a role. Apply the same gate as DoCopy() does.
+ */
+static void
+check_server_file_privileges(bool is_from) {
+    if (is_from) {
+        if (!has_privs_of_role(GetUserId(), ROLE_PG_READ_SERVER_FILES)) {
+            ereport(
+                ERROR,
+                errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
+                errmsg("chdb: permission denied to COPY from a file"),
+                errdetail(
+                    "Only roles with privileges of the \"pg_read_server_files\" role "
+                    "may COPY from a file."
+                )
+            );
+        }
+    } else if (!has_privs_of_role(GetUserId(), ROLE_PG_WRITE_SERVER_FILES)) {
+        ereport(
+            ERROR,
+            errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
+            errmsg("chdb: permission denied to COPY to a file"),
+            errdetail(
+                "Only roles with privileges of the \"pg_write_server_files\" role may "
+                "COPY to a file."
+            )
+        );
+    }
+}
+
+/*
+ * Opens and locks relation named by COPY statement, with privilege checks that
+ * DoCopy() applies to a normal COPY: INSERT or SELECT on relation or on each
+ * copied column, then row-level security. Errors out unless the current user
+ * may copy the relation. Returns the locked relation; the caller must close it.
+ */
+static Relation
+open_copy_relation(CopyStmt* copy) {
+    LOCKMODE lockmode = copy->is_from ? RowExclusiveLock : AccessShareLock;
+    Relation rel      = table_openrv(copy->relation, lockmode);
+
+    ParseState* pstate = make_parsestate(NULL);
+    ParseNamespaceItem* nsitem =
+        addRangeTableEntryForRelation(pstate, rel, lockmode, NULL, false, false);
+    RTEPermissionInfo* perminfo = nsitem->p_perminfo;
+    perminfo->requiredPerms     = copy->is_from ? ACL_INSERT : ACL_SELECT;
+
+    /* Only the copied columns require privileges. */
+    Bitmapset** cols =
+        copy->is_from ? &perminfo->insertedCols : &perminfo->selectedCols;
+    ListCell* lc;
+    foreach (lc, CopyGetAttnums(RelationGetDescr(rel), rel, copy->attlist)) {
+        *cols =
+            bms_add_member(*cols, lfirst_int(lc) - FirstLowInvalidHeapAttributeNumber);
+    }
+    ExecCheckPermissions(pstate->p_rtable, list_make1(perminfo), true);
+
+    /*
+     * chDB copies the whole relation, so policies cannot be applied to the
+     * rows. Postgres runs a query-based COPY TO, which we don't yet support.
+     */
+    if (check_enable_rls(RelationGetRelid(rel), InvalidOid, false) == RLS_ENABLED) {
+        ereport(
+            ERROR,
+            errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+            errmsg(
+                "chdb: COPY %s not supported with row-level security",
+                copy->is_from ? "FROM" : "TO"
+            ),
+            errdetail(
+                "Row-level security policies apply to relation \"%s\" for this role.",
+                RelationGetRelationName(rel)
+            )
+        );
+    }
+
+    if (RelationUsesLocalBuffers(rel)) {
+        ereport(
+            ERROR,
+            errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+            errmsg(
+                "chdb: cannot COPY temporary relation \"%s\"",
+                RelationGetRelationName(rel)
+            ),
+            errdetail(
+                "Temporary relations are visible only to the session that "
+                "created them, not to the chdb worker."
+            )
+        );
+    }
+
+    return rel;
 }
 
 static void
@@ -146,13 +256,21 @@ chDBProcessUtilityHook(
         /* Look for a URL filename. */
         CopyStmt* copy = (CopyStmt*)parsetree;
         scheme scheme  = scheme_for(copy->filename);
-        if (copy->relation && scheme != no_scheme) {
-            /* We own this copy. Fire up a worker to execute it. */
-            Oid rel_id = RangeVarGetRelid(copy->relation, NoLock, true);
+
+        /* Leave COPY TO/FROM PROGRAM to Postgres, which gates it on a role. */
+        if (copy->relation && !copy->is_program && scheme != no_scheme) {
+            /* We own this copy, but only if the user may copy the relation. */
+            if (copy->is_from) {
+                PreventCommandIfReadOnly("COPY FROM");
+            }
+            if (scheme == file_scheme) {
+                check_server_file_privileges(copy->is_from);
+            }
+            Relation rel = open_copy_relation(copy);
             chdbCopyContext ctx = {
                 .extra = {
                     .scheme  = scheme,
-                    .rel_id = rel_id,
+                    .rel_id = RelationGetRelid(rel),
                     .db_id   = MyDatabaseId,
                     .role_id = GetAuthenticatedUserId(),
                     .is_from = copy->is_from
@@ -160,8 +278,15 @@ chDBProcessUtilityHook(
                     // .outer_user_id = GetCurrentRoleId(),
                  },
                 .url     = copy->filename,
+                .attlist = copy->attlist ? nodeToString(copy->attlist) : "",
             };
+
+            /* The worker copies as the role whose privileges we just checked. */
+            GetUserIdAndSecContext(&ctx.extra.user_id, &ctx.extra.sec_context);
             contextualize_options(&ctx, copy->options);
+
+            /* Retain the lock until commit so the worker copies what we checked. */
+            table_close(rel, NoLock);
             LaunchWorker(&ctx, qc);
 
             return;
@@ -191,6 +316,7 @@ LaunchWorker(chdbCopyContext* ctx, QueryCompletion* qc) {
     shm_toc_estimate_chunk(&estimator, strlen(ctx->format) + 1);
     shm_toc_estimate_chunk(&estimator, strlen(ctx->structure) + 1);
     shm_toc_estimate_chunk(&estimator, strlen(ctx->compression) + 1);
+    shm_toc_estimate_chunk(&estimator, strlen(ctx->attlist) + 1);
     shm_toc_estimate_chunk(&estimator, CHDB_ERROR_QUEUE_SIZE);
     shm_toc_estimate_keys(&estimator, CHDB_NUM_SHM_KEYS);
 
@@ -228,6 +354,10 @@ LaunchWorker(chdbCopyContext* ctx, QueryCompletion* qc) {
     string_shm = shm_toc_allocate(toc, strlen(ctx->compression) + 1);
     strcpy(string_shm, ctx->compression);
     shm_toc_insert(toc, CHDB_KEY_COMPRESSION, string_shm);
+
+    string_shm = shm_toc_allocate(toc, strlen(ctx->attlist) + 1);
+    strcpy(string_shm, ctx->attlist);
+    shm_toc_insert(toc, CHDB_KEY_ATTLIST, string_shm);
 
     /* Set up the error queue. */
     shm_mq* err_queue = shm_mq_create(

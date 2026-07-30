@@ -18,6 +18,7 @@
 #include "libpq/libpq.h"
 #include "libpq/pqformat.h"
 #include "libpq/pqmq.h"
+#include "nodes/nodes.h"
 #include "storage/ipc.h"
 #include "storage/shm_toc.h"
 #include "tcop/utility.h"
@@ -81,7 +82,7 @@ format_ch_type(const char* typname, Form_pg_attribute attr);
 
 /* Populates `ctx->structure` if it's not already set. */
 static void
-setup_structure(chdbCopyContext* ctx, Relation rel);
+setup_structure(chdbCopyContext* ctx, Relation rel, List* attnums);
 
 /*
  * Decomposition of an Azure URL into the arguments that `azureBlobStorage()`
@@ -181,6 +182,7 @@ chdb_bgw_main(Datum main_arg) {
     ctx->format        = shm_toc_lookup(toc, CHDB_KEY_FORMAT, false);
     ctx->structure     = shm_toc_lookup(toc, CHDB_KEY_STRUCTURE, false);
     ctx->compression   = shm_toc_lookup(toc, CHDB_KEY_COMPRESSION, false);
+    ctx->attlist       = shm_toc_lookup(toc, CHDB_KEY_ATTLIST, false);
 
     /*
      * Now we can find and attach to the error queue provided for us.  That's
@@ -226,6 +228,9 @@ chdb_bgw_main(Datum main_arg) {
     SetConfigOption("datestyle", "ISO", PGC_BACKEND, PGC_S_SESSION);
     SetConfigOption("timezone", "UTC", PGC_BACKEND, PGC_S_SESSION);
 
+    /* Preserve same user security context. */
+    SetUserIdAndSecContext(ctx->extra.user_id, ctx->extra.sec_context);
+
     /* Check our globals. */
     Assert(chDBConnection == NULL);
     Assert(chDBStreamingResult == NULL);
@@ -260,8 +265,11 @@ chdb_bgw_main(Datum main_arg) {
         ctx->extra.rel_id, ctx->extra.is_from ? RowExclusiveLock : AccessShareLock
     );
 
+    /* Copy only the columns the COPY command listed, all of them by default. */
+    List* attlist = ctx->attlist[0] ? (List*)stringToNode(ctx->attlist) : NIL;
+
     /* Assemble the chDB query; we always need a structure. */
-    setup_structure(ctx, rel);
+    setup_structure(ctx, rel, CopyGetAttnums(RelationGetDescr(rel), rel, attlist));
     StringInfoData ch_query;
     char* names[CHDB_MAX_TABLEFUNC_ARGS];
     char* values[CHDB_MAX_TABLEFUNC_ARGS];
@@ -316,7 +324,7 @@ chdb_bgw_main(Datum main_arg) {
                 pstate, rel, AccessShareLock, NULL, false, false
             );
             CopyFromState cstate = BeginCopyFrom(
-                pstate, rel, NULL, NULL, false, fetch_chdb_data, NIL, NIL
+                pstate, rel, NULL, NULL, false, fetch_chdb_data, attlist, NIL
             );
 
             /* Do the copy. */
@@ -365,7 +373,7 @@ chdb_bgw_main(Datum main_arg) {
                 NULL,
                 false,
                 send_chdb_data,
-                NIL,
+                attlist,
                 NIL
             );
 
@@ -1121,11 +1129,11 @@ format_ch_type(const char* typname, Form_pg_attribute attr) {
 }
 
 /*
- * Setup `ctx->structure` if none is provided. Builds it from the columns in
- * the relation to be copied.
+ * Setup `ctx->structure` if none is provided. Builds it from `attnums`, the
+ * columns of the relation to be copied.
  */
 static void
-setup_structure(chdbCopyContext* ctx, Relation rel) {
+setup_structure(chdbCopyContext* ctx, Relation rel, List* attnums) {
     if (ctx->structure[0] != '\0') {
         return;
     }
@@ -1133,14 +1141,11 @@ setup_structure(chdbCopyContext* ctx, Relation rel) {
     StringInfoData buf;
     initStringInfo(&buf);
     TupleDesc tupDesc = RelationGetDescr(rel);
-    int attr_count    = tupDesc->natts;
     bool first        = true;
+    ListCell* lc;
 
-    for (int i = 0; i < attr_count; i++) {
-        Form_pg_attribute attr = TupleDescAttr(tupDesc, i);
-        if (attr->attisdropped || attr->attgenerated) {
-            continue;
-        }
+    foreach (lc, attnums) {
+        Form_pg_attribute attr = TupleDescAttr(tupDesc, lfirst_int(lc) - 1);
 
         if (first) {
             first = false;

@@ -34,7 +34,8 @@
 #define CHDB_KEY_HEADERS UINT64CONST(0xB000000000000008)
 #define CHDB_KEY_EXTRA_CREDS UINT64CONST(0xB000000000000009)
 #define CHDB_KEY_ERROR_QUEUE UINT64CONST(0xB00000000000000a)
-#define CHDB_NUM_SHM_KEYS 10 /* Must equal highest CHDB_KEY number above. */
+#define CHDB_KEY_ATTLIST UINT64CONST(0xB00000000000000b)
+#define CHDB_NUM_SHM_KEYS 11 /* Must equal highest CHDB_KEY number above. */
 
 /* URL schemes that the COPY hook understands. */
 typedef enum scheme {
@@ -86,6 +87,8 @@ typedef struct chdbCopyExtra {
     Oid rel_id;
     Oid db_id;
     Oid role_id;
+    Oid user_id;
+    int sec_context;
     scheme scheme;
     bool is_from;
     uint32_t timeout; /* request timeout in milliseconds */
@@ -98,6 +101,7 @@ typedef struct chdbCopyExtra {
 typedef struct chdbCopyContext {
     chdbCopyExtra extra;
     char* url;
+    char* attlist;
     char* access_key;
     char* access_secret;
     char* session_token;

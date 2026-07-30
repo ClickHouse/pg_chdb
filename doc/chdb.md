@@ -87,6 +87,21 @@ CREATE TABLE times (
 COPY times FROM 's3://datasets-documentation/my-test-bucket-768/some_prefix/some_file_1.csv';
 ```
 
+### Privileges
+
+A chdb `COPY` requires the same privileges as the [COPY] it replaces: `SELECT`
+on the relation or on every copied column for `COPY TO`, and `INSERT` for `COPY
+FROM`. A `file://` URL reads or writes a file on the server, so also requires
+membership in `pg_read_server_files` or `pg_write_server_files`. `COPY FROM`
+requires a read-write transaction.
+
+The chdb extension rejects two cases it cannot copy faithfully:
+
+*   Relations with [row-level security] policies that apply to the copying
+    role. Postgres applies such policies by rewriting `COPY TO` into a query,
+    which the chdb extension does not support.
+*   Temporary relations, which only the session that created them can read.
+
 ### URL Schemes
 
 The chdb extension only executes for URL `COPY` targets that use one of the
@@ -351,6 +366,8 @@ Copyright (c) 2026, ClickHouse
   [COPY]: https://www.postgresql.org/docs/current/sql-copy.html "Postgres Docs: COPY"
   [formats]: https://github.com/chdb-io/chdb/blob/main/refs/clickhouse-formats-settings.md#complete-format-names-table
     "chDB Docs: Complete Format Names Table"
+  [row-level security]: https://www.postgresql.org/docs/current/ddl-rowsecurity.html
+    "Postgres Docs: Row Security Policies"
   [LOAD]: https://www.postgresql.org/docs/current/sql-load.html "Postgres Docs: LOAD"
   [session_preload_libraries]:https://www.postgresql.org/docs/18/runtime-config-client.html#GUC-SESSION-PRELOAD-LIBRARIES
     "Postgres Docs: `session_preload_libraries`"

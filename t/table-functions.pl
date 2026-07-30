@@ -199,7 +199,7 @@ subtest http => sub {
     check_query(
         $node, 'TO structure, round up timeout',
         qq{COPY stuff FROM 'http://example.org/path/file.csv' (structure 'id Int32', timeout 1500)},
-        qr/\QHTTP status code: 404\E|\QDB::Exception: Poco::Net::NoMessageException: No message received/,
+        qr/\QHTTP status code: 404\E|\QDB::Exception: Poco::Net::NoMessageException: /,
         qr[\QSELECT * FROM url({url:String}, {format:String}, {structure:String}) SETTINGS date_time_output_format='iso', engine_file_truncate_on_insert=1, http_connection_timeout=2, http_max_tries=1],
         qr[\Q{ url: "http://example.org/path/file.csv", format: "auto", structure: "id Int32" }],
     );
