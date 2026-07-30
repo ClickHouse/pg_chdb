@@ -1,4 +1,5 @@
 LOAD 'chdb';
+-- Simple COPY FROM without credentials.
 CREATE TABLE gcs_times (
     id    INT PRIMARY KEY,
     months INT NOT NULL,
@@ -13,4 +14,38 @@ SELECT * FROM gcs_times ORDER BY id;
   4 |      5 |    6
 (3 rows)
 
-TRUNCATE gcs_times;
+\set ECHO errors
+-- Create some random data to copy.
+CREATE TABLE gcs_things (
+    id       INT  PRIMARY KEY,
+    name     TEXT NOT NULL,
+    quantity INT NOT NULL
+);
+INSERT INTO gcs_things
+VALUES ((random() * 10000)::int, format('thing-%s', (random() * 100)::int), (random() * 1000)::int)
+     , ((random() * 10000)::int, format('thing-%s', (random() * 100)::int), (random() * 1000)::int)
+     , ((random() * 10000)::int, format('thing-%s', (random() * 100)::int), (random() * 1000)::int)
+;
+-- Copy to existing file to ensure s3_truncate_on_insert is true.
+COPY gcs_things TO 'gs://storage.googleapis.com/pg-chdb-ci/keep-me.tsv' (
+    access_key :'access_key',
+    access_secret :'access_secret'
+);
+\set ECHO errors
+-- Copy the data to GCS.
+COPY gcs_things TO :'url' (
+    access_key :'access_key',
+    access_secret :'access_secret'
+);
+-- Copy it back.
+CREATE TABLE gcs_things2 (LIKE gcs_things INCLUDING ALL);
+COPY gcs_things2 FROM :'url' (
+    access_key :'access_key',
+    access_secret :'access_secret'
+);
+-- Make sure they're the same.
+WITH x AS (
+    SELECT * FROM gcs_things EXCEPT ALL SELECT * FROM gcs_things2
+) SELECT COUNT(*) = 0 AS same FROM x \gset
+\set ECHO errors
+Table contents the same

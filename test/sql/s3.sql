@@ -39,6 +39,13 @@ VALUES ((random() * 10000)::int, format('thing-%s', (random() * 100)::int), (ran
      , ((random() * 10000)::int, format('thing-%s', (random() * 100)::int), (random() * 1000)::int)
 ;
 
+-- Copy to existing file to ensure s3_truncate_on_insert is true.
+COPY s3_things TO 's3://pg-chdb-ci-248825820370-us-east-2-an/keep-me.tsv' (
+    access_key :'access_key',
+    access_secret :'access_secret',
+    session_token :'session_token'
+);
+
 \set ECHO errors
 -- Create unique URL path to avoid conflicts between concurrent execution.
 SELECT (random() * 100000)::int AS rand \gset
@@ -47,7 +54,7 @@ SELECT (random() * 100000)::int AS rand \gset
 \set url s3://pg-chdb-ci-248825820370-us-east-2-an/ci/:SERVER_VERSION_NUM - :arch - :rand /test.csv
 \set ECHO all
 
--- Copy the data to AWS.
+-- Copy the data to S3.
 COPY s3_things TO :'url' (
     access_key :'access_key',
     access_secret :'access_secret',

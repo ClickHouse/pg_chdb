@@ -26,7 +26,6 @@ jobs:
         with:
           version: ${{ matrix.pg }}
           packages: libkrb5-dev libipc-run-perl
-      - run: env
       - name: Configure AWS credentials # for s3.sql round-trip test
         uses: aws-actions/configure-aws-credentials@v6
         with:
@@ -52,6 +51,10 @@ jobs:
         run: sudo make install
       - name: Test
         run: make installcheck
+        # https://console.cloud.google.com/storage/settings;tab=interoperability?project=ch-pg-test
+        env:
+          CLOUDSDK_AUTH_HMAC_KEY: ${{ secrets.gcp_hmac_key }}
+          CLOUDSDK_AUTH_HMAC_SECRET: ${{ secrets.gcp_hmac_secret }}
       - name: Show Diffs
         if: failure()
         run: find . -name regression.diffs -exec cat {} +
