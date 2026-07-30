@@ -30,7 +30,7 @@ OBJS = $(subst .c,.o, $(wildcard src/*.c))
 PG_CFLAGS    = -Wno-declaration-after-statement -Wall -Werror
 
 # Clean up generated files.
-EXTRA_CLEAN  = src/version.h sql/$(EXTENSION)--$(EXTVERSION).sql src/bgw/chdb_bgw.* src/bgw/worker.o src/bgw/worker.bc test/schedule
+EXTRA_CLEAN  = src/version.h sql/$(EXTENSION)--$(EXTVERSION).sql src/bgw/chdb_bgw$(DLSUFFIX) src/bgw/*.o src/bgw/*.bc test/schedule
 
 PGXS := $(shell $(PG_CONFIG) --pgxs)
 include $(PGXS)
@@ -57,10 +57,6 @@ src/version.h: META.json
 # Background worker.
 src/bgw/chdb_bgw$(DLSUFFIX): $(wildcard src/bgw/*.c src/bgw/*.h) $(wildcard $(PGCH_DIR)/*.h $(CH_C_DIR)/*.h)
 	@$(MAKE) -C $(dir $@) all -j $$(nproc) CH_C_DIR=$(CH_C_DIR) PGCH_DIR=$(PGCH_DIR)
-
-# Fail with something more useful than a missing include.
-$(CH_C_DIR)/clickhouse.h:
-	@echo "$@ missing; run: git submodule update --init --recursive" >&2; exit 1
 
 # Install the chdb_bgw library.
 install-bgw: src/bgw/chdb_bgw$(DLSUFFIX)
