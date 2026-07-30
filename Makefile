@@ -30,7 +30,7 @@ OBJS = $(subst .c,.o, $(wildcard src/*.c))
 PG_CFLAGS    = -Wno-declaration-after-statement -Wall -Werror
 
 # Clean up generated files.
-EXTRA_CLEAN  = src/version.h sql/$(EXTENSION)--$(EXTVERSION).sql src/bgw/chdb_bgw.* src/bgw/worker.o src/bgw/worker.bc test/schedule
+EXTRA_CLEAN  = src/version.h sql/$(EXTENSION)--$(EXTVERSION).sql src/bgw/chdb_bgw$(DLSUFFIX) src/bgw/*.o src/bgw/*.bc test/schedule
 
 PGXS := $(shell $(PG_CONFIG) --pgxs)
 include $(PGXS)
@@ -43,8 +43,9 @@ endif
 # Require the versioned SQL script.
 all: sql/$(EXTENSION)--$(EXTVERSION).sql src/bgw/chdb_bgw$(DLSUFFIX)
 
-# Require the version header.
-$(OBJS): src/version.h
+# Require clickhouse-c and the version header. The bitcode twins compile the
+# same sources, so they need the same generated header.
+$(OBJS) $(OBJS:.o=.bc): $(CH_C_DIR)/clickhouse.h src/version.h
 
 # Versioned SQL script.
 sql/$(EXTENSION)--$(EXTVERSION).sql: sql/$(EXTENSION).sql
@@ -55,12 +56,12 @@ src/version.h: META.json
 	@printf '#define PGCHCB_VERSION "%s"\n' "$(DISTVERSION)" > $@
 
 # Background worker.
-src/bgw/chdb_bgw$(DLSUFFIX): $(wildcard src/bgw/*.c src/bgw/*.h) $(wildcard $(PGCH_DIR)/*.h $(CH_C_DIR)/*.h)
+src/bgw/chdb_bgw$(DLSUFFIX): $(wildcard src/bgw/*.c src/bgw/*.h) $(CH_C_DIR)/clickhouse.h
 	@$(MAKE) -C $(dir $@) all -j $$(nproc) CH_C_DIR=$(CH_C_DIR) PGCH_DIR=$(PGCH_DIR)
 
 # Fail with something more useful than a missing include.
-$(CH_C_DIR)/clickhouse.h:
-	@echo "$@ missing; run: git submodule update --init --recursive" >&2; exit 1
+$(CH_C_DIR)/clickhouse.h: .gitmodules
+	git submodule update --init --recursive
 
 # Install the chdb_bgw library.
 install-bgw: src/bgw/chdb_bgw$(DLSUFFIX)
