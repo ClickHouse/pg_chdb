@@ -18,6 +18,10 @@ jobs:
     name: 🐘 PostgreSQL ${{ matrix.pg }} ${{ matrix.arch == 'amd64' && '🧰' || '🦾' }} ${{ matrix.arch }}
     runs-on: ubuntu-${{ matrix.arch == 'amd64' && 'latest' || '24.04-arm' }}
     env: { chdb_version: v26.5.1-rc.3 }
+    services:
+      kv-rest:
+        image: ghcr.io/theory/kv-rest
+        ports: [80]
     steps:
       - name: Checkout the Repository
         uses: actions/checkout@v7
@@ -56,6 +60,7 @@ jobs:
         env:
           CLOUDSDK_AUTH_HMAC_KEY: ${{ secrets.gcp_hmac_key }}
           CLOUDSDK_AUTH_HMAC_SECRET: ${{ secrets.gcp_hmac_secret }}
+          PG_CHDB_HTTP_URL: http://localhost:${{ job.services.kv-rest.ports[80] }}
       - name: Show Diffs
         if: failure()
         run: find . -name regression.diffs -exec cat {} +

@@ -1,0 +1,2 @@
+\set ECHO errors
+SKIP: No URL found in $PG_CHDB_HTTP_URL

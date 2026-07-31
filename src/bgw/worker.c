@@ -481,8 +481,7 @@ chdb_bgw_main(Datum main_arg) {
 static const char settings[] =
     "allow_experimental_nullable_tuple_type=1, "
     "date_time_output_format='iso', "
-    "output_format_json_quote_denormals=1, "
-    "engine_file_truncate_on_insert=1, " PGCH_NATIVE_SETTINGS;
+    "output_format_json_quote_denormals=1, " PGCH_NATIVE_SETTINGS;
 
 size_t
 make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** values) {
@@ -540,7 +539,7 @@ make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** value
         }
         appendStringInfo(
             query,
-            ") SETTINGS %s, s3_request_timeout_ms = %u, s3_truncate_on_insert = 1",
+            ") SETTINGS %s, s3_truncate_on_insert = 1, s3_request_timeout_ms = %u",
             settings,
             ctx->extra.timeout
         );
@@ -587,7 +586,7 @@ make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** value
         PARAM(", {structure:String}", "structure", ctx->structure);
         appendStringInfo(
             query,
-            ") SETTINGS %s, azure_request_timeout_ms=%u",
+            ") SETTINGS %s, azure_truncate_on_insert = 1, azure_request_timeout_ms=%u",
             settings,
             ctx->extra.timeout
         );
@@ -605,7 +604,9 @@ make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** value
         if (ctx->compression[0] != '\0') {
             PARAM(", {compression:String}", "compression", ctx->compression);
         }
-        appendStringInfo(query, ") SETTINGS %s", settings);
+        appendStringInfo(
+            query, ") SETTINGS %s, engine_file_truncate_on_insert=1", settings
+        );
         break;
     case hdfs_scheme:
         /* https://clickhouse.com/docs/sql-reference/table-functions/hdfs#syntax */
@@ -616,7 +617,7 @@ make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** value
         /* Append remaining arguments and settings. */
         PARAM(", {format:String}", "format", ctx->format[0] ? ctx->format : "auto");
         PARAM(", {structure:String}", "structure", ctx->structure);
-        appendStringInfo(query, ") SETTINGS %s", settings);
+        appendStringInfo(query, ") SETTINGS %s, hdfs_truncate_on_insert = 1", settings);
         break;
     default:
         elog(ERROR, "unsupported URL scheme %d", ctx->extra.scheme);
