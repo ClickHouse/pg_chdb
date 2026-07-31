@@ -45,14 +45,30 @@ PG_MODULE_MAGIC_EXT(.name = "chdb_bgw", .version = PGCHCB_VERSION);
 PG_MODULE_MAGIC;
 #endif
 
-/* Connection to chDB, one per worker. */
-static chdb_connection* chDBConnection = NULL;
+typedef struct chdbResources {
+    MemoryContextCallback cleanup;
+    chdb_connection* conn;
+    chdb_result* result;
+    chdb_insert_stream insert;
+} chdbResources;
 
-/* Streaming result. */
-static chdb_result* chDBStreamingResult = NULL;
+static void
+free_chdb_resources(void* arg) {
+    chdbResources* resources = arg;
 
-/* Insert streaming handle. */
-static chdb_insert_stream chDBInsertStream = NULL;
+    if (resources->result) {
+        chdb_destroy_query_result(resources->result);
+        resources->result = NULL;
+    }
+    if (resources->insert) {
+        chdb_destroy_insert_stream(resources->insert);
+        resources->insert = NULL;
+    }
+    if (resources->conn) {
+        chdb_close_conn(resources->conn);
+        resources->conn = NULL;
+    }
+}
 
 /*
  * Decomposition of an Azure URL into the arguments that `azureBlobStorage()`
@@ -79,15 +95,6 @@ parse_azure_url(chdbCopyContext*, azureURLParts* parts);
 /* Extracts and returns the local file path from `url`. */
 static char*
 get_local_path_from_file_url(const char* url);
-
-/* Memory context callback to free the chDB connection. */
-static void
-chdb_conn_free(void*);
-
-inline static void
-chdb_conn_free(void* c) {
-    chdb_close_conn((chdb_connection*)c);
-}
 
 /*
  * Structure clause for the columns `attnums` names, as
@@ -256,18 +263,21 @@ chdb_bgw_main(Datum main_arg) {
     /* Preserve same user security context. */
     SetUserIdAndSecContext(ctx->extra.user_id, ctx->extra.sec_context);
 
-    /* Check our globals. */
-    Assert(chDBConnection == NULL);
-    Assert(chDBStreamingResult == NULL);
-    Assert(chDBInsertStream == NULL);
+    /* Bind chDB handle lifetime to transaction. */
+    StartTransactionCommand();
+    chdbResources* resources = palloc0(sizeof(*resources));
+
+    resources->cleanup.func = free_chdb_resources;
+    resources->cleanup.arg  = resources;
+    MemoryContextRegisterResetCallback(CurrentMemoryContext, &resources->cleanup);
 
     /*
      * Connect to chDB. It will use a temporary directory that it cleans up
      * upon exit.
      */
-    chDBConnection = chdb_connect(1, (char*[]){ "chdb" });
+    resources->conn = chdb_connect(1, (char*[]){ "chdb" });
 
-    if (!chDBConnection) {
+    if (!resources->conn) {
         ereport(
             ERROR,
             errcode(ERRCODE_CONNECTION_FAILURE),
@@ -275,14 +285,6 @@ chdb_bgw_main(Datum main_arg) {
         );
     }
 
-    /* Set up a callback to release the connection when we're done. */
-    MemoryContextCallback cleanup = { 0 };
-    cleanup.func                  = chdb_conn_free;
-    cleanup.arg                   = chDBConnection;
-    MemoryContextRegisterResetCallback(CurrentMemoryContext, &cleanup);
-
-    /* Start a transaction and fetch the relation. */
-    StartTransactionCommand();
     PushActiveSnapshot(GetTransactionSnapshot());
     Relation rel = table_open(
         ctx->extra.rel_id, ctx->extra.is_from ? RowExclusiveLock : AccessShareLock
@@ -337,8 +339,8 @@ chdb_bgw_main(Datum main_arg) {
 
     if (ctx->extra.is_from) {
         /* Start streaming the chDB query. */
-        chDBStreamingResult = chdb_stream_query_with_params(
-            *chDBConnection,
+        resources->result = chdb_stream_query_with_params(
+            *resources->conn,
             ch_query.data,
             "Native",
             (const char* const*)names,
@@ -346,7 +348,7 @@ chdb_bgw_main(Datum main_arg) {
             param_count
         );
 
-        if (!chDBStreamingResult) {
+        if (!resources->result) {
             ereport(
                 ERROR,
                 errcode(ERRCODE_EXTERNAL_ROUTINE_EXCEPTION),
@@ -356,9 +358,8 @@ chdb_bgw_main(Datum main_arg) {
         }
 
         /* Check for errors. */
-        if ((error = chdb_result_error(chDBStreamingResult))) {
+        if ((error = chdb_result_error(resources->result))) {
             error = chdb_trim_error(pstrdup(error));
-            chdb_destroy_query_result(chDBStreamingResult);
             ereport(
                 ERROR,
                 errcode(ERRCODE_EXTERNAL_ROUTINE_EXCEPTION),
@@ -372,7 +373,7 @@ chdb_bgw_main(Datum main_arg) {
         PG_TRY();
         {
             num_rows =
-                chdb_native_receive(rel, attnums, *chDBConnection, chDBStreamingResult);
+                chdb_native_receive(rel, attnums, *resources->conn, resources->result);
         }
         PG_CATCH();
         {
@@ -380,18 +381,13 @@ chdb_bgw_main(Datum main_arg) {
             table_close(rel, RowExclusiveLock);
             PopActiveSnapshot();
             AbortCurrentTransaction();
-            chdb_destroy_query_result(chDBStreamingResult);
-            chDBStreamingResult = NULL;
             PG_RE_THROW();
         }
         PG_END_TRY();
-
-        chdb_destroy_query_result(chDBStreamingResult);
-        chDBStreamingResult = NULL;
     } else {
         /* Start the streaming insert. */
-        chDBInsertStream = chdb_stream_insert_with_params(
-            *chDBConnection,
+        resources->insert = chdb_stream_insert_with_params(
+            *resources->conn,
             ch_query.data,
             "Native",
             (const char* const*)names,
@@ -400,9 +396,8 @@ chdb_bgw_main(Datum main_arg) {
         );
 
         /* Check for errors. */
-        if ((error = chdb_stream_insert_error(chDBInsertStream))) {
+        if ((error = chdb_stream_insert_error(resources->insert))) {
             error = chdb_trim_error(pstrdup(error));
-            chdb_destroy_insert_stream(chDBInsertStream);
             ereport(
                 ERROR,
                 errcode(ERRCODE_EXTERNAL_ROUTINE_EXCEPTION),
@@ -414,11 +409,12 @@ chdb_bgw_main(Datum main_arg) {
 
         PG_TRY();
         {
-            num_rows = chdb_native_send(rel, ctx->structure, attnums, chDBInsertStream);
+            num_rows =
+                chdb_native_send(rel, ctx->structure, attnums, resources->insert);
 
             /* Tell chDB the insert is done. */
-            chDBStreamingResult = chdb_stream_done(chDBInsertStream);
-            if ((error = chdb_result_error(chDBStreamingResult))) {
+            resources->result = chdb_stream_done(resources->insert);
+            if ((error = chdb_result_error(resources->result))) {
                 ereport(
                     ERROR,
                     errcode(ERRCODE_EXTERNAL_ROUTINE_EXCEPTION),
@@ -434,19 +430,9 @@ chdb_bgw_main(Datum main_arg) {
             table_close(rel, AccessShareLock);
             PopActiveSnapshot();
             AbortCurrentTransaction();
-            chdb_destroy_query_result(chDBStreamingResult);
-            chdb_destroy_insert_stream(chDBInsertStream);
-            chDBStreamingResult = NULL;
-            chDBInsertStream    = NULL;
             PG_RE_THROW();
         }
         PG_END_TRY();
-
-        /* Cleanup streaming insert. */
-        chdb_destroy_query_result(chDBStreamingResult);
-        chdb_destroy_insert_stream(chDBInsertStream);
-        chDBStreamingResult = NULL;
-        chDBInsertStream    = NULL;
     }
 
     /* Success! Close and commit. */

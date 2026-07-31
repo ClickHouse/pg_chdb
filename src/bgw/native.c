@@ -214,10 +214,21 @@ chdb_native_send(
 
 /* chDB's result chunks, feeding the reader's byte source. */
 typedef struct nativeChunks {
+    MemoryContextCallback cleanup;
     chdb_connection conn;
     chdb_result* result; /* streaming query handle, owned by the caller */
     chdb_result* chunk;  /* current chunk, alive until the next fetch */
 } nativeChunks;
+
+static void
+free_native_chunks(void* arg) {
+    nativeChunks* chunks = arg;
+
+    if (chunks->chunk) {
+        chdb_destroy_query_result(chunks->chunk);
+        chunks->chunk = NULL;
+    }
+}
 
 /*
  * chDB repeats a request ID per attempt in storage errors, appends a stack
@@ -507,9 +518,16 @@ chdb_native_receive(
     );
     MemoryContext rowcxt =
         AllocSetContextCreate(CurrentMemoryContext, "chdb row", ALLOCSET_DEFAULT_SIZES);
-    MemoryContext oldcxt  = MemoryContextSwitchTo(streamcxt);
-    nativeChunks chunks   = { .conn = conn, .result = result, .chunk = NULL };
-    pgch_chunk_source src = { .ud         = &chunks,
+    MemoryContext oldcxt = MemoryContextSwitchTo(streamcxt);
+    nativeChunks* chunks = palloc0(sizeof(*chunks));
+
+    chunks->cleanup.func = free_native_chunks;
+    chunks->cleanup.arg  = chunks;
+    chunks->conn         = conn;
+    chunks->result       = result;
+    MemoryContextRegisterResetCallback(streamcxt, &chunks->cleanup);
+
+    pgch_chunk_source src = { .ud         = chunks,
                               .next_chunk = next_chunk,
                               .cancelled  = chunks_cancelled };
     pgch_reader reader;
@@ -528,10 +546,6 @@ chdb_native_receive(
     }
     if (pgch_reader_columns(&reader) == 0) {
         /* Nothing streamed at all, so there is no schema to check. */
-        pgch_reader_free(&reader);
-        if (chunks.chunk) {
-            chdb_destroy_query_result(chunks.chunk);
-        }
         MemoryContextSwitchTo(oldcxt);
         MemoryContextDelete(streamcxt);
         MemoryContextDelete(rowcxt);
@@ -782,10 +796,6 @@ chdb_native_receive(
 
     /* ---- end of CopyFrom ---- */
 
-    pgch_reader_free(&reader);
-    if (chunks.chunk) {
-        chdb_destroy_query_result(chunks.chunk);
-    }
     MemoryContextDelete(streamcxt);
     MemoryContextDelete(rowcxt);
 
