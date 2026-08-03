@@ -6,9 +6,9 @@
 
 #include "utils/relcache.h"
 
-/* Strips the request ID and stack trace chDB pads an error with, in place. */
+/* Copy and clean up a chDB error, truncating it if necessary. */
 extern char*
-chdb_trim_error(char* error);
+chdb_capture_error(const char* error);
 
 /*
  * Scans the `attnums` columns of `rel` into `stream` as Native blocks carrying

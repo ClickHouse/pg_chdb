@@ -46,6 +46,7 @@
 #include "pg-clickhouse-encode.h"
 
 #include "native.h"
+#include "worker.h"
 
 /*
  * Bytes to accumulate before cutting a block. ClickHouse coalesces small
@@ -116,7 +117,7 @@ send_block(pgch_writer* w, pgch_buf* buf, chdb_insert_stream stream) {
     if (chdb_stream_append(stream, buf->data, buf->len) != CHDBSuccess) {
         const char* error = chdb_stream_insert_error(stream);
 
-        error = chdb_trim_error(pstrdup(error ? error : "unknown error"));
+        error = error ? chdb_capture_error(error) : "unknown error";
         chdb_stream_cancel_insert(stream);
         ereport(
             ERROR,
@@ -232,36 +233,26 @@ free_native_chunks(void* arg) {
 }
 
 /*
- * chDB repeats a request ID per attempt in storage errors, appends a stack
- * trace to others, and ends every message with its own version. None belongs
- * in error message.
+ * Copy error minus Request ID before freeing chDB result. Result is valid
+ * until next call to chdb_capture_error.
  */
 char*
-chdb_trim_error(char* error) {
-    char* id  = strstr(error, "Request ID:");
-    char* eol = id ? strchr(id, '\n') : NULL;
+chdb_capture_error(const char* error) {
+    static char buf[CHDB_ERROR_QUEUE_SIZE / 4];
+    const char* id  = strstr(error, "Request ID:");
+    const char* eol = id ? strchr(id, '\n') : NULL;
+    size_t len      = 0;
 
     if (eol) {
-        memmove(id, eol + 1, strlen(eol + 1) + 1);
+        len = Min((size_t)(id - error), sizeof(buf) - 1);
+        memcpy(buf, error, len);
+        error = eol + 1;
     }
-    char* trace = strstr(error, ", Stack trace (when copying this message");
-    if (trace) {
-        *trace = '\0';
-    } else {
-        char* version = NULL;
-        for (char* pos = error; (pos = strstr(pos, " (version ")); pos++) {
-            version = pos;
-        }
-        if (version) {
-            char* close = strchr(version, ')');
+    size_t rest = Min(strlen(error), sizeof(buf) - 1 - len);
 
-            if (close && close[1] == '\0') {
-                *version = '\0';
-            }
-        }
-    }
-
-    return error;
+    memcpy(buf + len, error, rest);
+    buf[len + rest] = '\0';
+    return buf;
 }
 
 /*
@@ -279,13 +270,8 @@ next_chunk(void* ud, const void** p, size_t* n, char** error) {
     }
 
     chunks->chunk = chdb_stream_fetch_result(chunks->conn, chunks->result);
-    if (!chunks->chunk) {
-        chdb_stream_cancel_query(chunks->conn, chunks->result);
-        *error = "streaming fetch failed";
-        return false;
-    }
     if ((err = chdb_result_error(chunks->chunk))) {
-        *error = chdb_trim_error(pstrdup(err));
+        *error = chdb_capture_error(err);
         chdb_destroy_query_result(chunks->chunk);
         chunks->chunk = NULL;
         return false;

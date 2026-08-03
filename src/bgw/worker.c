@@ -21,6 +21,7 @@
 #include "nodes/nodes.h"
 #include "storage/ipc.h"
 #include "storage/shm_toc.h"
+#include "tcop/tcopprot.h"
 #include "tcop/utility.h"
 #include "utils/builtins.h"
 #include "utils/guc.h"
@@ -59,6 +60,13 @@ free_chdb_resources(void* arg) {
     chdbResources* resources = arg;
 
     if (resources->result) {
+        /*
+         * Cancel the query to release stream state after an interrupted copy.
+         * Cancellation has no effect after the stream ends.
+         */
+        if (resources->conn) {
+            chdb_stream_cancel_query(*resources->conn, resources->result);
+        }
         chdb_destroy_query_result(resources->result);
         resources->result = NULL;
     }
@@ -282,10 +290,13 @@ chdb_bgw_main(Datum main_arg) {
     MemoryContextRegisterResetCallback(CurrentMemoryContext, &resources->cleanup);
 
     /*
-     * Connect to chDB. It uses a temporary directory that it cleans up upon
-     * exit.
+     * Connect to chDB. It uses a temporary directory and removes it on exit.
+     * Disable ClickHouse signal handlers to preserve Postgres behavior, then
+     * restore the Postgres SIGFPE handler because disabling them resets it.
      */
+    chdb_set_signal_handlers_enabled(0);
     resources->conn = chdb_connect(1, (char*[]){ "chdb" });
+    pqsignal(SIGFPE, FloatExceptionHandler);
 
     if (!resources->conn) {
         ereport(
@@ -360,42 +371,20 @@ chdb_bgw_main(Datum main_arg) {
             param_count
         );
 
-        if (!resources->result) {
-            ereport(
-                ERROR,
-                errcode(ERRCODE_EXTERNAL_ROUTINE_EXCEPTION),
-                errmsg("chdb: error executing chDB query"),
-                errcontext("query: %s", ch_query.data)
-            );
-        }
-
         /* Check for errors. */
         if ((error = chdb_result_error(resources->result))) {
-            error = chdb_trim_error(pstrdup(error));
             ereport(
                 ERROR,
                 errcode(ERRCODE_EXTERNAL_ROUTINE_EXCEPTION),
                 errmsg("chdb: error executing chDB query"),
-                errdetail("%s", error),
+                errdetail("%s", chdb_capture_error(error)),
                 errcontext("query: %s", ch_query.data)
             );
         }
 
         /* Decode the blocks chDB streams back and insert their rows. */
-        PG_TRY();
-        {
-            num_rows =
-                chdb_native_receive(rel, attnums, *resources->conn, resources->result);
-        }
-        PG_CATCH();
-        {
-            /* Cleanup streaming query. */
-            table_close(rel, RowExclusiveLock);
-            PopActiveSnapshot();
-            AbortCurrentTransaction();
-            PG_RE_THROW();
-        }
-        PG_END_TRY();
+        num_rows =
+            chdb_native_receive(rel, attnums, *resources->conn, resources->result);
     } else {
         /* Start the streaming insert. */
         resources->insert = chdb_stream_insert_with_params(
@@ -409,42 +398,28 @@ chdb_bgw_main(Datum main_arg) {
 
         /* Check for errors. */
         if ((error = chdb_stream_insert_error(resources->insert))) {
-            error = chdb_trim_error(pstrdup(error));
             ereport(
                 ERROR,
                 errcode(ERRCODE_EXTERNAL_ROUTINE_EXCEPTION),
                 errmsg("chdb: unable to execute query"),
-                errdetail("chDB Error: %s", error),
+                errdetail("chDB Error: %s", chdb_capture_error(error)),
                 errcontext("query: %s", ch_query.data)
             );
         }
 
-        PG_TRY();
-        {
-            num_rows =
-                chdb_native_send(rel, ctx->structure, attnums, resources->insert);
+        num_rows = chdb_native_send(rel, ctx->structure, attnums, resources->insert);
 
-            /* Tell chDB the insert is done. */
-            resources->result = chdb_stream_done(resources->insert);
-            if ((error = chdb_result_error(resources->result))) {
-                ereport(
-                    ERROR,
-                    errcode(ERRCODE_EXTERNAL_ROUTINE_EXCEPTION),
-                    errmsg("chdb: error finishing chDB query"),
-                    errdetail("chDB Error: %s", chdb_trim_error(pstrdup(error))),
-                    errcontext("query: %s", ch_query.data)
-                );
-            }
+        /* Tell chDB the insert is done. */
+        resources->result = chdb_stream_done(resources->insert);
+        if ((error = chdb_result_error(resources->result))) {
+            ereport(
+                ERROR,
+                errcode(ERRCODE_EXTERNAL_ROUTINE_EXCEPTION),
+                errmsg("chdb: error finishing chDB query"),
+                errdetail("chDB Error: %s", chdb_capture_error(error)),
+                errcontext("query: %s", ch_query.data)
+            );
         }
-        PG_CATCH();
-        {
-            /* Cleanup streaming insert. */
-            table_close(rel, AccessShareLock);
-            PopActiveSnapshot();
-            AbortCurrentTransaction();
-            PG_RE_THROW();
-        }
-        PG_END_TRY();
     }
 
     /* Success! Close and commit. */
