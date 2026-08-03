@@ -480,6 +480,9 @@ static const char settings[] =
     "date_time_output_format='iso', "
     "output_format_json_quote_denormals=1, " PGCH_NATIVE_SETTINGS;
 
+#define GCS_HOST "storage.googleapis.com"
+#define AWS_HOST ".amazonaws.com"
+
 size_t
 make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** values) {
     /* Start the query. */
@@ -501,22 +504,40 @@ make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** value
 
     switch (ctx->extra.scheme) {
     case s3_scheme:
-    case gcs_scheme:
+    case gcs_scheme: {
         /*
          * https://clickhouse.com/docs/sql-reference/table-functions/s3#syntax
          * https://clickhouse.com/docs/sql-reference/table-functions/gcs#syntax
          */
 
         /* First parameter: the base URL. */
+        char* uri = strstr(ctx->url, "://");
+        if (!uri) {
+            /* Should not happen, validated by the hook. */
+            elog(ERROR, "chdb: malformed GCS URL %s ", ctx->url);
+        }
+        uri += strlen("://");
+        char* slash = strchr(uri, '/');
+
         if (ctx->extra.scheme == s3_scheme) {
-            PARAM("{url:String}", "url", ctx->url);
-        } else {
-            char* uri = strstr(ctx->url, "://");
-            if (!uri) {
-                /* Should not happen, validated by the hook. */
-                elog(ERROR, "chdb: malformed GCS URL %s ", ctx->url);
+            if (slash && slash - uri >= strlen(AWS_HOST) &&
+                !pg_strncasecmp(slash - strlen(AWS_HOST), AWS_HOST, strlen(AWS_HOST))) {
+                /* s3://{bucket}.{region}.amazonaws.com/{path} */
+                PARAM("{url:String}", "url", psprintf("https://%s", uri));
+            } else {
+                /* s3://{bucket}/{path} */
+                PARAM("{url:String}", "url", ctx->url);
             }
-            PARAM("{url:String}", "url", psprintf("https%s", uri));
+        } else {
+            // If it contains the host name, just emit.
+            if (slash && (slash - uri) >= strlen(GCS_HOST) &&
+                !pg_strncasecmp(uri, GCS_HOST, strlen(GCS_HOST))) {
+                /* gs://storage.googleapis.com/{bucket}/{path} */
+                PARAM("{url:String}", "url", psprintf("https://%s", uri));
+            } else {
+                /* gs://{bucket}/{path} */
+                PARAM("{url:String}", "url", psprintf("https://%s/%s", GCS_HOST, uri));
+            }
         }
 
         if (ctx->access_key[0] != '\0') {
@@ -541,6 +562,7 @@ make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** value
             ctx->extra.timeout
         );
         break;
+    }
     case http_scheme:
         /* https://clickhouse.com/docs/sql-reference/table-functions/url#syntax */
 

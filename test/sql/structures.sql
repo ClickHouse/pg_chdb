@@ -5,8 +5,8 @@ LOAD 'chdb';
 CREATE TABLE structures (
     jp   jsonpath NOT NULL,
     xml  XML      NOT NULL,
-    j  JSON       NOT NULL,
-    jb JSONB          NULL
+    j    JSON     NOT NULL,
+    jb   JSONB        NULL
 );
 
 INSERT INTO structures
@@ -42,8 +42,8 @@ CREATE TABLE structures2 (LIKE structures INCLUDING ALL);
 CREATE TABLE structure_arrays (
     jp   jsonpath[] NOT NULL,
     xml  XML[]      NOT NULL,
-    j  JSON[]       NOT NULL,
-    jb JSONB[]      NOT NULL
+    j    JSON[]     NOT NULL,
+    jb   JSONB[]    NOT NULL
 );
 
 INSERT INTO structure_arrays

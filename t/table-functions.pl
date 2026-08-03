@@ -141,22 +141,22 @@ subtest gcs => sub {
     # GCS passes url as https and ignores session_token. Otherwise the same as s3.
     check_query(
         $node, 'just FROM url',
-        qq{COPY stuff FROM 'gcs://example.org/bucket/prefix/file.csv'},
-        qr/\QHTTP response code: 404/,
+        qq{COPY stuff FROM 'gcs://bucket/prefix/file.csv'},
+        qr/\Qchdb: error fetching chDB query result/,
         qr[\QSELECT * FROM gcs({url:String}, {format:String}, {structure:String}) SETTINGS allow_experimental_nullable_tuple_type=1, date_time_output_format='iso', output_format_json_quote_denormals=1, output_format_native_encode_types_in_binary_format=0,output_format_native_write_json_as_string=1, s3_truncate_on_insert = 1, s3_request_timeout_ms = 30000],
-        qr[\Q{ url: "https://example.org/bucket/prefix/file.csv", format: "auto", structure: "id Nullable(Int32)" }],
+        qr[\Q{ url: "https://storage.googleapis.com/bucket/prefix/file.csv", format: "auto", structure: "id Nullable(Int32)" }],
     );
     check_query(
         $node, 'just TO url',
-        qq{COPY stuff TO 'gcs://example.org/bucket/prefix/file.csv'},
+        qq{COPY stuff TO 'gcs://storage.googleapis.com/bucket/prefix/file.csv'},
         qr/chDB Error: Code: 499/,
         qr[\QINSERT INTO FUNCTION gcs({url:String}, {format:String}, {structure:String}) SETTINGS allow_experimental_nullable_tuple_type=1, date_time_output_format='iso', output_format_json_quote_denormals=1, output_format_native_encode_types_in_binary_format=0,output_format_native_write_json_as_string=1, s3_truncate_on_insert = 1, s3_request_timeout_ms = 30000],
-        qr[\Q{ url: "https://example.org/bucket/prefix/file.csv", format: "auto", structure: "id Nullable(Int32)" }],
+        qr[\Q{ url: "https://storage.googleapis.com/bucket/prefix/file.csv", format: "auto", structure: "id Nullable(Int32)" }],
     );
     check_query(
         $node, 'FROM all params',
         qq{
-            COPY stuff FROM 'gcs://example.org/bucket/prefix/file.csv' (
+            COPY stuff FROM 'gcs://bucket/prefix/file.csv' (
                 access_key 'key',
                 access_secret 'secret',
                 session_token 'big fat token',
@@ -166,9 +166,9 @@ subtest gcs => sub {
                 timeout 0
             )
         },
-        qr/\QHTTP response code: 404/,
+        qr/\Qchdb: error fetching chDB query result/,
         qr[\QSELECT * FROM gcs({url:String}, {access_key:String}, {access_secret:String}, {format:String}, {structure:String}, {compression:String}) SETTINGS allow_experimental_nullable_tuple_type=1, date_time_output_format='iso', output_format_json_quote_denormals=1, output_format_native_encode_types_in_binary_format=0,output_format_native_write_json_as_string=1, s3_truncate_on_insert = 1, s3_request_timeout_ms = 0],
-        qr[\Q{ url: "https://example.org/bucket/prefix/file.csv", access_key: "key", access_secret: "secret", format: "parquet", structure: "id Int64", compression: "lz4" }],
+        qr[\Q{ url: "https://storage.googleapis.com/bucket/prefix/file.csv", access_key: "key", access_secret: "secret", format: "parquet", structure: "id Int64", compression: "lz4" }],
     );
 };
 

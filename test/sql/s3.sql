@@ -7,7 +7,13 @@ CREATE TABLE s3_times (
     days   INT NOT NULL
 );
 
+-- Try S3 URI.
 COPY s3_times FROM 's3://datasets-documentation/my-test-bucket-768/some_prefix/some_file_1.csv';
+SELECT * FROM s3_times ORDER BY id;
+
+-- Try Object URL:
+TRUNCATE s3_times;
+COPY s3_times FROM 's3://datasets-documentation.s3.eu-west-3.amazonaws.com/my-test-bucket-768/some_prefix/some_file_1.csv';
 SELECT * FROM s3_times ORDER BY id;
 
 \set ECHO errors

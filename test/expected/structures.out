@@ -4,8 +4,8 @@ LOAD 'chdb';
 CREATE TABLE structures (
     jp   jsonpath NOT NULL,
     xml  XML      NOT NULL,
-    j  JSON       NOT NULL,
-    jb JSONB          NULL
+    j    JSON     NOT NULL,
+    jb   JSONB        NULL
 );
 INSERT INTO structures
 VALUES ('$.x', '<html>hi</html>', '{"x": true}', '{"y": false}')
@@ -93,8 +93,8 @@ t: BSONEachRow
 CREATE TABLE structure_arrays (
     jp   jsonpath[] NOT NULL,
     xml  XML[]      NOT NULL,
-    j  JSON[]       NOT NULL,
-    jb JSONB[]      NOT NULL
+    j    JSON[]     NOT NULL,
+    jb   JSONB[]    NOT NULL
 );
 INSERT INTO structure_arrays
 VALUES ('{$.x}', '{<html>hi</html>}', '{NULL, "{\"x\": true}"}', '{"{\"y\": false}", NULL}')

@@ -7,7 +7,13 @@ CREATE TABLE gcs_times (
     days   INT NOT NULL
 );
 
+-- Try Public URL.
 COPY gcs_times FROM 'gcs://storage.googleapis.com/clickhouse_public_datasets/my-test-bucket-768/data.csv.gz';
+SELECT * FROM gcs_times ORDER BY id;
+
+-- Try Cloud Storage URI.
+TRUNCATE gcs_times;
+COPY gcs_times FROM 'gcs://clickhouse_public_datasets/my-test-bucket-768/data.csv.gz';
 SELECT * FROM gcs_times ORDER BY id;
 
 \set ECHO errors

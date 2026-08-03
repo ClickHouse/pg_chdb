@@ -9,26 +9,36 @@ CREATE EXTENSION
 
 # LOAD 'chdb';
 LOAD
+
+# CREATE TABLE times (
+    id     INT NOT NULL,
+    months INT NOT NULL,
+    days   INT NOT NULL
+);
+CREATE TABLE
+
+# COPY times FROM 's3://datasets-documentation/my-test-bucket-768/{some,another}_prefix/some_file_{1..3}.csv';
+COPY 16
 ```
 
 ## Description
 
 This library contains a single PostgreSQL extension, `chdb`, which provides a
 background worker to execute [chDB] queries. It currently only supports [COPY]
-to a URL.
+to or from a URL.
 
 ## Loading
 
 Load the chdb extension in one of the following ways as a super user. Use
 whichever makes the most sense for your use case:
 
-*   Explicitly via the [LOAD] command:
+*   Explicitly via the [LOAD] command; lasts for the duration of a session:
 
     ```sql
     LOAD 'chdb';
     ```
 
-*   Implicitly by calling [pgchdb_version()]:
+*   Implicitly by calling [pgchdb_version()]; lasts for the duration of a session:
 
     ```sql
     SELECT pgchdb_version();
@@ -66,16 +76,17 @@ whichever makes the most sense for your use case:
     ```
 
 > [!WARNING]
-> Be aware that loading the chdb extension allows users to `COPY` data to and
-> from files on the Postgres server, as well as to cloud storage.
+> Be aware that loading the chdb extension allows users in the
+> `pg_read_server_files` or `pg_write_server_files` roles to `COPY` data to
+> and from files on the Postgres server, as well as cloud storage.
 
 ## COPY Overloading
 
 On [loading](#loading), the chdb extension library wires itself into the
-Postgres [COPY] command to allow copying data `TO` or `FROM` all of the [data
-formats provided by chDB][formats], and stored in local files, [AWS S3]
-buckets, [Google Cloud Storage], and more. To load a table from a CSV file in
-S3, for example, create the table then call `COPY` with an `s3://` URL:
+Postgres [COPY] command to copy data `TO` or `FROM` any of the supported [data
+formats provided by chDB][formats] in local files, [AWS S3] buckets, [Google
+Cloud Storage], and more. To load a table from a CSV file in S3, for example,
+create the table then call `COPY` with an `s3://` URL:
 
 ```sql
 CREATE TABLE times (
@@ -90,7 +101,7 @@ COPY times FROM 's3://datasets-documentation/my-test-bucket-768/some_prefix/some
 ### Background Worker
 
 When the chdb extension library detects a `COPY` command it can handle, it
-starts a [background worker] to handle it. The background worker keeps the
+starts a [background worker] to do so. The background worker keeps the
 resource consumption of [chDB] separate from the main Postgres process, an
 advantage for an occasionally-used workflow such as loading data from a data
 lake.
@@ -113,17 +124,10 @@ ALTER SYSTEM SET max_worker_processes = 12;
 ### Privileges
 
 A chdb `COPY` requires the same privileges as the [COPY] it replaces: `SELECT`
-on the relation or on every copied column for `COPY TO`, and `INSERT` for `COPY
-FROM`. A `file://` URL reads or writes a file on the server, so also requires
-membership in `pg_read_server_files` or `pg_write_server_files`. `COPY FROM`
-requires a read-write transaction.
-
-The chdb extension rejects two cases it cannot copy faithfully:
-
-*   Relations with [row-level security] policies that apply to the copying
-    role. Postgres applies such policies by rewriting `COPY TO` into a query,
-    which the chdb extension does not support.
-*   Temporary relations, which only the session that created them can read.
+on the relation or on every copied column for `COPY TO`, and `INSERT` for
+`COPY FROM`. A `file://` URL reads or writes a file on the server, so also
+requires membership in `pg_read_server_files` or `pg_write_server_files`.
+`COPY FROM` requires a read-write transaction.
 
 ### URL Schemes
 
@@ -146,10 +150,11 @@ The format of URLs varies by the target.
 #### File
 
 Must be an absolute path on the Postgres server. A relative path results in an
-error. The Postgres server user must have read or write access to the file, as
-appropriate. For `COPY TO`, if the path does not exist, the chdb extension
-will create any missing parent directories; it must have file system
-permission to do so. Example:
+error. The Postgres user must be a member of the `pg_read_server_files` or
+`pg_write_server_files` role, as appropriate. The Postgres system user must
+have read or write access to the file, as appropriate. For `COPY TO`, if the
+path does not exist, the chdb extension will create any missing parent
+directories; it must have file system permission to do so. Example:
 
 ```
 file:///tmp/users.parquet
@@ -166,18 +171,30 @@ https://datasets-documentation.s3.eu-west-3.amazonaws.com/my-test-bucket-768/som
 
 #### S3
 
-S3 URLs take this form:
+S3 URLs may take the form of an S3 URI
 
 ```
 s3://{bucket}/{path}
 ```
 
-GCS URLs take this form:
+Or of an object URL:
+
+```
+s3://{bucket}.{region}.amazonaws.com/{path}
+```
 
 #### GCS
 
+GCS URLs take the form of a public URL:
+
 ```
-gcs://storage.googleapis.com/{bucket}/{path}
+gs://storage.googleapis.com/{bucket}/{path}
+```
+
+Or a Cloud Storage URI, which chdb converts to a public URL:
+
+```
+gs://{bucket}/{path}
 ```
 
 #### Azure Blob Storage
@@ -196,25 +213,34 @@ az://{host}/{container}/{blob}
 
 #### Azure ABFS
 
-Must use this format:
+ABFS URLs must use this format:
 
 ```
 abfs://{container}@{account}.dfs.core.windows.net/{blob}
 ```
 
+#### HDFS URLS
+
+HDFS URLs may use typical HTTP-style URLs with an optional port:
+
+```
+hdfs://{host}/{path}
+hdfs://{host}:{port}/{path}
+```
+
 ### Path Wildcards
 
 URL Paths may contain globs in `COPY FROM` commands. Files must match the
-whole path pattern, not only the suffix or prefix. There is one exception that
-if the path refers to an existing directory and does not use globs, a `*` will
-be implicitly added to the path so all the files in the directory are
-selected.
+whole path pattern, not only the suffix or prefix. The one exception: when
+path refers to an existing directory and does not use globs, a `*` will be
+implicitly added to the path to select all of the files in the directory.
+
+The supported wildcards:
 
 *   `*`: Arbitrarily match many characters except `/`, including the empty string.
 *   `?`: Match an arbitrary single character.
-*   `{some_string,another_string,yet_another_one}`: Substitute any of strings
-    "some_string", "another_string", and "yet_another_one". The strings may
-    contain `/`.
+*   `{groucho,harpo,chico}`: Substitute any of strings "groucho", "harpo", and
+    "chico". The strings may contain `/`.
 *   `{N..M}`: Match any number `>= N` and `<= M`.
 *   `**`: Recursively match all files in a directory.
 
@@ -255,29 +281,34 @@ at the end of the URL.
 
 #### `structure`
 
-The [chDB] data structure to use for the data. Consists of a list of column
-names and [ClickHouse data types] and modifiers. If omitted, the chdb
-extension maps the Postgres data types to generally-appropriate ClickHouse
-types; see [Data Types](#data-types) for details. If set to `auto`, chDB
-attempts to infer the types.
+The [chDB] data structure for a row. Consists of a list of column names and
+[ClickHouse data types] and modifiers. If omitted, the chdb extension maps the
+Postgres data types to generally-appropriate ClickHouse types; see [Data
+Types](#data-types) for details. If set to `auto`, chDB attempts to infer the
+types.
 
 Example:
 
 ```sql
 COPY users TO 'file:///tmp/users.parquet' (
-    structure 'id Int64, name String, age UInt8, attributes JSON'
+    structure 'id Int64, name String, age Nullable(UInt8), attributes JSON'
 );
 ```
 
 #### `access_key` and `access_secret`
 
 Long-term credentials for the AWS account user to authenticate requests.
-Supported by S3, GCS, Azure, and HDFS URLs.
+
+*   **S3:** An AWS [access key ID and access secret], often defined with the
+    environment variables `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`
+*   **GCS:** A GCP [HMAC key and secret]
+*   **Azure:** An Azure Storage account name and [access key]
 
 #### `session_token`
 
-Session token to use with the `access_key` and `access_secret`. Supported
-by S3 URLs.
+AWS session token to use with the `access_key` and `access_secret`, often
+defined by the environment variable `AWS_SESSION_TOKEN`. Used only for S3
+URLs.
 
 #### `compression`
 
@@ -301,7 +332,7 @@ Defaults to `30000` (30s).
 In the absence of an explicit [structure](#structure) option, the chDB
 extension automatically maps Postgres types to reasonable chDB equivalents.
 When they don't match your use case, specify the [structure](#structure) to
-get the types you need.
+override the generated types with those you need.
 
 | Postgres    | chDB                                     | Notes                                                                  |
 | ----------- | ---------------------------------------- | ---------------------------------------------------------------------- |
@@ -333,32 +364,74 @@ get the types you need.
 | float4      | Float32                                  |                                                                        |
 | float8      | Float64                                  |                                                                        |
 | date        | Date32                                   |                                                                        |
-| time        | Time64(6)                                | Override with `String` for formats that don't support dates.           |
+| time        | Time64(6)                                | Override with `String` for formats that don't support times.           |
 | timetz      | String                                   |                                                                        |
 | timestamp   | DateTime64(6)                            | Declared with the `UTC` time zone; values cross as UTC instants.       |
 | timestamptz | DateTime64(6)                            | Declared with the `UTC` time zone; values cross as UTC instants.       |
 | numeric     | Decimal                                  |                                                                        |
 | uuid        | UUID                                     |                                                                        |
-| point       | `Point`                                  | Same two coordinates as Postgres.                                     |
-| lseg        | `LineString`                             | A line of exactly two points.                                         |
-| path        | `LineString`                             | A closed path repeats its first point.                                |
-| polygon     | `Ring`                                   | A ring closes implicitly, as a polygon does.                          |
-| box         | `Tuple(high Point, low Point)`           | The two corners, sorted as Postgres sorts.                            |
+| point       | `Point`                                  | Same two coordinates as Postgres.                                      |
+| lseg        | `LineString`                             | A line of exactly two points.                                          |
+| path        | `LineString`                             | A closed path repeats its first point.                                 |
+| polygon     | `Ring`                                   | A ring closes implicitly, as a polygon does.                           |
+| box         | `Tuple(high Point, low Point)`           | The two corners, sorted as Postgres sorts.                             |
 | circle      | `Tuple(center Point, radius Float64)`    |                                                                        |
-| line        | `Tuple(a Float64, b Float64, c Float64)` | The equation `Ax + By + C = 0`.                                       |
+| line        | `Tuple(a Float64, b Float64, c Float64)` | The equation `Ax + By + C = 0`.                                        |
 
-Array types map to `Array` of the mapped element type. ClickHouse constrains
+Array types map to `Array`s of the mapped element type. ClickHouse constrains
 nullability per column while Postgres constrains it per array, so elements are
 always `Nullable`.
 
-#### Conversion Loss
+### Limitations
 
-*   NULL array comes back as an empty array. ClickHouse has no NULL array, so
-    `COPY TO` stores `[]` for a NULL and `COPY FROM` reads `{}` back.
-*   NULL `lseg`, `path` or `polygon` comes back empty for similar reasons, as
-    they're represented as arrays in ClickHouse.
-*   Open `path` whose last point equals its first comes back closed, closed
-    being what a repeated first point means.
+Due to a few known issues and variations in the behaviors of data types
+between Postgres and chDB, the chdb extension `COPY` support has the following
+limitations:
+
+*   Cannot `COPY` relations with [row-level security] policies that apply to
+    the copying role. Postgres applies such policies by rewriting `COPY TO`
+    into a query, which the chdb extension does not support.
+*   Cannot `COPY` temporary relations, which only the session that created
+    them can read.
+*   ClickHouse has no NULL array, so `COPY TO` stores an empty array (`[]`)
+    for a `NULL`.
+*   ClickHouse represents the equivalents of `lseg`, `path`, or `polygon` as
+    arrays; thus NULL values of these types also `COPY TO` an empty array
+    (`[]`).
+*   NULL values output for a specified [structure](#structure) that doesn't
+    define the column as Nullable will be output as their default values.
+    Always explicitly define nullable columns in the [structure](#structure)
+    to avoid this conversion.
+*   An open `path` whose last point equals its first outputs as a closed path.
+*   Protobuf has no null in a repeated field, so it omits NULL values in
+    arrays.
+*   The chDB [JSON type] supports only JSON objects; override the default
+    `String` mapping for `json` and `jsonb` with `JSON` only if all values are
+    JSON object. (ClickHouse/ClickHouse#68428)
+*   The chDB [JSON type] ignores `null`s; object keys with NULL values will be
+    omitted on output. Override the default `String` mapping for `json` and
+    `jsonb` with `JSON` only if object values aren't `null` or their loss is
+    acceptable. (ClickHouse/ClickHouse#68428)
+*   The JSON, JSONCompact, and JSONColumnsWithMetadata formats always validate
+    UTF-8, so they emit bytea values with replacement characters.
+*   `COPY FROM` reads a Protobuf `Nullable` field containing an empty string
+    or zero as `NULL`. (chdb-io/chdb-core#152)
+*   `COPY TO` Parquet drops `NULL`s from a Nullable Tuple's own null map.
+    (ClickHouse/ClickHouse#112427)
+*   The Parquet, Arrow, ArrowStream, ORC, Avro, Protobuf, ProtobufList,
+    MsgPack and BSONEachRow formats have no type corresponding to Postgres
+    `time` or chDB `Time64`. Configure `time` columns as `String`s in an
+    explicit [structure](#structure) to preserve their values.
+*   Protobuf output truncates timestamp values to the second.
+*   Protobuf output does not support dates prior to 1970-01-01. Configure
+    `time` columns as `String`s in an explicit [structure](#structure) to
+    preserve their values. (ClickHouse/ClickHouse#111860)
+*   The ORC format incorrectly writes out dates after 2059-09-18 due to an
+    integer overflow. Override dates with the `String` type to avoid this
+    issue.
+*   The ORC format raises an error on `timestamp` values from 2262 and later.
+    Will be fixed when [chDB] upgrades to ClickHouse v26.7 or greater.
+    (ClickHouse/ClickHouse#109295)
 
 ## Versioning Policy
 
@@ -402,6 +475,12 @@ Copyright (c) 2026, ClickHouse
   [COPY]: https://www.postgresql.org/docs/current/sql-copy.html "Postgres Docs: COPY"
   [formats]: https://github.com/chdb-io/chdb/blob/main/refs/clickhouse-formats-settings.md#complete-format-names-table
     "chDB Docs: Complete Format Names Table"
+  [access key ID and access secret]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
+    "AWS Identity and Access Management: Manage access keys for IAM users"
+  [HMAC key and secret]: https://docs.cloud.google.com/storage/docs/authentication/hmackeys
+    "Google Cloud Storage: HMAC keys"
+  [access key]: https://learn.microsoft.com/en-us/azure/storage/common/storage-account-keys-manage?tabs=azure-cli
+    "Azure: Manage storage account access keys"
   [row-level security]: https://www.postgresql.org/docs/current/ddl-rowsecurity.html
     "Postgres Docs: Row Security Policies"
   [LOAD]: https://www.postgresql.org/docs/current/sql-load.html "Postgres Docs: LOAD"

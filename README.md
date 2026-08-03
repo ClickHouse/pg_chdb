@@ -6,7 +6,32 @@ chdb Postgres Extension
 
 This library contains a single PostgreSQL extension, `chdb`, which provides a
 background worker to execute [chDB] queries. It currently only supports [COPY]
-to a URL.
+to or from an S3, GCS, Azure Blob, file, or http URL. This example loads
+records from multiple CSV files on S3 in a single [COPY] command:
+
+```sql
+CREATE TABLE times (
+    id     INT NOT NULL,
+    months INT NOT NULL,
+    days   INT NOT NULL
+);
+
+COPY times FROM 's3://datasets-documentation/my-test-bucket-768/{some,another}_prefix/some_file_{1..3}.csv';
+```
+
+Dependencies
+------------
+
+The `chdb` extension requires PostgreSQL 16 or higher and the [chDB] library
+v26.5.1 or greater. The simplest way to install it is via the [lib.chdb.io]
+shell script:
+
+```sh
+curl -sL https://lib.chdb.io | bash
+```
+
+Installation
+------------
 
 To build chdb, just do this:
 
@@ -52,8 +77,8 @@ If you encounter an error such as:
 worker.c:1:10: fatal error: 'chdb.h' file not found
 ```
 
-You either need to install [chDB] or tell the compiler where to find it.
-If, for example, you installed it via the [lib.chdb.io] shell script, point to
+You either need to install [chDB] or tell the compiler where to find it. If,
+for example, you installed it via the [lib.chdb.io] shell script, point to
 `/usr/local`:
 
 ``` sh
@@ -89,8 +114,8 @@ extension_control_path = '/usr/local/extras/postgresql/share:$system'
 dynamic_library_path   = '/usr/local/extras/postgresql/lib:$libdir'
 ```
 
-Once chdb is installed, you can add it to a database by connecting to a
-database as a super user and running:
+Once the chdb extension is installed, you can add it to a database by
+connecting as a super user and running:
 
 ``` sql
 CREATE EXTENSION chdb;
@@ -103,11 +128,6 @@ specific schema, use the `SCHEMA` clause to specify the schema, like so:
 CREATE SCHEMA chdb;
 CREATE EXTENSION chdb SCHEMA chdb;
 ```
-
-Dependencies
------------
-
-The `chdb` extension requires PostgreSQL 16 or higher and the [chDB] library.
 
 Author
 ------
