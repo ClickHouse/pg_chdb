@@ -100,8 +100,9 @@ typedef struct chdbCopyExtra {
  */
 typedef struct chdbCopyContext {
     chdbCopyExtra extra;
-    char* url;
     char* attlist;
+    /* Table function options; keep in sync with CHDB_MAX_TABLEFUNC_ARGS. */
+    char* url;
     char* access_key;
     char* access_secret;
     char* session_token;
@@ -111,8 +112,8 @@ typedef struct chdbCopyContext {
 } chdbCopyContext;
 
 /*
- * URL + number of options (char* fields other than schema and table) +2 for
- * Azure URL parsing.
+ * Number of table function arguments in chdbCopyContext +2 for Azure URL
+ * parsing.
  */
 #define CHDB_MAX_TABLEFUNC_ARGS 9
 

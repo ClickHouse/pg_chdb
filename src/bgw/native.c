@@ -220,6 +220,7 @@ typedef struct nativeChunks {
     chdb_result* chunk;  /* current chunk, alive until the next fetch */
 } nativeChunks;
 
+/* Memory context callback to free the global streaming chunks. */
 static void
 free_native_chunks(void* arg) {
     nativeChunks* chunks = arg;

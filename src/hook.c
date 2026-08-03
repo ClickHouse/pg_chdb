@@ -61,7 +61,11 @@ open_copy_relation(CopyStmt* copy);
 static void
 contextualize_options(chdbCopyContext* ctx, List* options);
 void
-ProcessMessages(shm_mq_handle* queue, QueryCompletion* qc);
+ProcessMessages(
+    shm_mq_handle* queue,
+    QueryCompletion* qc,
+    BackgroundWorkerHandle* handle
+);
 
 /*
  * InitializeUtilityHook hooks chDBProcessUtilityHook into the process utility
@@ -402,7 +406,7 @@ LaunchWorker(chdbCopyContext* ctx, QueryCompletion* qc) {
         ereport(
             ERROR,
             errcode(ERRCODE_CONFIGURATION_LIMIT_EXCEEDED),
-            errmsg("out of background worker slots"),
+            errmsg("chdb: out of background worker slots"),
             errhint("You might need to increase max_worker_processes.")
         );
     }
@@ -419,7 +423,7 @@ LaunchWorker(chdbCopyContext* ctx, QueryCompletion* qc) {
         ereport(
             ERROR,
             (errcode(ERRCODE_INSUFFICIENT_RESOURCES),
-             errmsg("could not start background process"),
+             errmsg("chdb: could not start background process"),
              errhint("More details may be available in the server log."))
         );
     }
@@ -427,7 +431,7 @@ LaunchWorker(chdbCopyContext* ctx, QueryCompletion* qc) {
         ereport(
             ERROR,
             (errcode(ERRCODE_INSUFFICIENT_RESOURCES),
-             errmsg("cannot start background processes without postmaster"),
+             errmsg("chdb: cannot start background processes without postmaster"),
              errhint("Kill all remaining database processes and restart the database."))
         );
     }
@@ -435,7 +439,7 @@ LaunchWorker(chdbCopyContext* ctx, QueryCompletion* qc) {
 
     /* Wait for it to finish. */
     PG_TRY();
-    { ProcessMessages(mqh, qc); }
+    { ProcessMessages(mqh, qc, handle); }
     PG_CATCH();
     {
         dsm_detach(seg);
@@ -455,7 +459,11 @@ LaunchWorker(chdbCopyContext* ctx, QueryCompletion* qc) {
  * queue has been drained.
  */
 void
-ProcessMessages(shm_mq_handle* queue, QueryCompletion* qc) {
+ProcessMessages(
+    shm_mq_handle* queue,
+    QueryCompletion* qc,
+    BackgroundWorkerHandle* handle
+) {
     Size msg_len;
     void* data;
     StringInfoData msg;
@@ -464,12 +472,23 @@ ProcessMessages(shm_mq_handle* queue, QueryCompletion* qc) {
     for (;;) {
         CHECK_FOR_INTERRUPTS();
 
+        /* Check on the health of the background worker. */
+        pid_t pid;
+        BgwHandleStatus status = GetBackgroundWorkerPid(handle, &pid);
+        if (status == BGWH_STOPPED || status == BGWH_POSTMASTER_DIED) {
+            ereport(
+                ERROR,
+                errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
+                errmsg("chdb: the background worker died")
+            );
+        }
+
         shm_mq_result res = shm_mq_receive(queue, &msg_len, &data, false);
         if (res != SHM_MQ_SUCCESS) {
             ereport(
                 ERROR,
                 errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-                errmsg("lost connection to chdb worker")
+                errmsg("chdb: lost connection to chdb worker")
             );
         }
 
@@ -493,8 +512,8 @@ ProcessMessages(shm_mq_handle* queue, QueryCompletion* qc) {
         }
         case PqMsg_Progress: {
             /* Progress report. See pgstat_progress_parallel_incr_param for format. */
-            (void)pq_getmsgint(&msg, sizeof(uint32_t)); /* unused for now */
-            SetQueryCompletion(qc, CMDTAG_COPY, pq_getmsgint64(&msg));
+            CommandTag cmd = pq_getmsgint(&msg, sizeof(uint32_t));
+            SetQueryCompletion(qc, cmd, pq_getmsgint64(&msg));
             resetStringInfo(&msg);
             break;
         }

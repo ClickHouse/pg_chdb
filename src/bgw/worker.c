@@ -45,6 +45,7 @@ PG_MODULE_MAGIC_EXT(.name = "chdb_bgw", .version = PGCHCB_VERSION);
 PG_MODULE_MAGIC;
 #endif
 
+/* Global resources for a streaming COPY. */
 typedef struct chdbResources {
     MemoryContextCallback cleanup;
     chdb_connection* conn;
@@ -52,6 +53,7 @@ typedef struct chdbResources {
     chdb_insert_stream insert;
 } chdbResources;
 
+/* Memory context callback to free the global copy context.*/
 static void
 free_chdb_resources(void* arg) {
     chdbResources* resources = arg;
@@ -97,7 +99,7 @@ static char*
 get_local_path_from_file_url(const char* url);
 
 /*
- * Structure clause for the columns `attnums` names, as
+ * Structure clause for the columns `attnums` names, similar to how
  * pgch_structure_from_tupdesc builds for a whole relation. A COPY column list
  * decides which columns cross, so the clause has to follow it.
  */
@@ -124,7 +126,10 @@ structure_for_attnums(TupleDesc desc, List* attnums) {
     return buf.data;
 }
 
-/* Declares every bare `type` in a structure clause String instead. */
+/*
+ * Return a copy of `structure` with every bare `type` clause replaced with
+ * `String`.
+ */
 static char*
 structure_as_string(const char* structure, const char* type) {
     StringInfoData buf;
@@ -148,12 +153,16 @@ structure_as_string(const char* structure, const char* type) {
     return buf.data;
 }
 
-/* Formats lacking Time64 support. String fallback should be used. */
+/*
+ * Returns true if `format` is one of the formats lacking Time64 support.
+ * In such cases, `Time64(6)` should be replaced with `String`.
+ */
 static bool
 format_lacks_time64(const char* format) {
-    static const char* const formats[] = { "Parquet",      "Arrow",   "ArrowStream",
-                                           "ORC",          "Avro",    "Protobuf",
-                                           "ProtobufList", "MsgPack", "BSONEachRow" };
+    static const char* const formats[] = {
+        "Parquet",  "Arrow",        "ArrowStream", "ORC",         "Avro",
+        "Protobuf", "ProtobufList", "MsgPack",     "BSONEachRow",
+    };
 
     for (size_t i = 0; i < lengthof(formats); i++) {
         if (pg_strcasecmp(format, formats[i]) == 0) {
@@ -163,6 +172,7 @@ format_lacks_time64(const char* format) {
     return false;
 }
 
+/* Main function executed when worker starts. */
 void
 chdb_bgw_main(Datum main_arg) {
     /* Establish signal handlers before unblocking signals. */
@@ -177,12 +187,12 @@ chdb_bgw_main(Datum main_arg) {
         AllocSetContextCreate(TopMemoryContext, "chDB worker", ALLOCSET_DEFAULT_SIZES);
 
     /*
-     * Attach to the dynamic shared memory segment for the parallel query, and
-     * find its table of contents.
+     * Attach to the dynamic shared memory segment for the query, and find its
+     * table of contents.
      *
      * Note: at this point, we have not created any ResourceOwner in this
      * process. This will result in our DSM mapping surviving until process
-     * exit, which is fine.  If there were a ResourceOwner, it would acquire
+     * exit, which is fine. If there were a ResourceOwner, it would acquire
      * ownership of the mapping, but we have no need for that.
      */
     dsm_segment* seg = dsm_attach(DatumGetUInt32(main_arg));
@@ -190,7 +200,7 @@ chdb_bgw_main(Datum main_arg) {
         ereport(
             ERROR,
             errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-            errmsg("could not map dynamic shared memory segment")
+            errmsg("chdb: could not map dynamic shared memory segment")
         );
     }
     shm_toc* toc = shm_toc_attach(CHDB_SHM_MAGIC, dsm_segment_address(seg));
@@ -198,7 +208,7 @@ chdb_bgw_main(Datum main_arg) {
         ereport(
             ERROR,
             errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-            errmsg("invalid magic number in dynamic shared memory segment")
+            errmsg("chdb: invalid magic number in dynamic shared memory segment")
         );
     }
 
@@ -217,7 +227,7 @@ chdb_bgw_main(Datum main_arg) {
     ctx->attlist       = shm_toc_lookup(toc, CHDB_KEY_ATTLIST, false);
 
     /*
-     * Now we can find and attach to the error queue provided for us.  That's
+     * Now we can find and attach to the error queue provided for us. That's
      * good, because until we do that, any errors that happen here will not be
      * reported back to the process that requested that this worker be
      * launched.
@@ -228,7 +238,7 @@ chdb_bgw_main(Datum main_arg) {
     pq_redirect_to_shm_mq(seg, mqh);
 
     /*
-     * Hooray! Primary initialization is complete.  Now, we need to set up our
+     * Hooray! Primary initialization is complete. Now, we need to set up our
      * backend-local state to match the original backend.
      */
 
@@ -272,8 +282,8 @@ chdb_bgw_main(Datum main_arg) {
     MemoryContextRegisterResetCallback(CurrentMemoryContext, &resources->cleanup);
 
     /*
-     * Connect to chDB. It will use a temporary directory that it cleans up
-     * upon exit.
+     * Connect to chDB. It uses a temporary directory that it cleans up upon
+     * exit.
      */
     resources->conn = chdb_connect(1, (char*[]){ "chdb" });
 
@@ -281,7 +291,7 @@ chdb_bgw_main(Datum main_arg) {
         ereport(
             ERROR,
             errcode(ERRCODE_CONNECTION_FAILURE),
-            errmsg("unable to connect to chDB")
+            errmsg("chdb: unable to connect to chDB")
         );
     }
 
@@ -310,7 +320,7 @@ chdb_bgw_main(Datum main_arg) {
     List* attlist = ctx->attlist[0] ? (List*)stringToNode(ctx->attlist) : NIL;
     List* attnums = CopyGetAttnums(RelationGetDescr(rel), rel, attlist);
 
-    /* Assemble the chDB query; we always need a structure. */
+    /* We always need a structure. */
     if (ctx->structure[0] == '\0') {
         ctx->structure = structure_for_attnums(RelationGetDescr(rel), attnums);
         if (pg_strcasecmp(ctx->format, "ORC") == 0) {
@@ -327,6 +337,8 @@ chdb_bgw_main(Datum main_arg) {
             }
         }
     }
+
+    /* Assemble the chDB query. */
     StringInfoData ch_query;
     char* names[CHDB_MAX_TABLEFUNC_ARGS];
     char* values[CHDB_MAX_TABLEFUNC_ARGS];
@@ -352,7 +364,7 @@ chdb_bgw_main(Datum main_arg) {
             ereport(
                 ERROR,
                 errcode(ERRCODE_EXTERNAL_ROUTINE_EXCEPTION),
-                errmsg("error executing chDB query"),
+                errmsg("chdb: error executing chDB query"),
                 errcontext("query: %s", ch_query.data)
             );
         }
@@ -363,7 +375,7 @@ chdb_bgw_main(Datum main_arg) {
             ereport(
                 ERROR,
                 errcode(ERRCODE_EXTERNAL_ROUTINE_EXCEPTION),
-                errmsg("error executing chDB query"),
+                errmsg("chdb: error executing chDB query"),
                 errdetail("%s", error),
                 errcontext("query: %s", ch_query.data)
             );
@@ -446,7 +458,7 @@ chdb_bgw_main(Datum main_arg) {
 #else
     StringInfo msg = makeStringInfo();
 #endif
-    pq_sendint32(msg, 0); /* unused for now */
+    pq_sendint32(msg, CMDTAG_COPY);
     pq_sendint64(msg, num_rows);
     pq_putmessage(PqMsg_Progress, msg->data, msg->len);
 
@@ -456,7 +468,6 @@ chdb_bgw_main(Datum main_arg) {
 }
 
 /* Convenience constant function to append a parameter to a query. */
-/* Using quote_literal_cstr() to work around lack of parameter-supporting insert. */
 #define PARAM(format, name, val)                                                       \
     Assert(i + 1 <= CHDB_MAX_TABLEFUNC_ARGS);                                          \
     appendStringInfoString(query, format);                                             \
