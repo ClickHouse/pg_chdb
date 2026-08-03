@@ -61,11 +61,7 @@ open_copy_relation(CopyStmt* copy);
 static void
 contextualize_options(chdbCopyContext* ctx, List* options);
 void
-ProcessMessages(
-    shm_mq_handle* queue,
-    QueryCompletion* qc,
-    BackgroundWorkerHandle* handle
-);
+ProcessMessages(shm_mq_handle* queue, QueryCompletion* qc);
 
 /*
  * InitializeUtilityHook hooks chDBProcessUtilityHook into the process utility
@@ -418,15 +414,6 @@ LaunchWorker(chdbCopyContext* ctx, QueryCompletion* qc) {
     pid_t pid;
     BgwHandleStatus status = WaitForBackgroundWorkerStartup(handle, &pid);
 
-    if (status == BGWH_STOPPED) {
-        dsm_detach(seg);
-        ereport(
-            ERROR,
-            (errcode(ERRCODE_INSUFFICIENT_RESOURCES),
-             errmsg("chdb: could not start background process"),
-             errhint("More details may be available in the server log."))
-        );
-    }
     if (status == BGWH_POSTMASTER_DIED) {
         ereport(
             ERROR,
@@ -435,11 +422,16 @@ LaunchWorker(chdbCopyContext* ctx, QueryCompletion* qc) {
              errhint("Kill all remaining database processes and restart the database."))
         );
     }
-    Assert(status == BGWH_STARTED);
+
+    /*
+     * BGWH_STOPPED also covers a worker that already ran to completion, with
+     * its messages waiting in the queue, so fall through to drain it.
+     */
+    Assert(status == BGWH_STARTED || status == BGWH_STOPPED);
 
     /* Wait for it to finish. */
     PG_TRY();
-    { ProcessMessages(mqh, qc, handle); }
+    { ProcessMessages(mqh, qc); }
     PG_CATCH();
     {
         dsm_detach(seg);
@@ -459,11 +451,7 @@ LaunchWorker(chdbCopyContext* ctx, QueryCompletion* qc) {
  * queue has been drained.
  */
 void
-ProcessMessages(
-    shm_mq_handle* queue,
-    QueryCompletion* qc,
-    BackgroundWorkerHandle* handle
-) {
+ProcessMessages(shm_mq_handle* queue, QueryCompletion* qc) {
     Size msg_len;
     void* data;
     StringInfoData msg;
@@ -472,23 +460,17 @@ ProcessMessages(
     for (;;) {
         CHECK_FOR_INTERRUPTS();
 
-        /* Check on the health of the background worker. */
-        pid_t pid;
-        BgwHandleStatus status = GetBackgroundWorkerPid(handle, &pid);
-        if (status == BGWH_STOPPED || status == BGWH_POSTMASTER_DIED) {
-            ereport(
-                ERROR,
-                errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-                errmsg("chdb: the background worker died")
-            );
-        }
-
+        /*
+         * shm_mq_receive drains fully written messages before SHM_MQ_DETACHED,
+         * and detects a worker that dies before attaching as sender.
+         * Detach without PqMsg_Terminate means the worker died.
+         */
         shm_mq_result res = shm_mq_receive(queue, &msg_len, &data, false);
         if (res != SHM_MQ_SUCCESS) {
             ereport(
                 ERROR,
                 errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-                errmsg("chdb: lost connection to chdb worker")
+                errmsg("chdb: the background worker died")
             );
         }
 
