@@ -106,6 +106,18 @@ parse_azure_url(chdbCopyContext*, azureURLParts* parts);
 static char*
 get_local_path_from_file_url(const char* url);
 
+/* Backend-local copy of data from FixedParallelState. */
+static pid_t parent_pid;
+#if PG_VERSION_NUM >= 170000
+ProcNumber parent_proc_num = INVALID_PROC_NUMBER;
+#else
+BackendId parent_proc_num = InvalidBackendId;
+#endif
+
+/* Informs parent process that we're shutting down. */
+static void
+chdb_bgw_shutdown(int code, Datum arg);
+
 /*
  * Structure clause for the columns `attnums` names, similar to how
  * pgch_structure_from_tupdesc builds for a whole relation. A COPY column list
@@ -223,6 +235,11 @@ chdb_bgw_main(Datum main_arg) {
     /* Reconstruct the context, starting with fixed size fields in bgw_extra. */
     chdbCopyContext* ctx = palloc_object(chdbCopyContext);
     memcpy(&ctx->extra, MyBgworkerEntry->bgw_extra, sizeof(chdbCopyExtra));
+
+    /* Arrange to signal the leader if we exit. */
+    parent_pid      = ctx->extra.parent_pid;
+    parent_proc_num = ctx->extra.parent_proc_num;
+    before_shmem_exit(chdb_bgw_shutdown, PointerGetDatum(seg));
 
     /* Assemble the rest of the context from shared memory. */
     ctx->url           = shm_toc_lookup(toc, CHDB_KEY_URL, false);
@@ -767,4 +784,27 @@ get_local_path_from_file_url(const char* url) {
     }
 
     return path;
+}
+
+/*
+ * Make sure the parent tries to read from our error queue one more time.
+ * This guards against the case where we exit uncleanly without sending an
+ * ErrorResponse to the leader, for example because some code calls proc_exit
+ * directly.
+ *
+ * Also explicitly detach from dsm segment so that subsystems using
+ * on_dsm_detach() have a chance to send stats before the stats subsystem is
+ * shut down as part of a before_shmem_exit() hook.
+ *
+ * One might think this could instead be solved by carefully ordering the
+ * attaching to dsm segments, so that the pgstats segments get detached from
+ * later than the parallel query one. That turns out to not work because the
+ * stats hash might need to grow which can cause new segments to be allocated,
+ * which then will be detached from earlier.
+ */
+static void
+chdb_bgw_shutdown(int code, Datum arg) {
+    SendProcSignal(parent_pid, PROCSIG_PARALLEL_MESSAGE, parent_proc_num);
+
+    dsm_detach((dsm_segment*)DatumGetPointer(arg));
 }

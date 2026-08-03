@@ -4,6 +4,8 @@
 #if PG_VERSION_NUM >= 170000
 #include "libpq/protocol.h"
 #else
+#include "storage/backendid.h"
+typedef BackendId ProcNumber;
 #define PqMsg_Terminate 'X'
 #define PqMsg_ErrorResponse 'E'
 #define PqMsg_NoticeResponse 'N'
@@ -92,6 +94,8 @@ typedef struct chdbCopyExtra {
     scheme scheme;
     bool is_from;
     uint32_t timeout; /* request timeout in milliseconds */
+    pid_t parent_pid;
+    ProcNumber parent_proc_num;
 } chdbCopyExtra;
 
 /*

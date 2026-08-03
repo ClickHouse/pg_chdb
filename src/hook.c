@@ -273,7 +273,13 @@ chDBProcessUtilityHook(
                     .rel_id = RelationGetRelid(rel),
                     .db_id   = MyDatabaseId,
                     .role_id = GetAuthenticatedUserId(),
-                    .is_from = copy->is_from
+                    .is_from = copy->is_from,
+                    .parent_pid = MyProcPid,
+#if PG_VERSION_NUM >= 170000
+                    .parent_proc_num = MyProcNumber,
+#else
+                    .parent_proc_num = MyBackendId
+#endif
                     // .session_user_id = GetSessionUserId(),
                     // .outer_user_id = GetCurrentRoleId(),
                  },
