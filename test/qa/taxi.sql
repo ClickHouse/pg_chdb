@@ -1,0 +1,53 @@
+-- https://clickhouse.com/docs/get-started/quickstarts/tutorial
+DROP TABLE IF EXISTS trips;
+CREATE TABLE trips (
+    trip_id                 bigint                    NOT NULL,
+    vendor_id               text                      NOT NULL,
+    pickup_date             date                      NOT NULL,
+    pickup_datetime         timestamp with time zone  NOT NULL,
+    dropoff_date            date                      NOT NULL,
+    dropoff_datetime        timestamp with time zone  NOT NULL,
+    store_and_fwd_flag      smallint                  NOT NULL,
+    rate_code_id            smallint                  NOT NULL,
+    pickup_longitude        double precision          NOT NULL,
+    pickup_latitude         double precision          NOT NULL,
+    dropoff_longitude       double precision          NOT NULL,
+    dropoff_latitude        double precision          NOT NULL,
+    passenger_count         smallint                  NOT NULL,
+    trip_distance           double precision          NOT NULL,
+    fare_amount             numeric(10,2)             NOT NULL,
+    extra                   numeric(10,2)             NOT NULL,
+    mta_tax                 numeric(10,2)             NOT NULL,
+    tip_amount              numeric(10,2)             NOT NULL,
+    tolls_amount            numeric(10,2)             NOT NULL,
+    ehail_fee               numeric(10,2)             NOT NULL,
+    improvement_surcharge   numeric(10,2)             NOT NULL,
+    total_amount            numeric(10,2)             NOT NULL,
+    payment_type            text                      NOT NULL,
+    trip_type               smallint                  NOT NULL,
+    pickup                  character varying(25)     NOT NULL,
+    dropoff                 character varying(25)     NOT NULL,
+    cab_type                text                      NOT NULL,
+    pickup_nyct2010_gid     smallint                  NOT NULL,
+    pickup_ctlabel          real                      NOT NULL,
+    pickup_borocode         smallint                  NOT NULL,
+    pickup_ct2010           text                      NOT NULL,
+    pickup_boroct2010       text                      NOT NULL,
+    pickup_cdeligibil       text                      NOT NULL,
+    pickup_ntacode          character varying(4)      NOT NULL,
+    pickup_ntaname          text                      NOT NULL,
+    pickup_puma             integer                   NOT NULL,
+    dropoff_nyct2010_gid    smallint                  NOT NULL,
+    dropoff_ctlabel         real                      NOT NULL,
+    dropoff_borocode        smallint                  NOT NULL,
+    dropoff_ct2010          text                      NOT NULL,
+    dropoff_boroct2010      text                      NOT NULL,
+    dropoff_cdeligibil      text                      NOT NULL,
+    dropoff_ntacode         character varying(4)      NOT NULL,
+    dropoff_ntaname         text                      NOT NULL,
+    dropoff_puma            integer                   NOT NULL
+);
+
+LOAD 'chdb';
+\timing on
+COPY trips from 's3://datasets-documentation/nyc-taxi/trips_{1..2}.gz';
