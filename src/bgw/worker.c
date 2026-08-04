@@ -539,6 +539,14 @@ make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** value
             if (ctx->session_token[0] != '\0' && ctx->extra.scheme == s3_scheme) {
                 PARAM(", {session_token:String}", "session_token", ctx->session_token);
             }
+        } else {
+            /*
+             * Consider adding a superuser-only GUC to allow using environment
+             * or file credentials. If enabled we'd simply omit this parameter
+             * and append the `s3_allow_server_credentials_in_user_queries=1`
+             * setting.
+             */
+            appendStringInfoString(query, ", NOSIGN");
         }
 
         /* Append remaining arguments and settings. */

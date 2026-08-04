@@ -27,14 +27,14 @@ subtest s3 => sub {
         $node, 'just FROM url',
         qq{COPY stuff FROM 's3://localhost:$port/bucket/prefix/file.csv'},
         qr/\QHTTP response code: 403/,
-        qr[\QSELECT * FROM s3({url:String}, {format:String}, {structure:String}) SETTINGS allow_experimental_nullable_tuple_type=1, date_time_output_format='iso', output_format_json_quote_denormals=1, output_format_native_encode_types_in_binary_format=0,output_format_native_write_json_as_string=1, s3_truncate_on_insert = 1, s3_request_timeout_ms = 30000],
+        qr[\QSELECT * FROM s3({url:String}, NOSIGN, {format:String}, {structure:String}) SETTINGS allow_experimental_nullable_tuple_type=1, date_time_output_format='iso', output_format_json_quote_denormals=1, output_format_native_encode_types_in_binary_format=0,output_format_native_write_json_as_string=1, s3_truncate_on_insert = 1, s3_request_timeout_ms = 30000],
         qr[\Q{ url: "s3://localhost:\E$port\Q/bucket/prefix/file.csv", format: "auto", structure: "id Nullable(Int32)" }],
     );
     check_query(
         $node, 'just TO url',
         qq{COPY stuff TO 's3://localhost:$port/bucket/prefix/file.csv'},
         qr/\QDB::Exception: Message: Access Denied/,
-        qr[\QINSERT INTO FUNCTION s3({url:String}, {format:String}, {structure:String}) SETTINGS allow_experimental_nullable_tuple_type=1, date_time_output_format='iso', output_format_json_quote_denormals=1, output_format_native_encode_types_in_binary_format=0,output_format_native_write_json_as_string=1, s3_truncate_on_insert = 1, s3_request_timeout_ms = 30000],
+        qr[\QINSERT INTO FUNCTION s3({url:String}, NOSIGN, {format:String}, {structure:String}) SETTINGS allow_experimental_nullable_tuple_type=1, date_time_output_format='iso', output_format_json_quote_denormals=1, output_format_native_encode_types_in_binary_format=0,output_format_native_write_json_as_string=1, s3_truncate_on_insert = 1, s3_request_timeout_ms = 30000],
         qr[\Q{ url: "s3://localhost:\E$port\Q/bucket/prefix/file.csv", format: "auto", structure: "id Nullable(Int32)" }],
     );
     check_query(
@@ -95,7 +95,7 @@ subtest s3 => sub {
             )
         },
         qr/\QHTTP response code: 403/,
-        qr[\QSELECT * FROM s3({url:String}, {format:String}, {structure:String}) SETTINGS allow_experimental_nullable_tuple_type=1, date_time_output_format='iso', output_format_json_quote_denormals=1, output_format_native_encode_types_in_binary_format=0,output_format_native_write_json_as_string=1, s3_truncate_on_insert = 1, s3_request_timeout_ms = 0],
+        qr[\QSELECT * FROM s3({url:String}, NOSIGN, {format:String}, {structure:String}) SETTINGS allow_experimental_nullable_tuple_type=1, date_time_output_format='iso', output_format_json_quote_denormals=1, output_format_native_encode_types_in_binary_format=0,output_format_native_write_json_as_string=1, s3_truncate_on_insert = 1, s3_request_timeout_ms = 0],
         qr[\Q{ url: "s3://localhost:\E$port\Q/bucket/prefix/file.csv", format: "parquet", structure: "id Int64" }],
     );
     check_query(
@@ -108,7 +108,7 @@ subtest s3 => sub {
             )
         },
         qr/\QHTTP response code: 403/,
-        qr[\QSELECT * FROM s3({url:String}, {format:String}, {structure:String}, {compression:String}) SETTINGS allow_experimental_nullable_tuple_type=1, date_time_output_format='iso', output_format_json_quote_denormals=1, output_format_native_encode_types_in_binary_format=0,output_format_native_write_json_as_string=1, s3_truncate_on_insert = 1, s3_request_timeout_ms = 0],
+        qr[\QSELECT * FROM s3({url:String}, NOSIGN, {format:String}, {structure:String}, {compression:String}) SETTINGS allow_experimental_nullable_tuple_type=1, date_time_output_format='iso', output_format_json_quote_denormals=1, output_format_native_encode_types_in_binary_format=0,output_format_native_write_json_as_string=1, s3_truncate_on_insert = 1, s3_request_timeout_ms = 0],
         qr[\Q{ url: "s3://localhost:\E$port\Q/bucket/prefix/file.csv", format: "parquet", structure: "id Nullable(Int32)", compression: "snappy" }],
     );
     check_query(
@@ -120,7 +120,7 @@ subtest s3 => sub {
             )
         },
         qr/\QHTTP response code: 403/,
-        qr[\QSELECT * FROM s3({url:String}, {format:String}, {structure:String}, {compression:String}) SETTINGS allow_experimental_nullable_tuple_type=1, date_time_output_format='iso', output_format_json_quote_denormals=1, output_format_native_encode_types_in_binary_format=0,output_format_native_write_json_as_string=1, s3_truncate_on_insert = 1, s3_request_timeout_ms = 0],
+        qr[\QSELECT * FROM s3({url:String}, NOSIGN, {format:String}, {structure:String}, {compression:String}) SETTINGS allow_experimental_nullable_tuple_type=1, date_time_output_format='iso', output_format_json_quote_denormals=1, output_format_native_encode_types_in_binary_format=0,output_format_native_write_json_as_string=1, s3_truncate_on_insert = 1, s3_request_timeout_ms = 0],
         qr[\Q{ url: "s3://localhost:\E$port\Q/bucket/prefix/file.csv", format: "auto", structure: "id Nullable(Int32)", compression: "snappy" }],
     );
     check_query(
@@ -132,7 +132,7 @@ subtest s3 => sub {
             )
         },
         qr/\QHTTP response code: 403/,
-        qr[\QSELECT * FROM s3({url:String}, {format:String}, {structure:String}) SETTINGS allow_experimental_nullable_tuple_type=1, date_time_output_format='iso', output_format_json_quote_denormals=1, output_format_native_encode_types_in_binary_format=0,output_format_native_write_json_as_string=1, s3_truncate_on_insert = 1, s3_request_timeout_ms = 100],
+        qr[\QSELECT * FROM s3({url:String}, NOSIGN, {format:String}, {structure:String}) SETTINGS allow_experimental_nullable_tuple_type=1, date_time_output_format='iso', output_format_json_quote_denormals=1, output_format_native_encode_types_in_binary_format=0,output_format_native_write_json_as_string=1, s3_truncate_on_insert = 1, s3_request_timeout_ms = 100],
         qr[\Q{ url: "s3://localhost:\E$port\Q/bucket/prefix/file.csv", format: "tsv", structure: "id Nullable(Int32)" }],
     );
 };
@@ -143,14 +143,14 @@ subtest gcs => sub {
         $node, 'just FROM url',
         qq{COPY stuff FROM 'gcs://bucket/prefix/file.csv'},
         qr/\Qchdb: error fetching chDB query result/,
-        qr[\QSELECT * FROM gcs({url:String}, {format:String}, {structure:String}) SETTINGS allow_experimental_nullable_tuple_type=1, date_time_output_format='iso', output_format_json_quote_denormals=1, output_format_native_encode_types_in_binary_format=0,output_format_native_write_json_as_string=1, s3_truncate_on_insert = 1, s3_request_timeout_ms = 30000],
+        qr[\QSELECT * FROM gcs({url:String}, NOSIGN, {format:String}, {structure:String}) SETTINGS allow_experimental_nullable_tuple_type=1, date_time_output_format='iso', output_format_json_quote_denormals=1, output_format_native_encode_types_in_binary_format=0,output_format_native_write_json_as_string=1, s3_truncate_on_insert = 1, s3_request_timeout_ms = 30000],
         qr[\Q{ url: "https://storage.googleapis.com/bucket/prefix/file.csv", format: "auto", structure: "id Nullable(Int32)" }],
     );
     check_query(
         $node, 'just TO url',
         qq{COPY stuff TO 'gcs://storage.googleapis.com/bucket/prefix/file.csv'},
         qr/chDB Error: Code: 499/,
-        qr[\QINSERT INTO FUNCTION gcs({url:String}, {format:String}, {structure:String}) SETTINGS allow_experimental_nullable_tuple_type=1, date_time_output_format='iso', output_format_json_quote_denormals=1, output_format_native_encode_types_in_binary_format=0,output_format_native_write_json_as_string=1, s3_truncate_on_insert = 1, s3_request_timeout_ms = 30000],
+        qr[\QINSERT INTO FUNCTION gcs({url:String}, NOSIGN, {format:String}, {structure:String}) SETTINGS allow_experimental_nullable_tuple_type=1, date_time_output_format='iso', output_format_json_quote_denormals=1, output_format_native_encode_types_in_binary_format=0,output_format_native_write_json_as_string=1, s3_truncate_on_insert = 1, s3_request_timeout_ms = 30000],
         qr[\Q{ url: "https://storage.googleapis.com/bucket/prefix/file.csv", format: "auto", structure: "id Nullable(Int32)" }],
     );
     check_query(
