@@ -55,7 +55,7 @@ COPY gcs_things TO 'gs://storage.googleapis.com/pg-chdb-ci/keep-me.tsv' (
 SELECT (random() * 100000)::int AS rand \gset
 \set arch ''
 \getenv arch RUNNER_ARCH
-\set url gs://storage.googleapis.com/pg-chdb-ci/ci/:SERVER_VERSION_NUM - :arch - :rand /test.csv
+\set url gs://storage.googleapis.com/pg-chdb-ci/ci/pg-:SERVER_VERSION_NUM - :arch - :rand /test.csv
 \set ECHO all
 
 -- Copy the data to GCS.
