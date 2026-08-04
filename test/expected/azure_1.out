@@ -1,0 +1,2 @@
+\set ECHO errors
+SKIP: No Azure credentials found in the environment

@@ -22,3 +22,4 @@ log/
 /test/schedule
 /tmp_check/
 *.tmp
+.DS_Store
