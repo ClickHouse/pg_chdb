@@ -1,0 +1,37 @@
+LOAD 'chdb';
+/****************************************************************************/
+-- Error clipping. chDB errors longer than the worker's capture buffer get
+-- clipped, and the cut has to land on a character boundary.
+CREATE TABLE clipped (id INT);
+DO $$
+DECLARE
+    path   text;
+    detail text;
+    pad    int;
+BEGIN
+    FOR pad IN 0..3 LOOP
+        -- chDB echoes the whole path, so the error outruns the buffer. Padding
+        -- walks the cut through a four byte character.
+        path := '/tmp/' || repeat('x', pad) || repeat('😃', 1100) || '.csv';
+        BEGIN
+            EXECUTE format('COPY clipped FROM %L', 'file://' || path);
+            RAISE 'chDB read a % byte path', octet_length(path);
+        EXCEPTION WHEN external_routine_exception THEN
+            GET STACKED DIAGNOSTICS detail = PG_EXCEPTION_DETAIL;
+            IF octet_length(detail) >= octet_length(path) THEN
+                RAISE 'detail not clipped: % bytes', octet_length(detail);
+            END IF;
+            -- Raises when the clip cut a character in half.
+            PERFORM length(detail::bytea, 'UTF8');
+            IF right(detail, 1) <> '😃' THEN
+                RAISE 'detail ends with %', quote_literal(right(detail, 1));
+            END IF;
+        END;
+        RAISE NOTICE 'pad % clipped on a character boundary', pad;
+    END LOOP;
+END $$;
+NOTICE:  pad 0 clipped on a character boundary
+NOTICE:  pad 1 clipped on a character boundary
+NOTICE:  pad 2 clipped on a character boundary
+NOTICE:  pad 3 clipped on a character boundary
+DROP TABLE clipped;

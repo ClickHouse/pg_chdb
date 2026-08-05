@@ -155,7 +155,7 @@ t: Parquet
 t: Arrow
 t: ArrowStream
 psql:test/utils/round-trip-formats.sql:376: ERROR:  chdb: error fetching chDB query result
-DETAIL:  Code: 321. DB::Exception: Timestamp value in column "tstz" is out of range for DateTime64: seconds=10413791999, nanoseconds=999999000: (in file/uri /tmp/datetimes.tmp): While executing ORCBlockInputFormat: While executing File. (VALUE_IS_OUT_OF_RANGE_OF_D
+DETAIL:  Code: 321. DB::Exception: Timestamp value in column "tstz" is out of range for DateTime64: seconds=10413791999, nanoseconds=999999000: (in file/uri /tmp/datetimes.tmp): While executing ORCBlockInputFormat: While executing File. (VALUE_IS_OUT_OF_RANGE_OF_DATA_TYPE)
 psql:test/utils/round-trip-formats.sql:376: STATEMENT:  COPY "datetimes2" FROM 'file:///tmp/datetimes.tmp' (format 'ORC');
 f: ORC
 t: Avro
@@ -225,7 +225,7 @@ t: Parquet
 t: Arrow
 t: ArrowStream
 psql:test/utils/round-trip-formats.sql:376: ERROR:  chdb: error fetching chDB query result
-DETAIL:  Code: 321. DB::Exception: Timestamp value in column "ts" is out of range for DateTime64: seconds=10413791999, nanoseconds=999999000: (in file/uri /tmp/datetimes.tmp): While executing ORCBlockInputFormat: While executing File. (VALUE_IS_OUT_OF_RANGE_OF_DAT
+DETAIL:  Code: 321. DB::Exception: Timestamp value in column "ts" is out of range for DateTime64: seconds=10413791999, nanoseconds=999999000: (in file/uri /tmp/datetimes.tmp): While executing ORCBlockInputFormat: While executing File. (VALUE_IS_OUT_OF_RANGE_OF_DATA_TYPE)
 psql:test/utils/round-trip-formats.sql:376: STATEMENT:  COPY "datetime_arrays2" FROM 'file:///tmp/datetimes.tmp' (format 'ORC');
 f: ORC
 t: Avro

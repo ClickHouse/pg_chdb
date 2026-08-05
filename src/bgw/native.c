@@ -30,6 +30,7 @@
 #include "executor/executor.h"
 #include "executor/nodeModifyTable.h"
 #include "foreign/fdwapi.h"
+#include "mb/pg_wchar.h"
 #include "miscadmin.h"
 #include "optimizer/optimizer.h"
 #include "parser/parse_relation.h"
@@ -232,6 +233,17 @@ free_native_chunks(void* arg) {
     }
 }
 
+static size_t
+clip_utf8(const char* s, size_t len, size_t limit) {
+    return len > limit ? (size_t)pg_encoding_mbcliplen(PG_UTF8, s, limit, limit) : len;
+}
+
+/* A reader error passes through chc_err.msg, which must hold all of buf. */
+StaticAssertDecl(
+    CHC_ERR_MSG_LEN >= CHDB_ERROR_QUEUE_SIZE / 4,
+    "chc_err.msg clips captured errors"
+);
+
 /*
  * Copy error minus Request ID before freeing chDB result. Result is valid
  * until next call to chdb_capture_error.
@@ -244,11 +256,11 @@ chdb_capture_error(const char* error) {
     size_t len      = 0;
 
     if (eol) {
-        len = Min((size_t)(id - error), sizeof(buf) - 1);
+        len = clip_utf8(error, (size_t)(id - error), sizeof(buf) - 1);
         memcpy(buf, error, len);
         error = eol + 1;
     }
-    size_t rest = Min(strlen(error), sizeof(buf) - 1 - len);
+    size_t rest = clip_utf8(error, strlen(error), sizeof(buf) - 1 - len);
 
     memcpy(buf + len, error, rest);
     buf[len + rest] = '\0';
