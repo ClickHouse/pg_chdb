@@ -566,9 +566,9 @@ chdb_native_receive(
     void** states = palloc0(ncols * sizeof(void*));
 
     for (size_t i = 0; i < ncols; i++) {
-        states[i] = pgch_reader_convert_init(
-            &reader, i, TupleDescAttr(desc, dest[i])->atttypid
-        );
+        Form_pg_attribute attr = TupleDescAttr(desc, dest[i]);
+        states[i] =
+            pgch_reader_convert_init(&reader, i, attr->atttypid, attr->atttypmod);
     }
 
     MemoryContextSwitchTo(oldcxt);
