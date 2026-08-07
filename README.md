@@ -4,10 +4,10 @@ chdb Postgres Extension
 [![PGXN version](https://badge.fury.io/pg/chdb.svg)](https://badge.fury.io/pg/chdb)
 [![Build Status](https://github.com/ClickHouse/pg_chdb/actions/workflows/ci.yml/badge.svg)](https://github.com/ClickHouse/pg_chdb/actions/workflows/ci.yml)
 
-This library contains a single PostgreSQL extension, `chdb`, which provides a
-background worker to execute [chDB] queries. It currently only supports [COPY]
-to or from an S3, GCS, Azure Blob, file, or http URL. This example loads
-records from multiple CSV files on S3 in a single [COPY] command:
+This library contains a single PostgreSQL extension, `chdb`, which runs [chDB]
+queries in a helper process. It currently only supports [COPY] to or from an S3,
+GCS, Azure Blob, file, or http URL. This example loads records from multiple CSV
+files on S3 in a single [COPY] command:
 
 ```sql
 CREATE TABLE times (
@@ -74,7 +74,7 @@ env PG_CONFIG=/path/to/pg_config make && make installcheck && make install
 If you encounter an error such as:
 
 ```
-worker.c:1:10: fatal error: 'chdb.h' file not found
+chdb_helper.c:22:10: fatal error: 'chdb.h' file not found
 ```
 
 You either need to install [chDB] or tell the compiler where to find it. If,

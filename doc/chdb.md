@@ -23,9 +23,9 @@ COPY 16
 
 ## Description
 
-This library contains a single PostgreSQL extension, `chdb`, which provides a
-background worker to execute [chDB] queries. It currently only supports [COPY]
-to or from a URL.
+This library contains a single PostgreSQL extension, `chdb`, which runs [chDB]
+queries in a helper process. It currently only supports [COPY] to or from a
+URL.
 
 ## Loading
 
@@ -98,27 +98,28 @@ CREATE TABLE times (
 COPY times FROM 's3://datasets-documentation/my-test-bucket-768/some_prefix/some_file_1.csv';
 ```
 
-### Background Worker
+### Helper Process
 
 When the chdb extension library detects a `COPY` command it can handle, it
-starts a [background worker] to do so. The background worker keeps the
-resource consumption of [chDB] separate from the main Postgres process, an
-advantage for an occasionally-used workflow such as loading data from a data
-lake.
+starts a `chdb_helper` process to do so. The helper keeps the resource
+consumption of [chDB] separate from the main Postgres process, an advantage for
+an occasionally-used workflow such as loading data from a data lake.
 
-As a consequence, execution may fail if the Postgres server has too many
-background workers loaded already. In that situation, the `COPY` will fail
-with this error:
+Unlike a background worker, the helper holds no Postgres shared memory and the
+postmaster does not manage it. This isolates crashes from affecting Postgres.
+A helper that dies instead fails one `COPY` and leaves other sessions untouched.
 
-```
-ERROR:  out of background worker slots
-```
+The `COPY` itself runs in the session that issued it, so it takes that
+transaction's snapshot, sees its uncommitted rows, and rolls back with it.
 
-To solve this problem, increase the [max_worker_processes] setting to allow
-more background workers and restart the service:
+### Memory Settings
+
+`chdb.max_memory` limits how much memory a helper may claim. It is a superuser
+setting, zero by default, which leaves chDB to decide. It becomes ClickHouse's
+`max_memory_usage` for the query, so exceeding it raises a memory-limit error:
 
 ```sql
-ALTER SYSTEM SET max_worker_processes = 12;
+ALTER SYSTEM SET chdb.max_memory = '4GB';
 ```
 
 ### Privileges
@@ -391,8 +392,6 @@ limitations:
 *   Cannot `COPY` relations with [row-level security] policies that apply to
     the copying role. Postgres applies such policies by rewriting `COPY TO`
     into a query, which the chdb extension does not support.
-*   Cannot `COPY` temporary relations, which only the session that created
-    them can read.
 *   ClickHouse has no NULL array, so `COPY TO` stores an empty array (`[]`)
     for a `NULL`.
 *   ClickHouse represents the equivalents of `lseg`, `path`, or `polygon` as
@@ -493,10 +492,6 @@ Copyright (c) 2026, ClickHouse
   [ALTER ROLE]: https://www.postgresql.org/docs/18/sql-alterrole.html "Postgres Docs: ALTER ROLE"
   [AWS S3]: https://aws.amazon.com/s3/ "Cloud Object Storage - Amazon S3 - Amazon Web Services"
   [Google Cloud Storage]: https://cloud.google.com/storage "Cloud Storage - Google Cloud"
-  [background worker]: https://www.postgresql.org/docs/current/bgworker.html
-    "Postgres Docs: Background Worker Processes"
-  [max_worker_processes]: https://www.postgresql.org/docs/current/runtime-config-resource.html#GUC-MAX-WORKER-PROCESSES
-    "Postgres Docs: max_worker_processes"
   [`file()`]: https://clickhouse.com/docs/sql-reference/table-functions/file
     "ClickHouse Docs: file Table Function"
   [`url()`]: https://clickhouse.com/docs/sql-reference/table-functions/url

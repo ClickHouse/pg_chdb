@@ -52,7 +52,7 @@ COPY secrets (id, secret) TO :'names_out';
 ERROR:  permission denied for table secrets
 COPY secrets (id, name) TO :'names_out';
 COPY 2
--- The worker copies as the role that ran the COPY.
+-- The copy runs as the role that ran the COPY.
 COPY names (id, name) FROM :'names_out';
 COPY 2
 RESET ROLE;
@@ -112,12 +112,39 @@ COPY names FROM :'names_out';
 ERROR:  cannot execute COPY FROM in a read-only transaction
 ROLLBACK;
 ROLLBACK
--- The worker cannot see this session's temporary relations.
+-- The copy runs in this session, so it sees its temporary relations.
 CREATE TEMP TABLE tmp_names (id INT, name TEXT);
 CREATE TABLE
-COPY tmp_names TO :'names_out';
-ERROR:  chdb: cannot COPY temporary relation "tmp_names"
-DETAIL:  Temporary relations are visible only to the session that created them, not to the chdb worker.
+COPY names (id, name) TO :'names_out';
+COPY 2
+COPY tmp_names FROM :'names_out';
+COPY 2
+SELECT * FROM tmp_names ORDER BY id;
+ id | name  
+----+-------
+  1 | alice
+  2 | bob
+(2 rows)
+
+-- The copy joins this transaction, so a rollback takes its rows with it.
+BEGIN;
+BEGIN
+COPY tmp_names FROM :'names_out';
+COPY 2
+SELECT count(*) FROM tmp_names;
+ count 
+-------
+     4
+(1 row)
+
+ROLLBACK;
+ROLLBACK
+SELECT count(*) FROM tmp_names;
+ count 
+-------
+     2
+(1 row)
+
 DROP TABLE secrets, names, exported;
 DROP TABLE
 DROP ROLE chdb_none, chdb_reader;

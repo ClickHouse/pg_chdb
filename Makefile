@@ -7,10 +7,9 @@ DISTVERSION  = $(shell grep -m 1 '^[[:space:]]\{2\}"version":' META.json | \
 
 MAX_CONCURRENT_TESTS ?= 6
 
-# Header-only dependencies, vendored as submodules. Absolute so the recursive
-# make in src/bgw resolves them. clickhouse-c comes from pg-clickhouse-c's own
-# pin, its signatures naming clickhouse-c types, so a second checkout on the
-# include path would silently win.
+# Header-only dependencies, vendored as submodules. clickhouse-c comes from
+# pg-clickhouse-c's own pin, its signatures naming clickhouse-c types, so a
+# second checkout on the include path would silently win.
 PGCH_DIR     = $(CURDIR)/vendor/pg-clickhouse-c
 CH_C_DIR     = $(PGCH_DIR)/clickhouse-c
 
@@ -23,14 +22,23 @@ MODULE_big   = $(EXTENSION)
 PG_CONFIG   ?= pg_config
 TAP_TESTS   ?= 1
 
+CLANG_FORMAT ?= clang-format
+
 # Collect all the C files to compile into MODULE_big.
 OBJS = $(subst .c,.o, $(wildcard src/*.c))
 
 # Suppress annoying pre-c99 warning, error on other warnings.
 PG_CFLAGS    = -Wno-declaration-after-statement -Wall -Werror
 
+# -isystem keeps the vendored headers' warnings out of the -Werror build.
+# PGCH_MSG_PREFIX prefixes messages pg-clickhouse-c raises like our own.
+# clickhouse-c copies what it raises through chc_err.msg, 256 bytes by default,
+# which clips the longer type names out of a decoding error.
+PG_CPPFLAGS  = -isystem $(CH_C_DIR) -isystem $(PGCH_DIR) -DPGCH_MSG_PREFIX='"chdb: "' \
+               -DCHC_ERR_MSG_LEN=4096
+
 # Clean up generated files.
-EXTRA_CLEAN  = src/version.h sql/$(EXTENSION)--$(EXTVERSION).sql src/bgw/chdb_bgw$(DLSUFFIX) src/bgw/*.o src/bgw/*.bc test/schedule
+EXTRA_CLEAN  = src/version.h sql/$(EXTENSION)--$(EXTVERSION).sql src/helper/chdb_helper src/helper/*.o test/schedule
 
 PGXS := $(shell $(PG_CONFIG) --pgxs)
 include $(PGXS)
@@ -41,11 +49,12 @@ PROVE_FLAGS = -fwvj $(shell nproc)
 endif
 
 # Require the versioned SQL script.
-all: sql/$(EXTENSION)--$(EXTVERSION).sql src/bgw/chdb_bgw$(DLSUFFIX)
+all: sql/$(EXTENSION)--$(EXTVERSION).sql src/helper/chdb_helper
 
-# Require clickhouse-c and the version header. The bitcode twins compile the
-# same sources, so they need the same generated header.
-$(OBJS) $(OBJS:.o=.bc): $(CH_C_DIR)/clickhouse.h src/version.h
+# PGXS tracks no header dependencies, and the vendored libraries are all header.
+# *.bc compiles same sources, so needs same headers.
+$(OBJS) $(OBJS:.o=.bc): $(CH_C_DIR)/clickhouse.h src/version.h \
+                        $(wildcard src/*.h $(PGCH_DIR)/*.h $(CH_C_DIR)/*.h)
 
 # Versioned SQL script.
 sql/$(EXTENSION)--$(EXTVERSION).sql: sql/$(EXTENSION).sql
@@ -55,21 +64,24 @@ sql/$(EXTENSION)--$(EXTVERSION).sql: sql/$(EXTENSION).sql
 src/version.h: META.json
 	@printf '#define PGCHCB_VERSION "%s"\n' "$(DISTVERSION)" > $@
 
-# Background worker.
-src/bgw/chdb_bgw$(DLSUFFIX): $(wildcard src/bgw/*.c src/bgw/*.h) $(CH_C_DIR)/clickhouse.h
-	@$(MAKE) -C $(dir $@) all -j $$(nproc) CH_C_DIR=$(CH_C_DIR) PGCH_DIR=$(PGCH_DIR)
-
 # Fail with something more useful than a missing include.
 $(CH_C_DIR)/clickhouse.h: .gitmodules
 	git submodule update --init --recursive
 
-# Install the chdb_bgw library.
-install-bgw: src/bgw/chdb_bgw$(DLSUFFIX)
-	cp -a $< $(DESTDIR)$(pkglibdir)/
-uninstall-bgw:
-	rm -f $(DESTDIR)$(pkglibdir)/src/bgw/chdb_bgw$(DLSUFFIX)
-install: install-bgw
-uninstall: uninstall-bgw
+# The only program linking libchdb, kept beside the library that starts it.
+src/helper/chdb_helper: $(wildcard src/helper/*.c) src/setup.h
+	@$(MAKE) -C $(dir $@) all
+
+# Install the helper. Write beside the live copy and rename over it: install
+# unlinks its target first, so a COPY starting in that moment finds no helper.
+# rename leaves no such gap.
+install-helper: src/helper/chdb_helper
+	@to=$(DESTDIR)$(pkglibdir)/chdb_helper; \
+	  $(INSTALL_PROGRAM) $< $$to.new && mv -f $$to.new $$to
+uninstall-helper:
+	rm -f $(DESTDIR)$(pkglibdir)/chdb_helper
+install: install-helper
+uninstall: uninstall-helper
 
 .PHONY: test/schedule # Depends on $(TESTS), so always rebuild.
 test/schedule:
@@ -78,12 +90,12 @@ test/schedule:
 installcheck: test/schedule
 
 .PHONY: format # Format .c and .h files to project standard in .clang-format.
-format: $(wildcard src/*.c src/*.h src/bgw/*.c src/bgw/*.h)
-	@clang-format --style=file:.clang-format -i $^
+format: $(wildcard src/*.c src/*.h src/helper/*.c)
+	@$(CLANG_FORMAT) --style=file:.clang-format -i $^
 
 .PHONY: clang-tidy # Run clang-tidy static analysis (requires compile_commands.json)
 clang-tidy: compile_commands.json
-	run-clang-tidy -p . $(wildcard src/*.c src/*.h src/bgw/*.c src/bgw/*.h)
+	run-clang-tidy -p . $(wildcard src/*.c src/*.h src/helper/*.c)
 
 .PHONY: lint # Lint the project
 lint: .pre-commit-config.yaml

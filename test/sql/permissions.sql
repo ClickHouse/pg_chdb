@@ -47,7 +47,7 @@ COPY secrets TO :'names_out';
 COPY secrets (id, secret) TO :'names_out';
 COPY secrets (id, name) TO :'names_out';
 
--- The worker copies as the role that ran the COPY.
+-- The copy runs as the role that ran the COPY.
 COPY names (id, name) FROM :'names_out';
 RESET ROLE;
 SELECT * FROM names ORDER BY id;
@@ -78,9 +78,18 @@ BEGIN READ ONLY;
 COPY names FROM :'names_out';
 ROLLBACK;
 
--- The worker cannot see this session's temporary relations.
+-- The copy runs in this session, so it sees its temporary relations.
 CREATE TEMP TABLE tmp_names (id INT, name TEXT);
-COPY tmp_names TO :'names_out';
+COPY names (id, name) TO :'names_out';
+COPY tmp_names FROM :'names_out';
+SELECT * FROM tmp_names ORDER BY id;
+
+-- The copy joins this transaction, so a rollback takes its rows with it.
+BEGIN;
+COPY tmp_names FROM :'names_out';
+SELECT count(*) FROM tmp_names;
+ROLLBACK;
+SELECT count(*) FROM tmp_names;
 
 DROP TABLE secrets, names, exported;
 DROP ROLE chdb_none, chdb_reader;

@@ -6,37 +6,35 @@ use Exporter 'import';
 use PostgreSQL::Test::Utils;
 use Test::More;
 
-our @EXPORT = qw(bgw_log check_log check_query);
+our @EXPORT = qw(server_log check_log check_query);
 
-=begin chdb_bgw
+=begin server_log
 
-Fetch chdb_bgw log lines since the last fetch.
+Fetch server log lines since the last fetch.
 
 =cut
 
 {
     my $offset = 0;
-    sub bgw_log($) {
+    sub server_log($) {
         my $node = shift;
         my $data = slurp_file $node->logfile, $offset;
         $offset += length $data;
-        return grep { /\bchdb_bgw\b/ } split /\n/, $data
-            if $node->pg_version > 19;
         return split /\n/, $data
     }
 }
 
 =head2 check_log
 
-Compare hdb_bgw log lines immediately following a "executing chDB query" log
-line. The first should contain the chDB query with placeholders. The second
-should map the placeholders to values.
+Compare the log lines immediately following an "executing chDB query" log line.
+The first should contain the chDB query with placeholders. The second should map
+the placeholders to values.
 
 =cut
 
 sub check_log {
     my ($file, $desc, $query_rx, $params_rx) = @_;
-    my @lines = bgw_log $file;
+    my @lines = server_log $file;
     while (@lines && $lines[0] !~ /executing chDB query/) {
         shift @lines;
     }

@@ -12,6 +12,7 @@ regression.out
 _build/
 /release-notes.md
 src/version.h
+/src/helper/chdb_helper
 /sql/*--*.sql
 !/sql/*--*--*.sql
 compile_commands.json

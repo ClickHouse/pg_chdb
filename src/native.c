@@ -3,7 +3,7 @@
  * defining the clickhouse-c and pg-clickhouse-c implementations.
  *
  * Values cross as Datums in both directions: a pgch_writer fed from scan slots
- * on the way out, a pgch_reader over chDB's result chunks feeding an insert
+ * on the way out, a pgch_reader over the helper's output feeding an insert
  * loop on the way in. Nothing passes through COPY's text escaping, so arrays,
  * decimals and timestamps keep their types instead of collapsing to String.
  *
@@ -19,7 +19,6 @@
 
 #include "access/heapam.h"
 #include "access/htup_details.h"
-#include "access/sysattr.h"
 #include "access/table.h"
 #include "access/tableam.h"
 #include "access/tupconvert.h"
@@ -30,10 +29,8 @@
 #include "executor/executor.h"
 #include "executor/nodeModifyTable.h"
 #include "foreign/fdwapi.h"
-#include "mb/pg_wchar.h"
 #include "miscadmin.h"
 #include "optimizer/optimizer.h"
-#include "parser/parse_relation.h"
 #include "rewrite/rewriteHandler.h"
 #include "utils/memutils.h"
 #include "utils/rel.h"
@@ -47,7 +44,6 @@
 #include "pg-clickhouse-encode.h"
 
 #include "native.h"
-#include "worker.h"
 
 /*
  * Bytes to accumulate before cutting a block. ClickHouse coalesces small
@@ -110,24 +106,11 @@ writer_for(const char* structure, int nattrs) {
     return pgch_writer_new(CurrentMemoryContext, cols, ncols);
 }
 
-/* Serializes the buffered rows as one block and hands it to chDB. */
+/* Serializes the buffered rows as one block and hands it to the helper. */
 static void
-send_block(pgch_writer* w, pgch_buf* buf, chdb_insert_stream stream) {
+send_block(pgch_writer* w, pgch_buf* buf, chdbHelper* helper) {
     pgch_writer_flush(w, buf, NULL);
-
-    if (chdb_stream_append(stream, buf->data, buf->len) != CHDBSuccess) {
-        const char* error = chdb_stream_insert_error(stream);
-
-        error = error ? chdb_capture_error(error) : "unknown error";
-        chdb_stream_cancel_insert(stream);
-        ereport(
-            ERROR,
-            errcode(ERRCODE_EXTERNAL_ROUTINE_EXCEPTION),
-            errmsg("chdb: error appending to chDB query"),
-            errdetail("chDB Error: %s", error)
-        );
-    }
-
+    chdb_helper_write(helper, buf->data, buf->len);
     pgch_buf_reset(buf);
 }
 
@@ -146,9 +129,9 @@ static void
 append_slot(pgch_writer* w, TupleTableSlot* slot, List* attnums) {
     TupleDesc desc = slot->tts_tupleDescriptor;
     size_t col     = 0;
-    ListCell* lc;
 
     slot_getallattrs(slot);
+    ListCell* lc;
     foreach (lc, attnums) {
         int i = lfirst_int(lc) - 1;
 
@@ -167,7 +150,7 @@ chdb_native_send(
     Relation rel,
     const char* structure,
     List* attnums,
-    chdb_insert_stream stream
+    chdbHelper* helper
 ) {
     pgch_writer* w = writer_for(structure, list_length(attnums));
     pgch_buf buf   = { 0 };
@@ -195,13 +178,13 @@ chdb_native_send(
         rows++;
 
         if (pgch_writer_bytes(w) >= CHDB_NATIVE_BLOCK_BYTES) {
-            send_block(w, &buf, stream);
+            send_block(w, &buf, helper);
         }
     }
 
     /* Rows the scan left short of a cut, so one block, not one per row. */
     if (pgch_writer_rows(w)) {
-        send_block(w, &buf, stream);
+        send_block(w, &buf, helper);
     }
 
     ExecDropSingleTupleTableSlot(slot);
@@ -214,91 +197,9 @@ chdb_native_send(
 
 /* ---- chDB to Postgres ------------------------------------------------ */
 
-/* chDB's result chunks, feeding the reader's byte source. */
-typedef struct nativeChunks {
-    MemoryContextCallback cleanup;
-    chdb_connection conn;
-    chdb_result* result; /* streaming query handle, owned by the caller */
-    chdb_result* chunk;  /* current chunk, alive until the next fetch */
-} nativeChunks;
-
-/* Memory context callback to free the global streaming chunks. */
-static void
-free_native_chunks(void* arg) {
-    nativeChunks* chunks = arg;
-
-    if (chunks->chunk) {
-        chdb_destroy_query_result(chunks->chunk);
-        chunks->chunk = NULL;
-    }
-}
-
-static size_t
-clip_utf8(const char* s, size_t len, size_t limit) {
-    return len > limit ? (size_t)pg_encoding_mbcliplen(PG_UTF8, s, limit, limit) : len;
-}
-
-/* A reader error passes through chc_err.msg, which must hold all of buf. */
-StaticAssertDecl(
-    CHC_ERR_MSG_LEN >= CHDB_ERROR_QUEUE_SIZE / 4,
-    "chc_err.msg clips captured errors"
-);
-
-/*
- * Copy error minus Request ID before freeing chDB result. Result is valid
- * until next call to chdb_capture_error.
- */
-char*
-chdb_capture_error(const char* error) {
-    static char buf[CHDB_ERROR_QUEUE_SIZE / 4];
-    const char* id  = strstr(error, "Request ID:");
-    const char* eol = id ? strchr(id, '\n') : NULL;
-    size_t len      = 0;
-
-    if (eol) {
-        len = clip_utf8(error, (size_t)(id - error), sizeof(buf) - 1);
-        memcpy(buf, error, len);
-        error = eol + 1;
-    }
-    size_t rest = clip_utf8(error, strlen(error), sizeof(buf) - 1 - len);
-
-    memcpy(buf + len, error, rest);
-    buf[len + rest] = '\0';
-    return buf;
-}
-
-/*
- * Next chunk of Native bytes. The current chunk stays alive until the call
- * that replaces it, since block assembly copies out of it.
- */
-static bool
-next_chunk(void* ud, const void** p, size_t* n, char** error) {
-    nativeChunks* chunks = (nativeChunks*)ud;
-    const char* err;
-
-    if (chunks->chunk) {
-        chdb_destroy_query_result(chunks->chunk);
-        chunks->chunk = NULL;
-    }
-
-    chunks->chunk = chdb_stream_fetch_result(chunks->conn, chunks->result);
-    if ((err = chdb_result_error(chunks->chunk))) {
-        *error = chdb_capture_error(err);
-        chdb_destroy_query_result(chunks->chunk);
-        chunks->chunk = NULL;
-        return false;
-    }
-
-    *p = chdb_result_buffer(chunks->chunk);
-    *n = chdb_result_length(chunks->chunk); /* zero at end of stream */
-
-    return true;
-}
-
 /* Polled between refills, which is where interrupting is cheap. */
 static bool
-chunks_cancelled(void* ud) {
-    (void)ud;
+chunks_cancelled(void* ud pg_attribute_unused()) {
     CHECK_FOR_INTERRUPTS();
 
     return false;
@@ -443,14 +344,13 @@ defaults_for(Relation rel, List* attnums) {
 
     for (int attnum = 1; attnum <= desc->natts; attnum++) {
         Form_pg_attribute attr = TupleDescAttr(desc, attnum - 1);
-        Expr* expr;
 
         /* ExecComputeStoredGenerated computes a generated column instead. */
         if (attr->attisdropped || attr->attgenerated ||
             list_member_int(attnums, attnum)) {
             continue;
         }
-        expr = (Expr*)build_column_default(rel, attnum);
+        Expr* expr = (Expr*)build_column_default(rel, attnum);
         if (!expr) {
             continue;
         }
@@ -465,15 +365,12 @@ defaults_for(Relation rel, List* attnums) {
 /* Evaluates the defaults into `slot`, per row so a volatile one varies. */
 static void
 fill_defaults(const nativeDefaults* defaults, EState* estate, TupleTableSlot* slot) {
-    ExprContext* econtext;
-    MemoryContext oldcxt;
-
     if (!defaults->n) {
         return;
     }
 
-    econtext = GetPerTupleExprContext(estate);
-    oldcxt   = MemoryContextSwitchTo(econtext->ecxt_per_tuple_memory);
+    ExprContext* econtext = GetPerTupleExprContext(estate);
+    MemoryContext oldcxt  = MemoryContextSwitchTo(econtext->ecxt_per_tuple_memory);
     for (int i = 0; i < defaults->n; i++) {
         slot->tts_values[defaults->dest[i]] = ExecEvalExpr(
             defaults->exprs[i], econtext, &slot->tts_isnull[defaults->dest[i]]
@@ -507,8 +404,9 @@ uint64_t
 chdb_native_receive(
     Relation rel,
     List* attnums,
-    chdb_connection conn,
-    chdb_result* result
+    List* rtable,
+    List* rteperminfos,
+    chdbHelper* helper
 ) {
     TupleDesc desc = RelationGetDescr(rel);
     /* Blocks and reader state live here, one row's values in rowcxt. */
@@ -518,27 +416,20 @@ chdb_native_receive(
     MemoryContext rowcxt =
         AllocSetContextCreate(CurrentMemoryContext, "chdb row", ALLOCSET_DEFAULT_SIZES);
     MemoryContext oldcxt = MemoryContextSwitchTo(streamcxt);
-    nativeChunks* chunks = palloc0(sizeof(*chunks));
 
-    chunks->cleanup.func = free_native_chunks;
-    chunks->cleanup.arg  = chunks;
-    chunks->conn         = conn;
-    chunks->result       = result;
-    MemoryContextRegisterResetCallback(streamcxt, &chunks->cleanup);
-
-    pgch_chunk_source src = { .ud         = chunks,
-                              .next_chunk = next_chunk,
+    pgch_chunk_source src = { .ud         = helper,
+                              .next_chunk = chdb_helper_read,
                               .cancelled  = chunks_cancelled };
-    pgch_reader reader;
-    size_t ncols = list_length(attnums);
-    int* dest    = palloc(ncols * sizeof(int));
-    ListCell* lc;
-    size_t n = 0;
+    size_t ncols          = list_length(attnums);
+    int* dest             = palloc(ncols * sizeof(int));
+    size_t n              = 0;
 
+    ListCell* lc;
     foreach (lc, attnums) {
         dest[n++] = lfirst_int(lc) - 1;
     }
 
+    pgch_reader reader;
     pgch_reader_init_chunks(&reader, &src, NULL);
     if (reader.error) {
         report_reader_error(reader.error);
@@ -577,25 +468,17 @@ chdb_native_receive(
 
     /* ---- from here on, copyfrom.c's CopyFrom ---- */
 
-    /* The executor wants a range table to make index entries against. */
-    EState* estate     = CreateExecutorState();
-    ParseState* pstate = make_parsestate(NULL);
-    RTEPermissionInfo* perminfo =
-        addRangeTableEntryForRelation(pstate, rel, RowExclusiveLock, NULL, false, false)
-            ->p_perminfo;
+    /*
+     * The executor wants a range table to make index entries against. It is
+     * the one hook.c already built for `rel` and checked the copied columns
+     * against, so the entry the insert runs under is the entry that passed.
+     */
+    EState* estate = CreateExecutorState();
 
-    perminfo->requiredPerms = ACL_INSERT;
-    for (size_t i = 0; i < ncols; i++) {
-        perminfo->insertedCols = bms_add_member(
-            perminfo->insertedCols, dest[i] + 1 - FirstLowInvalidHeapAttributeNumber
-        );
-    }
 #if PG_VERSION_NUM >= 180000
-    ExecInitRangeTable(
-        estate, pstate->p_rtable, pstate->p_rteperminfos, bms_make_singleton(1)
-    );
+    ExecInitRangeTable(estate, rtable, rteperminfos, bms_make_singleton(1));
 #else
-    ExecInitRangeTable(estate, pstate->p_rtable, pstate->p_rteperminfos);
+    ExecInitRangeTable(estate, rtable, rteperminfos);
 #endif
     ResultRelInfo* target = makeNode(ResultRelInfo);
 
@@ -664,14 +547,11 @@ chdb_native_receive(
     ExecBSInsertTriggers(estate, target);
 
     for (;;) {
-        TupleTableSlot* slot;
-        ResultRelInfo* rri = target;
-
         CHECK_FOR_INTERRUPTS();
         ResetPerTupleExprContext(estate);
         MemoryContextReset(rowcxt);
 
-        slot = ins.buffered ? buffer_slot(&ins) : rootslot;
+        TupleTableSlot* slot = ins.buffered ? buffer_slot(&ins) : rootslot;
         ExecClearTuple(slot);
         /* Attributes without a stream column, default or generator stay null. */
         memset(slot->tts_isnull, true, desc->natts * sizeof(bool));
@@ -698,6 +578,7 @@ chdb_native_receive(
         /* Constraints may reference the tableoid column. */
         slot->tts_tableOid = RelationGetRelid(rel);
 
+        ResultRelInfo* rri = target;
         if (proute) {
             /* Raises when no partition of the row's key exists. */
             rri = ExecFindPartition(mtstate, target, proute, slot, estate);

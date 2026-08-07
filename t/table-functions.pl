@@ -142,14 +142,14 @@ subtest gcs => sub {
     check_query(
         $node, 'just FROM url',
         qq{COPY stuff FROM 'gcs://bucket/prefix/file.csv'},
-        qr/\Qchdb: error fetching chDB query result/,
+        qr/\Qchdb: error executing chDB query/,
         qr[\QSELECT * FROM gcs({url:String}, NOSIGN, {format:String}, {structure:String}) SETTINGS allow_experimental_nullable_tuple_type=1, output_format_json_quote_denormals=1, output_format_native_encode_types_in_binary_format=0,output_format_native_write_json_as_string=1, s3_truncate_on_insert = 1, s3_request_timeout_ms = 30000],
         qr[\Q{ url: "https://storage.googleapis.com/bucket/prefix/file.csv", format: "auto", structure: "id Nullable(Int32)" }],
     );
     check_query(
         $node, 'just TO url',
         qq{COPY stuff TO 'gcs://storage.googleapis.com/bucket/prefix/file.csv'},
-        qr/chDB Error: Code: 499/,
+        qr/Code: 499/,
         qr[\QINSERT INTO FUNCTION gcs({url:String}, NOSIGN, {format:String}, {structure:String}) SETTINGS allow_experimental_nullable_tuple_type=1, output_format_json_quote_denormals=1, output_format_native_encode_types_in_binary_format=0,output_format_native_write_json_as_string=1, s3_truncate_on_insert = 1, s3_request_timeout_ms = 30000],
         qr[\Q{ url: "https://storage.googleapis.com/bucket/prefix/file.csv", format: "auto", structure: "id Nullable(Int32)" }],
     );
@@ -166,7 +166,7 @@ subtest gcs => sub {
                 timeout 0
             )
         },
-        qr/\Qchdb: error fetching chDB query result/,
+        qr/\Qchdb: error executing chDB query/,
         qr[\QSELECT * FROM gcs({url:String}, {access_key:String}, {access_secret:String}, {format:String}, {structure:String}, {compression:String}) SETTINGS allow_experimental_nullable_tuple_type=1, output_format_json_quote_denormals=1, output_format_native_encode_types_in_binary_format=0,output_format_native_write_json_as_string=1, s3_truncate_on_insert = 1, s3_request_timeout_ms = 0],
         qr[\Q{ url: "https://storage.googleapis.com/bucket/prefix/file.csv", access_key: "key", access_secret: "secret", format: "parquet", structure: "id Int64", compression: "lz4" }],
     );

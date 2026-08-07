@@ -1,7 +1,7 @@
 LOAD 'chdb';
 
 /****************************************************************************/
--- Error clipping. chDB errors longer than the worker's capture buffer get
+-- Error clipping. chDB errors longer than the helper's capture buffer get
 -- clipped, and the cut has to land on a character boundary.
 CREATE TABLE clipped (id INT);
 
