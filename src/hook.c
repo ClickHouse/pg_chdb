@@ -471,8 +471,7 @@ ProcessMessages(shm_mq_handle* queue, QueryCompletion* qc) {
          * and detects a worker that dies before attaching as sender.
          * Detach without PqMsg_Terminate means the worker died.
          */
-        shm_mq_result res = shm_mq_receive(queue, &msg_len, &data, false);
-        if (res != SHM_MQ_SUCCESS) {
+        if (shm_mq_receive(queue, &msg_len, &data, false) != SHM_MQ_SUCCESS) {
             ereport(
                 ERROR,
                 errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),

@@ -469,7 +469,6 @@ chdb_bgw_main(Datum main_arg) {
 
 static const char settings[] =
     "allow_experimental_nullable_tuple_type=1, "
-    "date_time_output_format='iso', "
     "output_format_json_quote_denormals=1, " PGCH_NATIVE_SETTINGS;
 
 #define GCS_HOST "storage.googleapis.com"
