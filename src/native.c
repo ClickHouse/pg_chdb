@@ -52,6 +52,13 @@
  */
 #define CHDB_NATIVE_BLOCK_BYTES (8 * 1024 * 1024)
 
+/*
+ * Buffer small writes before sending them to helper. Send writes at least as
+ * large as direct-write limit without copying them into buffer first.
+ */
+#define CHDB_NATIVE_SINK_BYTES (256 * 1024)
+#define CHDB_NATIVE_SINK_DIRECT (16 * 1024)
+
 /* Rows and bytes to buffer before a table_multi_insert, as copyfrom.c does. */
 #define CHDB_MAX_BUFFERED_TUPLES 1000
 #define CHDB_MAX_BUFFERED_BYTES (64 * 1024)
@@ -71,7 +78,7 @@ static pgch_writer*
 writer_for(const char* structure, int nattrs) {
     char* tuple = psprintf("Tuple(%s)", structure);
     chc_type* type;
-    chc_err err = { 0 };
+    chc_err err = {};
 
     if (chc_type_parse(tuple, strlen(tuple), &pgch_alloc, &type, &err) != CHC_OK) {
         pgch_raise(&err, ERRCODE_INVALID_PARAMETER_VALUE, "structure: ");
@@ -106,12 +113,67 @@ writer_for(const char* structure, int nattrs) {
     return pgch_writer_new(CurrentMemoryContext, cols, ncols);
 }
 
-/* Serializes the buffered rows as one block and hands it to the helper. */
+/* Buffers small writes before sending them to helper. */
+typedef struct nativeSink {
+    chc_io io;
+    chdbHelper* helper;
+    size_t len;
+    uint8_t buf[CHDB_NATIVE_SINK_BYTES];
+} nativeSink;
+
 static void
-send_block(pgch_writer* w, pgch_buf* buf, chdbHelper* helper) {
-    pgch_writer_flush(w, buf, NULL);
-    chdb_helper_write(helper, buf->data, buf->len);
-    pgch_buf_reset(buf);
+sink_flush(nativeSink* s) {
+    if (s->len) {
+        chdb_helper_write(s->helper, s->buf, s->len);
+        s->len = 0;
+    }
+}
+
+static int
+sink_write(void* ud, const void* p, size_t len, chc_err* err pg_attribute_unused()) {
+    nativeSink* s = ud;
+
+    if (len >= CHDB_NATIVE_SINK_DIRECT) {
+        sink_flush(s); /* send buffered bytes first */
+        chdb_helper_write(s->helper, p, len);
+
+        return CHC_OK;
+    }
+
+    if (s->len + len > sizeof(s->buf)) {
+        sink_flush(s);
+    }
+    memcpy(s->buf + s->len, p, len);
+    s->len += len;
+
+    return CHC_OK;
+}
+
+static nativeSink*
+sink_for(chdbHelper* helper) {
+    nativeSink* s = palloc0(sizeof(*s));
+
+    s->helper = helper;
+    s->io     = (chc_io){ .ud = s, .write = sink_write };
+
+    return s;
+}
+
+/*
+ * Writes buffered rows to helper as one Native block. Sends data as encoder
+ * produces it instead of copying entire block into another buffer first.
+ */
+static void
+send_block(pgch_writer* w, nativeSink* sink) {
+    chc_err err = {};
+
+    if (chc_block_write(
+            &sink->io, pgch_writer_build(w), &pgch_block_opts_local, &err
+        ) != CHC_OK) {
+        pgch_raise(&err, ERRCODE_EXTERNAL_ROUTINE_EXCEPTION, "block write: ");
+    }
+    pgch_writer_reset(w);
+    sink_flush(sink);
 }
 
 /* table_beginscan gained a caller flags argument in PG 19. */
@@ -152,8 +214,8 @@ chdb_native_send(
     List* attnums,
     chdbHelper* helper
 ) {
-    pgch_writer* w = writer_for(structure, list_length(attnums));
-    pgch_buf buf   = { 0 };
+    pgch_writer* w   = writer_for(structure, list_length(attnums));
+    nativeSink* sink = sink_for(helper);
     MemoryContext rowcxt =
         AllocSetContextCreate(CurrentMemoryContext, "chdb row", ALLOCSET_DEFAULT_SIZES);
     TableScanDesc scan   = begin_scan(rel);
@@ -178,13 +240,13 @@ chdb_native_send(
         rows++;
 
         if (pgch_writer_bytes(w) >= CHDB_NATIVE_BLOCK_BYTES) {
-            send_block(w, &buf, helper);
+            send_block(w, sink);
         }
     }
 
     /* Rows the scan left short of a cut, so one block, not one per row. */
     if (pgch_writer_rows(w)) {
-        send_block(w, &buf, helper);
+        send_block(w, sink);
     }
 
     ExecDropSingleTupleTableSlot(slot);
@@ -197,12 +259,93 @@ chdb_native_send(
 
 /* ---- chDB to Postgres ------------------------------------------------ */
 
-/* Polled between refills, which is where interrupting is cheap. */
-static bool
-chunks_cancelled(void* ud pg_attribute_unused()) {
+/*
+ * Buffer small reads from helper. Read large chunks directly into destination,
+ * so only block metadata usually passes through this buffer.
+ */
+#define CHDB_NATIVE_SOURCE_BYTES (256 * 1024)
+
+/* Reads Native output from helper one block at a time. */
+typedef struct nativeSource {
+    chc_io io;
+    chc_in* in;
+    MemoryContext cxt; /* decoded blocks outlive rows read from them */
+    chdbHelper* helper;
+    char* error;
+} nativeSource;
+
+/* Helper failures are reported directly, so callback always returns success. */
+static int
+source_read(
+    void* ud,
+    void* buf,
+    size_t len,
+    size_t* got,
+    chc_err* err pg_attribute_unused()
+) {
+    nativeSource* s = ud;
+
+    *got = chdb_helper_recv(s->helper, buf, len);
+
+    return CHC_OK;
+}
+
+/* Checks for interrupts before decoder refills input buffer. */
+static int
+source_cancelled(void* ud pg_attribute_unused()) {
     CHECK_FOR_INTERRUPTS();
 
-    return false;
+    return 0;
+}
+
+static const chc_block*
+source_next(void* ud) {
+    nativeSource* s = ud;
+    chc_block* block;
+    chc_err err = {};
+
+    if (s->error) {
+        return NULL;
+    }
+
+    MemoryContext oldcxt = MemoryContextSwitchTo(s->cxt);
+
+    /* NULL block without an error marks end of stream. */
+    if (chc_block_read(s->in, &pgch_alloc, &pgch_block_opts_local, &block, &err) !=
+        CHC_OK) {
+        s->error = MemoryContextStrdup(
+            s->cxt, err.msg[0] ? err.msg : "chDB block could not be read"
+        );
+        block = NULL;
+    }
+    MemoryContextSwitchTo(oldcxt);
+
+    return block;
+}
+
+static const char*
+source_error(void* ud) {
+    return ((nativeSource*)ud)->error;
+}
+
+/* Creates block reader for helper output in current memory context. */
+static pgch_block_source
+source_for(chdbHelper* helper) {
+    nativeSource* s = palloc0(sizeof(*s));
+    chc_err err     = {};
+
+    s->helper = helper;
+    s->cxt    = CurrentMemoryContext;
+    s->io = (chc_io){ .ud = s, .read = source_read, .check_cancel = source_cancelled };
+    s->in = pgch_in_alloc();
+    if (chc_in_init(s->in, &s->io, &pgch_alloc, CHDB_NATIVE_SOURCE_BYTES, &err) !=
+        CHC_OK) {
+        pgch_raise(&err, ERRCODE_EXTERNAL_ROUTINE_EXCEPTION, "reader init: ");
+    }
+
+    return (pgch_block_source){ .ud         = s,
+                                .next_block = source_next,
+                                .error      = source_error };
 }
 
 /*
@@ -417,9 +560,7 @@ chdb_native_receive(
         AllocSetContextCreate(CurrentMemoryContext, "chdb row", ALLOCSET_DEFAULT_SIZES);
     MemoryContext oldcxt = MemoryContextSwitchTo(streamcxt);
 
-    pgch_chunk_source src = { .ud         = helper,
-                              .next_chunk = chdb_helper_read,
-                              .cancelled  = chunks_cancelled };
+    pgch_block_source src = source_for(helper);
     size_t ncols          = list_length(attnums);
     int* dest             = palloc(ncols * sizeof(int));
     size_t n              = 0;
@@ -430,7 +571,7 @@ chdb_native_receive(
     }
 
     pgch_reader reader;
-    pgch_reader_init_chunks(&reader, &src, NULL);
+    pgch_reader_init(&reader, &src);
     if (reader.error) {
         report_reader_error(reader.error);
     }
@@ -511,7 +652,7 @@ chdb_native_receive(
     AfterTriggerBeginQuery();
 
     /* Partition routing wants to know whether transition tuples are captured. */
-    nativeInsert ins = { 0 };
+    nativeInsert ins = {};
 
     ins.transition = mtstate->mt_transition_capture =
         MakeTransitionCaptureState(rel->trigdesc, RelationGetRelid(rel), CMD_INSERT);

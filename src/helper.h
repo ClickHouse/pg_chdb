@@ -31,9 +31,12 @@ chdb_helper_start(
     size_t nparams
 );
 
-/* pgch_chunk_source next_chunk over the helper's Native output. */
-extern bool
-chdb_helper_read(void* helper, const void** p, size_t* n, char** error);
+/*
+ * Reads up to `len` bytes of Native output into `buf`. Returns number of bytes
+ * read, or zero at end of stream. Reports helper failures as errors.
+ */
+extern size_t
+chdb_helper_recv(chdbHelper* helper, void* buf, size_t len);
 
 /* Sends one Native block, raising if the helper has gone. */
 extern void

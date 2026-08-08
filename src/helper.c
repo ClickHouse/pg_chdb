@@ -34,9 +34,6 @@
 
 #define CHDB_HELPER_ERR_MAX 4096
 
-/* Native bytes taken from the helper in one read. */
-#define CHDB_HELPER_READ_BYTES (256 * 1024)
-
 /* Milliseconds between wakeups while a channel is idle, so errors still drain. */
 #define CHDB_HELPER_POLL_MS 1000
 
@@ -55,7 +52,6 @@ struct chdbHelper {
     int wait_errno; /* why waitpid gave none */
     size_t err_len;
     char err_buf[CHDB_HELPER_ERR_MAX];
-    char buf[CHDB_HELPER_READ_BYTES];
 };
 
 static void
@@ -85,8 +81,9 @@ wait_fd(int fd, uint32 event) {
  */
 static void
 drain_err(chdbHelper* h) {
+    char sink[CHDB_HELPER_ERR_MAX];
+
     while (h->err >= 0) {
-        char sink[1024];
         size_t room = sizeof(h->err_buf) - 1 - h->err_len;
         char* into  = room ? h->err_buf + h->err_len : sink;
         ssize_t got = read(h->err, into, room ? room : sizeof(sink));
@@ -292,28 +289,49 @@ exec_helper(chdbHelper* h, const char* program, bool is_from) {
     _exit(127);
 }
 
+/*
+ * Writes `len` bytes to `fd`, taking the helper's error output whenever the
+ * channel would block. False with errno set for a write that cannot go on.
+ */
+static bool
+write_all(chdbHelper* h, int fd, const void* p, size_t len) {
+    const char* at = p;
+
+    while (len) {
+        CHECK_FOR_INTERRUPTS();
+        ssize_t put = write(fd, at, len);
+
+        if (put > 0) {
+            at += put;
+            len -= put;
+        } else if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            drain_err(h);
+            wait_fd(fd, WL_SOCKET_WRITEABLE);
+        } else if (errno != EINTR) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 /* Hands the helper its setup payload, then closes the channel it arrived on. */
 static void
 write_setup(chdbHelper* h, const char* setup, size_t len) {
-    while (len) {
-        ssize_t put = write(h->setup, setup, len);
-
-        if (put > 0) {
-            setup += put;
-            len -= put;
-        } else if (errno == EPIPE) {
+    if (!write_all(h, h->setup, setup, len)) {
+        /*
+         * A closed read end means the helper is already going, and it accounts
+         * for that better than errno does. Anything else leaves it waiting on
+         * a payload that will not arrive, so report without waiting for it.
+         */
+        if (errno == EPIPE) {
             report_helper(h, "could not start chDB");
-        } else if (errno == EAGAIN || errno == EWOULDBLOCK) {
-            CHECK_FOR_INTERRUPTS();
-            drain_err(h);
-            wait_fd(h->setup, WL_SOCKET_WRITEABLE);
-        } else if (errno != EINTR) {
-            ereport(
-                ERROR,
-                errcode_for_socket_access(),
-                errmsg("chdb: could not send the query to chDB: %m")
-            );
         }
+        ereport(
+            ERROR,
+            errcode_for_socket_access(),
+            errmsg("chdb: could not send the query to chDB: %m")
+        );
     }
     close_fd(&h->setup);
 }
@@ -445,37 +463,28 @@ chdb_helper_start(
     return h;
 }
 
-/* error goes unused: a failing helper raises rather than unwinding the reader. */
-bool
-chdb_helper_read(
-    void* helper,
-    const void** p,
-    size_t* n,
-    char** error pg_attribute_unused()
-) {
-    chdbHelper* h = helper;
-
+/*
+ * Drain error output when data socket would block. A full error pipe prevents
+ * helper from reading or writing data, so draining it lets helper continue.
+ */
+size_t
+chdb_helper_recv(chdbHelper* h, void* buf, size_t len) {
     for (;;) {
         CHECK_FOR_INTERRUPTS();
-        drain_err(h);
-        ssize_t got = read(h->data, h->buf, sizeof(h->buf));
+        ssize_t got = read(h->data, buf, len);
         if (got > 0) {
-            *p = h->buf;
-            *n = (size_t)got;
-
-            return true;
+            return (size_t)got;
         }
         if (got == 0) {
             close_fd(&h->data);
             if (drain_and_reap(h) != 0) {
                 report_helper(h, "error executing chDB query");
             }
-            *p = NULL;
-            *n = 0; /* end of stream */
 
-            return true;
+            return 0; /* end of stream */
         }
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            drain_err(h);
             wait_fd(h->data, WL_SOCKET_READABLE);
         } else if (errno != EINTR) {
             report_helper(h, "error fetching chDB query result");
@@ -485,20 +494,8 @@ chdb_helper_read(
 
 void
 chdb_helper_write(chdbHelper* h, const void* p, size_t len) {
-    const char* at = p;
-
-    while (len) {
-        CHECK_FOR_INTERRUPTS();
-        drain_err(h);
-        ssize_t put = write(h->data, at, len);
-        if (put > 0) {
-            at += put;
-            len -= put;
-        } else if (errno == EAGAIN || errno == EWOULDBLOCK) {
-            wait_fd(h->data, WL_SOCKET_WRITEABLE);
-        } else if (errno != EINTR) {
-            report_helper(h, "error appending to chDB query");
-        }
+    if (!write_all(h, h->data, p, len)) {
+        report_helper(h, "error appending to chDB query");
     }
 }
 
