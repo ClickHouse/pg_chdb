@@ -34,10 +34,7 @@ CREATE TABLE gcs_things (
     quantity INT NOT NULL
 );
 INSERT INTO gcs_things
-VALUES ((random() * 10000)::int, format('thing-%s', (random() * 100)::int), (random() * 1000)::int)
-     , ((random() * 10000)::int, format('thing-%s', (random() * 100)::int), (random() * 1000)::int)
-     , ((random() * 10000)::int, format('thing-%s', (random() * 100)::int), (random() * 1000)::int)
-;
+SELECT id, format('thing-%s', (random() * 100)::int), (random() * 1000)::int FROM generate_series(1, 3) AS id;
 -- Copy to existing file to ensure s3_truncate_on_insert is true.
 COPY gcs_things TO 'gs://storage.googleapis.com/pg-chdb-ci/keep-me.tsv' (
     access_key :'access_key',

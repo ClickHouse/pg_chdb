@@ -40,10 +40,7 @@ CREATE TABLE s3_things (
 );
 
 INSERT INTO s3_things
-VALUES ((random() * 10000)::int, format('thing-%s', (random() * 100)::int), (random() * 1000)::int)
-     , ((random() * 10000)::int, format('thing-%s', (random() * 100)::int), (random() * 1000)::int)
-     , ((random() * 10000)::int, format('thing-%s', (random() * 100)::int), (random() * 1000)::int)
-;
+SELECT id, format('thing-%s', (random() * 100)::int), (random() * 1000)::int FROM generate_series(1, 3) AS id;
 
 -- Copy to existing file to ensure s3_truncate_on_insert is true.
 COPY s3_things TO 's3://pg-chdb-ci-248825820370-us-east-2-an/keep-me.tsv' (

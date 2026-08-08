@@ -221,6 +221,8 @@ make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** value
      */
 
     size_t i = 0;
+    /* chDB infers a format the copy did not name from the file extension. */
+    char* format = ctx->format[0] ? ctx->format : "auto";
 
     switch (ctx->scheme) {
     case s3_scheme:
@@ -234,7 +236,12 @@ make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** value
         char* uri = strstr(ctx->url, "://");
         if (!uri) {
             /* Should not happen, validated by the hook. */
-            elog(ERROR, "chdb: malformed GCS URL %s ", ctx->url);
+            elog(
+                ERROR,
+                "chdb: malformed %s URL %s",
+                table_function[ctx->scheme],
+                ctx->url
+            );
         }
         uri += strlen("://");
         char* slash = strchr(uri, '/');
@@ -249,7 +256,7 @@ make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** value
                 PARAM("{url:String}", "url", ctx->url);
             }
         } else {
-            // If it contains the host name, just emit.
+            /* If it contains the host name, just emit. */
             if (slash && (slash - uri) >= strlen(GCS_HOST) &&
                 !pg_strncasecmp(uri, GCS_HOST, strlen(GCS_HOST))) {
                 /* gs://storage.googleapis.com/{bucket}/{path} */
@@ -278,7 +285,7 @@ make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** value
         }
 
         /* Append remaining arguments and settings. */
-        PARAM(", {format:String}", "format", ctx->format[0] ? ctx->format : "auto");
+        PARAM(", {format:String}", "format", format);
         PARAM(", {structure:String}", "structure", ctx->structure);
         if (ctx->compression[0] != '\0') {
             PARAM(", {compression:String}", "compression", ctx->compression);
@@ -296,7 +303,7 @@ make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** value
 
         /* First parameter: the base URL. */
         PARAM("{url:String}", "url", ctx->url);
-        PARAM(", {format:String}", "format", ctx->format[0] ? ctx->format : "auto");
+        PARAM(", {format:String}", "format", format);
         PARAM(", {structure:String}", "structure", ctx->structure);
         appendStringInfo(
             query,
@@ -324,7 +331,7 @@ make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** value
 
         /* Append remaining arguments (different order from the others) and
          * settings. */
-        PARAM(", {format:String}", "format", ctx->format[0] ? ctx->format : "auto");
+        PARAM(", {format:String}", "format", format);
         PARAM(
             ", {compression:String}",
             "compression",
@@ -346,7 +353,7 @@ make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** value
         PARAM("{path:String}", "path", get_local_path_from_file_url(ctx->url));
 
         /* Append remaining arguments and settings. */
-        PARAM(", {format:String}", "format", ctx->format[0] ? ctx->format : "auto");
+        PARAM(", {format:String}", "format", format);
         PARAM(", {structure:String}", "structure", ctx->structure);
         if (ctx->compression[0] != '\0') {
             PARAM(", {compression:String}", "compression", ctx->compression);
@@ -362,7 +369,7 @@ make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** value
         PARAM("{url:String}", "url", ctx->url);
 
         /* Append remaining arguments and settings. */
-        PARAM(", {format:String}", "format", ctx->format[0] ? ctx->format : "auto");
+        PARAM(", {format:String}", "format", format);
         PARAM(", {structure:String}", "structure", ctx->structure);
         appendStringInfo(query, ") SETTINGS %s, hdfs_truncate_on_insert = 1", settings);
         break;
@@ -420,13 +427,15 @@ parse_azure_url(chdbCopyContext* ctx, azureURLParts* parts) {
     char* uri = strstr(ctx->url, "://");
     if (!uri) {
         /* Should not happen, validated by the hook. */
-        elog(ERROR, "chdb: malformed Azure URL %s ", ctx->url);
+        elog(ERROR, "chdb: malformed Azure URL %s", ctx->url);
     }
 
     uri += 3;
 
-    /// Split off the query string (a SAS token such as `?sp=...&sig=...`)
-    /// before parsing the host and path.
+    /*
+     * Split off the query string (a SAS token such as `?sp=...&sig=...`)
+     * before parsing the host and path.
+     */
     char* query = strchr(uri, '?');
     if (query) {
         /* NUL terminate the URL and split off the query. */
@@ -512,7 +521,7 @@ get_local_path_from_file_url(const char* url) {
     char* path = strstr(url, "://");
     if (!path) {
         /* Should not happen, validated by the hook. */
-        elog(ERROR, "chdb: malformed file URL %s ", url);
+        elog(ERROR, "chdb: malformed file URL %s", url);
     }
 
     path += 3;

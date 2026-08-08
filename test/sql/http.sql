@@ -27,10 +27,7 @@ CREATE TABLE url_things (
 );
 
 INSERT INTO url_things
-VALUES ((random() * 10000)::int, format('thing-%s', (random() * 100)::int), (random() * 1000)::int)
-     , ((random() * 10000)::int, format('thing-%s', (random() * 100)::int), (random() * 1000)::int)
-     , ((random() * 10000)::int, format('thing-%s', (random() * 100)::int), (random() * 1000)::int)
-;
+SELECT id, format('thing-%s', (random() * 100)::int), (random() * 1000)::int FROM generate_series(1, 3) AS id;
 
 -- Copy the data to S3.
 COPY url_things TO :'url';

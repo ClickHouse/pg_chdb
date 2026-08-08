@@ -23,10 +23,7 @@ CREATE TABLE abs_things (
 );
 
 INSERT INTO abs_things
-VALUES ((random() * 10000)::int, format('thing-%s', (random() * 100)::int), (random() * 1000)::int)
-     , ((random() * 10000)::int, format('thing-%s', (random() * 100)::int), (random() * 1000)::int)
-     , ((random() * 10000)::int, format('thing-%s', (random() * 100)::int), (random() * 1000)::int)
-;
+SELECT id, format('thing-%s', (random() * 100)::int), (random() * 1000)::int FROM generate_series(1, 3) AS id;
 
 -- Copy to existing file to ensure s3_truncate_on_insert is true.
 COPY abs_things TO 'az://clickgres.blob.core.windows.net/pg-chdb-ci/keep-me.tsv' (
