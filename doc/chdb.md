@@ -322,6 +322,9 @@ the file name. Supported values:
 *   `brotli` or `br`
 *   `xz` or `LZMA`
 *   `zstd` or `zst`
+*   `lz4`
+*   `bz2`
+*   `snappy`
 
 #### `timeout`
 
