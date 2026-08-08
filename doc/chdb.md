@@ -331,6 +331,40 @@ the file name. Supported values:
 Request timeout in milliseconds. Applies to HTTP, S3, GCS, and Azure URLs.
 Defaults to `30000` (30s).
 
+### Debugging
+
+On error, the chdb `COPY` command includes the chDB query it attempted to
+execute in the error context:
+
+```
+ERROR:  chdb: error executing chDB query
+DETAIL:  Code: 53. DB::Exception: Requested type of column p doesn't match parquet schema
+CONTEXT:  query: SELECT * FROM file({path:String}, {format:String}, {structure:String}) SETTINGS allow_experimental_nullable_tuple_type=1, output_format_json_quote_denormals=1, output_format_native_encode_types_in_binary_format=0, output_format_native_write_json_as_string=1, engine_file_truncate_on_insert=1
+STATEMENT:  COPY "users" FROM 'file:///tmp/users.data' (format 'Parquet');
+```
+
+chdb uses `{name:Type}`-style placeholders for query parameters to protect
+against SQL injection vulnerabilities and to minimize the risk of logging
+sensitive data such as credentials.
+
+If, however, you need to see the content of those parameters in order to debug
+an issue, temporarily set the Postgres [log_min_messages] GUC to `DEBUG1` or
+higher to have chdb send the query and parameters to the Postgres log (never
+the client), where they'll appear like so:
+
+```
+2026-08-08 09:41:06.842 EDT [59940] LOG:  executing chDB query
+2026-08-08 09:41:06.842 EDT [59940] DETAIL:  query: SELECT * FROM file({path:String}, {format:String}, {structure:String}) SETTINGS allow_experimental_nullable_tuple_type=1, output_format_json_quote_denormals=1, output_format_native_encode_types_in_binary_format=0,output_format_native_write_json_as_string=1, engine_file_truncate_on_insert=1
+2026-08-08 09:41:06.842 EDT [59940] CONTEXT:  params: { path: "/tmp/users.data", format: "Parquet", structure: "user_id Nullable(Int64), username Nullable(String), password Nullable(String)" }
+2026-08-08 09:41:06.842 EDT [59940] STATEMENT:  COPY "users" FROM 'file:///tmp/users.data' (format 'Parquet');
+```
+
+> [!WARNING]
+> Do not leave [log_min_messages] set to a debugging level beyond a single
+> debugging session so as to avoid logging sensitive information such as
+> credentials, and because PostgreSQL itself also logs debugging information
+> and can quickly fill the log.
+
 ### Data Types
 
 In the absence of an explicit [structure](#structure) option, the chDB
@@ -514,3 +548,5 @@ Copyright (c) 2026, ClickHouse
     "ClickHouse Docs: hdfs Table Function"
   [ClickHouse data types]: https://clickhouse.com/docs/reference/data-types/index
     "ClickHouse Docs: Data Types in ClickHouse"
+  [log_min_messages]: https://www.postgresql.org/docs/current/runtime-config-logging.html#GUC-LOG-MIN-MESSAGES
+    "PostgreSQL Docs: log_min_messages"
