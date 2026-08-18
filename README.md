@@ -132,7 +132,8 @@ CREATE EXTENSION chdb SCHEMA chdb;
 Author
 ------
 
-[David E. Wheeler](https://justatheory.com/)
+*   [David E. Wheeler](https://justatheory.com/)
+*   [serprex](https://github.com/serprex)
 
 Copyright
 ---------

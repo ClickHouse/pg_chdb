@@ -17,7 +17,7 @@ SELECT (random() * 100000)::int AS rand \gset
 \set url :base_url /ci/:SERVER_VERSION_NUM - :arch - :rand /test.csv
 \set ECHO all
 
-LOAD 'chdb';
+LOAD 'chdb_hook';
 
 -- Create some random data to copy.
 CREATE TABLE url_things (

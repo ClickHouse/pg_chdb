@@ -48,6 +48,6 @@ CREATE TABLE trips (
     dropoff_puma            integer                   NOT NULL
 );
 
-LOAD 'chdb';
+LOAD 'chdb_hook';
 \timing on
 COPY trips from 's3://datasets-documentation/nyc-taxi/trips_{1..2}.gz';

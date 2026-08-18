@@ -19,6 +19,6 @@ CREATE TABLE hackernews (
     descendants BIGINT      NOT NULL
 );
 
-LOAD 'chdb';
+LOAD 'chdb_hook';
 \timing on
 COPY hackernews FROM 's3://datasets-documentation/hackernews/hacknernews.parquet';

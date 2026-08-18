@@ -1,4 +1,4 @@
-LOAD 'chdb';
+LOAD 'chdb_hook';
 
 /****************************************************************************/
 -- Maps, read only. No Postgres type maps to Map, and the encoder has no arm

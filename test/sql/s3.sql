@@ -1,4 +1,4 @@
-LOAD 'chdb';
+LOAD 'chdb_hook';
 
 -- Simple COPY FROM without credentials.
 CREATE TABLE s3_times (

@@ -1,4 +1,4 @@
-LOAD 'chdb';
+LOAD 'chdb_hook';
 
 /****************************************************************************/
 -- PostgreSQL applies column type modifiers when importing values from chDB.

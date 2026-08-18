@@ -1,4 +1,4 @@
-LOAD 'chdb';
+LOAD 'chdb_hook';
 /****************************************************************************/
 -- Enums.
 CREATE TYPE mood AS ENUM ('sad', 'ok', 'happy');

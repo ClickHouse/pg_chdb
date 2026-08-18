@@ -1,4 +1,4 @@
-LOAD 'chdb';
+LOAD 'chdb_hook';
 
 \set ECHO errors
 \set oid8 OID8

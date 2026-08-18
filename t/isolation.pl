@@ -26,12 +26,11 @@ my $node = PostgreSQL::Test::Cluster->new('isolation');
 $node->init;
 $node->append_conf(
     'postgresql.conf',
-    qq{shared_preload_libraries = 'chdb'\nlog_min_messages = DEBUG1}
+    qq{shared_preload_libraries = 'chdb_hook'\nlog_min_messages = DEBUG1}
 );
 $node->start;
 END { $node->stop('fast') if $node }
 
-$node->safe_psql(postgres => 'CREATE EXTENSION chdb');
 $node->safe_psql(postgres => 'CREATE TABLE landing (id bigint, payload text)');
 
 for my $signal (qw(SEGV ABRT KILL)) {

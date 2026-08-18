@@ -13,7 +13,7 @@ SELECT :'access_key' = '' OR :'access_secret' = '' AS no_creds \gset
 \endif
 \set ECHO all
 
-LOAD 'chdb';
+LOAD 'chdb_hook';
 
 -- Create some random data to copy.
 CREATE TABLE abs_things (

@@ -14,9 +14,9 @@
 /* PGCH_NATIVE_SETTINGS; native.c is the TU carrying the implementation. */
 #include "pg-clickhouse.h"
 
+#include "../helper.h"
+#include "../native.h"
 #include "copy.h"
-#include "helper.h"
-#include "native.h"
 
 /*
  * The names of the ClickHouse functions that correspond to each supported URL

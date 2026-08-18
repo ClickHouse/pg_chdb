@@ -1,4 +1,4 @@
-LOAD 'chdb';
+LOAD 'chdb_hook';
 
 /****************************************************************************/
 -- Error clipping. chDB errors longer than the helper's capture buffer get

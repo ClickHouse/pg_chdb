@@ -21,7 +21,7 @@ CREATE TABLE cell_towers (
     averageSignal SMALLINT    NOT NULL
 );
 
-LOAD 'chdb';
+LOAD 'chdb_hook';
 \timing on
 COPY cell_towers FROM 's3://datasets-documentation/cell_towers/cell_towers.csv.xz' (
     format 'CSVWithNames'

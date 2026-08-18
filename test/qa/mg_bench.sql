@@ -46,7 +46,7 @@ CREATE TABLE mgbench_logs3 (
   event_value  FLOAT4            NULL
 );
 
-LOAD 'chdb';
+LOAD 'chdb_hook';
 \timing on
 COPY mgbench_logs1 FROM 'https://datasets.clickhouse.com/mgbench1.csv.xz' ( format 'CSVWithNames');
 COPY mgbench_logs2 FROM 'https://datasets.clickhouse.com/mgbench2.csv.xz' ( format 'CSVWithNames');

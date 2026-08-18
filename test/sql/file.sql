@@ -1,4 +1,4 @@
-LOAD 'chdb';
+LOAD 'chdb_hook';
 
 CREATE TABLE requests (
     req_id    BIGINT PRIMARY KEY,

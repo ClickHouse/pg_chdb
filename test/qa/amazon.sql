@@ -19,6 +19,6 @@ CREATE TABLE amazon_reviews (
     review_body       TEXT     NOT NULL
 );
 
-LOAD 'chdb';
+LOAD 'chdb_hook';
 \timing on
 COPY amazon_reviews FROM 's3://datasets-documentation/amazon_reviews/amazon_reviews_2015.snappy.parquet';

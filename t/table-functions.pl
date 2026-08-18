@@ -13,12 +13,11 @@ my $node = PostgreSQL::Test::Cluster->new('table-functions');
 $node->init;
 $node->append_conf(
     'postgresql.conf',
-    qq{shared_preload_libraries = 'chdb'\nlog_min_messages = DEBUG1},
+    qq{shared_preload_libraries = 'chdb_hook'\nlog_min_messages = DEBUG1},
 );
 $node->start;
 END { $node->stop('fast') }
 
-$node->safe_psql(postgres => 'CREATE EXTENSION chdb');
 $node->safe_psql(postgres => 'CREATE TABLE stuff (id int)');
 my $port = PostgreSQL::Test::Cluster::get_free_port;
 

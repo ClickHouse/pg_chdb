@@ -22,6 +22,6 @@ CREATE TABLE noaa (
    name               TEXT         NOT NULL
 );
 
-LOAD 'chdb';
+LOAD 'chdb_hook';
 \timing on
 COPY noaa FROM 's3://datasets-documentation/noaa/noaa_enriched.parquet';

@@ -30,7 +30,7 @@ CREATE TABLE foursquare (
     bbox                FLOAT8[]
 );
 
-LOAD 'chdb';
+LOAD 'chdb_hook';
 \timing on
 -- XXX files currently missing, will copy zero rows.
 COPY foursquare FROM 's3://fsq-os-places-us-east-1/release/dt=2025-04-08/places/parquet/*' (

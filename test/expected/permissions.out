@@ -1,4 +1,4 @@
-LOAD 'chdb';
+LOAD 'chdb_hook';
 CREATE TABLE secrets (
     id     INT  PRIMARY KEY,
     name   TEXT NOT NULL,

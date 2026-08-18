@@ -11,6 +11,12 @@
       "file": "chdb.control",
       "docfile": "doc/chdb.md",
       "version": "0.0.1"
+    },
+    "chdb_hook": {
+      "abstract": "Hook into PostgreSQL commands to execute chDB queries.",
+      "file": "src/hook/hook.c",
+      "docfile": "doc/chdb_hook.md",
+      "version": "0.0.1"
     }
   },
   "prereqs": {

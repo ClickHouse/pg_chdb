@@ -1,5 +1,5 @@
 \set ECHO errors
-LOAD 'chdb';
+LOAD 'chdb_hook';
 -- Create some random data to copy.
 CREATE TABLE abs_things (
     id       INT  PRIMARY KEY,

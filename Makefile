@@ -1,5 +1,4 @@
-EXTENSION    = $(shell grep -m 1 '"name":' META.json | \
-               sed -e 's/[[:space:]]*"name":[[:space:]]*"\([^"]*\)",/\1/')
+EXTENSION    = $(patsubst %.control,%,$(wildcard *.control))
 EXTVERSION   = $(shell grep -m 1 'default_version' chdb.control | \
                sed -e "s/[[:space:]]*default_version[[:space:]]*=[[:space:]]*'\([^']*\)',\{0,1\}/\1/")
 DISTVERSION  = $(shell grep -m 1 '^[[:space:]]\{2\}"version":' META.json | \
@@ -27,7 +26,7 @@ CLANG_FORMAT ?= clang-format
 # Collect all the C files to compile into MODULE_big.
 OBJS = $(subst .c,.o, $(wildcard src/*.c))
 
-# Suppress annoying pre-c99 warning, error on other warnings.
+# Suppress annoying pre-c99 warning, error on 	/other warnings.
 PG_CFLAGS    = -Wno-declaration-after-statement -Wall -Werror
 
 # -isystem keeps the vendored headers' warnings out of the -Werror build.
@@ -38,7 +37,7 @@ PG_CPPFLAGS  = -isystem $(CH_C_DIR) -isystem $(PGCH_DIR) -DPGCH_MSG_PREFIX='"chd
                -DCHC_ERR_MSG_LEN=4096
 
 # Clean up generated files.
-EXTRA_CLEAN  = src/version.h sql/$(EXTENSION)--$(EXTVERSION).sql src/helper/chdb_helper src/helper/*.o test/schedule
+EXTRA_CLEAN  = src/version.h sql/$(EXTENSION)--$(EXTVERSION).sql src/hook/chdb_hook$(DLSUFFIX) src/hook/*.o src/hook/*.bc src/helper/chdb_helper src/helper/*.o test/schedule
 
 PGXS := $(shell $(PG_CONFIG) --pgxs)
 include $(PGXS)
@@ -49,7 +48,7 @@ PROVE_FLAGS = -fwvj $(shell nproc)
 endif
 
 # Require the versioned SQL script.
-all: sql/$(EXTENSION)--$(EXTVERSION).sql src/helper/chdb_helper
+all: sql/$(EXTENSION)--$(EXTVERSION).sql src/helper/chdb_helper src/hook/chdb_hook$(DLSUFFIX)
 
 # PGXS tracks no header dependencies, and the vendored libraries are all header.
 # *.bc compiles same sources, so needs same headers.
@@ -63,6 +62,19 @@ sql/$(EXTENSION)--$(EXTVERSION).sql: sql/$(EXTENSION).sql
 # Versioned source file.
 src/version.h: META.json
 	@printf '#define PGCHCB_VERSION "%s"\n' "$(DISTVERSION)" > $@
+
+# Hook module.
+HOOK_MODULE := src/hook/chdb_hook$(DLSUFFIX)
+$(HOOK_MODULE): $(wildcard src/hook/*.c src/hook/*.h) $(OBJS)
+	@$(MAKE) -C $(dir $@) all -j $$(nproc) CH_C_DIR=$(CH_C_DIR) PGCH_DIR=$(PGCH_DIR)
+
+# Install and uninstall the chdb_hook module.
+install-hook: $(HOOK_MODULE)
+	$(INSTALL_SHLIB) $< '$(DESTDIR)$(pkglibdir)/'
+uninstall-hook:
+	rm -f $(DESTDIR)$(pkglibdir)/$(HOOK_MODULE)
+install: install-hook
+uninstall: uninstall-hook
 
 # Fail with something more useful than a missing include.
 $(CH_C_DIR)/clickhouse.h: .gitmodules
