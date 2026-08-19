@@ -1,14 +1,14 @@
 /*
- * Runs one COPY's chDB query and exits.
+ * Runs one chDB query and exits.
  *
  * This is the only program in the distribution that links libchdb. It holds no
  * Postgres state and the postmaster does not know it exists, so libchdb may
- * abort or segfault on an allocation failure without costing more than the COPY
- * that provoked it. See src/helper.c.
+ * abort or segfault on an allocation failure without costing more than the
+ * command that provoked it. See src/helper.c.
  *
- * Reads the setup payload from CHDB_SETUP_FD, then streams Native blocks: out
- * on stdout for COPY FROM, in on stdin for COPY TO. Anything to say goes to
- * stderr, and a nonzero exit tells the backend to raise.
+ * Read setup payload from CHDB_SETUP_FD
+ * Read Native blocks from stdin for CHDB_CMD_INSERT, write them to stdout otherwise
+ * Write errors to stderr and return nonzero status when backend must raise
  */
 
 #include <errno.h>
@@ -205,6 +205,42 @@ run_select(chdb_connection conn, str query, const params* par) {
     return status;
 }
 
+/*
+ * Run queries unsupported by streaming API, including DESCRIBE
+ * Buffer complete result in memory
+ */
+static int
+run_query(chdb_connection conn, str query, const params* par) {
+    chdb_result* result = chdb_query_with_params_n(
+        conn,
+        query.data,
+        query.len,
+        native_format,
+        sizeof(native_format) - 1,
+        par->names,
+        par->name_lens,
+        par->values,
+        par->value_lens,
+        par->count
+    );
+    const char* error = chdb_result_error(result);
+    int status        = 0;
+
+    if (error) {
+        fprintf(stderr, "%s\n", error);
+        status = 1;
+    } else {
+        size_t len = chdb_result_length(result);
+
+        if (len && !write_all(chdb_result_buffer(result), len)) {
+            status = CHDB_HELPER_LOST_BACKEND;
+        }
+    }
+    chdb_destroy_query_result(result);
+
+    return status;
+}
+
 /* COPY TO: the backend's Native blocks, straight into the insert. */
 static int
 run_insert(chdb_connection conn, str query, const params* par) {
@@ -344,9 +380,21 @@ main(void) {
      * an initial query. https://github.com/chdb-io/chdb-core/issues/191
      */
     int status = setup_session(*conn, max_mem, max_threads, max_parsers);
+
     if (!status) {
-        status = cmd_type == CHDB_CMD_SELECT ? run_select(*conn, query, &par)
-                                             : run_insert(*conn, query, &par);
+        switch (cmd_type) {
+        case CHDB_CMD_SELECT:
+            status = run_select(*conn, query, &par);
+            break;
+        case CHDB_CMD_INSERT:
+            status = run_insert(*conn, query, &par);
+            break;
+        case CHDB_CMD_DESCRIBE:
+            status = run_query(*conn, query, &par);
+            break;
+        default:
+            fail("chdb: unknown command type");
+        }
     }
 
     fflush(stderr);

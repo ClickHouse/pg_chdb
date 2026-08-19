@@ -20,10 +20,11 @@ COPY 16
 
 ## Description
 
-The chdb_hook module hooks into the PostgreSQL [COPY] command to command to
+The chdb_hook module hooks into the PostgreSQL [COPY](#copy-overloading) command to command to
 use [chDB] copy data `TO` or `FROM` any of the supported [data formats
 provided by chDB][formats] in local files, [AWS S3] buckets, [Google Cloud
-Storage], and more.
+Storage], and more. It also hooks into [CREATE TABLE], so that a table can
+derive its columns, and load its rows, from any of those same targets.
 
 ## Loading
 
@@ -252,9 +253,9 @@ at the end of the URL.
 
 The [chDB] data structure for a row. Consists of a list of column names and
 [ClickHouse data types] and modifiers. If omitted, chdb_hook maps the
-Postgres data types to generally-appropriate ClickHouse types; see [Data
-Types](#data-types) for details. If set to `auto`, chDB attempts to infer the
-types.
+Postgres data types to generally-appropriate ClickHouse types; see [Postgres to
+chDB](#postgres-to-chdb) for details. If set to `auto`, chDB attempts to infer
+the types.
 
 Example:
 
@@ -307,7 +308,7 @@ to execute in the error context:
 ```
 ERROR:  chdb: error executing chDB query
 DETAIL:  Code: 53. DB::Exception: Requested type of column p doesn't match parquet schema
-CONTEXT:  query: SELECT * FROM file({path:String}, {format:String}, {structure:String}) SETTINGS allow_experimental_nullable_tuple_type=1, output_format_json_quote_denormals=1, output_format_native_encode_types_in_binary_format=0, output_format_native_write_json_as_string=1, engine_file_truncate_on_insert=1
+CONTEXT:  query: SELECT * FROM file({path:String}, {format:String}, {structure:String})
 STATEMENT:  COPY "users" FROM 'file:///tmp/users.data' (format 'Parquet');
 ```
 
@@ -322,7 +323,7 @@ higher to have chdb_hook send the query and parameters to the Postgres log
 
 ```
 2026-08-08 09:41:06.842 EDT [59940] LOG:  executing chDB query
-2026-08-08 09:41:06.842 EDT [59940] DETAIL:  query: SELECT * FROM file({path:String}, {format:String}, {structure:String}) SETTINGS allow_experimental_nullable_tuple_type=1, output_format_json_quote_denormals=1, output_format_native_encode_types_in_binary_format=0,output_format_native_write_json_as_string=1, engine_file_truncate_on_insert=1
+2026-08-08 09:41:06.842 EDT [59940] DETAIL:  query: SELECT * FROM file({path:String}, {format:String}, {structure:String})
 2026-08-08 09:41:06.842 EDT [59940] CONTEXT:  params: { path: "/tmp/users.data", format: "Parquet", structure: "user_id Nullable(Int64), username Nullable(String), password Nullable(String)" }
 2026-08-08 09:41:06.842 EDT [59940] STATEMENT:  COPY "users" FROM 'file:///tmp/users.data' (format 'Parquet');
 ```
@@ -333,12 +334,114 @@ higher to have chdb_hook send the query and parameters to the Postgres log
 > credentials, and because PostgreSQL itself also logs debugging information
 > and can quickly fill the log.
 
-### Data Types
+## CREATE TABLE Overloading
 
-In the absence of an explicit [structure](#structure) option, the chDB
-extension automatically maps Postgres types to reasonable chDB equivalents.
-When they don't match your use case, specify the [structure](#structure) to
-override the generated types with those you need.
+chdb_hook also hooks into [CREATE TABLE], so that a table can derive its
+columns, and load its rows, from a URL.
+
+To create a table with the structure derived from a URL, pass the URL in the
+`structure_from` option and leave the column list empty:
+
+```sql
+CREATE TABLE reviews () WITH (
+    structure_from = 's3://datasets-documentation/amazon_reviews/amazon_reviews_2015.snappy.parquet'
+);
+```
+
+Use `copy_from` to load the rows as well as the columns:
+
+```sql
+CREATE TABLE reviews () WITH (
+    copy_from = 's3://datasets-documentation/amazon_reviews/amazon_reviews_2015.snappy.parquet'
+);
+```
+
+`copy_from` infers the columns only when the statement names none of its own. A
+column list, an `INHERITS` clause, an `OF` type, or a partition each define
+columns, so `copy_from` then only copies:
+
+```sql
+CREATE TABLE times (
+    id     INT NOT NULL,
+    months INT NOT NULL,
+    days   INT NOT NULL
+) WITH (copy_from = 's3://datasets-documentation/my-test-bucket-768/some_prefix/some_file_1.csv');
+```
+
+Both options support the same [URL schemes](#url-schemes) and
+[options](#options) as `COPY`; credentials, format, compression, timeout, and
+even an explicit [structure](#structure) all apply. Postgres keeps whatever
+storage parameters remain:
+
+```sql
+CREATE TABLE users () WITH (
+    copy_from     = 's3://my-bucket/users.csv',
+    access_key    = 'AKIAIOSFODNN7EXAMPLE',
+    access_secret = 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY',
+    format        = 'CSVWithNames',
+    fillfactor    = 90
+);
+```
+
+Neither `structure_from` nor `copy_from` works with `IF NOT EXISTS`. Use [COPY]
+to load an existing relation.
+
+## Limitations
+
+Due to a few known issues and variations in the behaviors of data types
+between Postgres and chDB, chdb_hook has the following limitations:
+
+*   Cannot `COPY` relations with [row-level security] policies that apply to
+    the copying role. Postgres applies such policies by rewriting `COPY TO`
+    into a query, which chdb_hook does not support.
+*   ClickHouse has no NULL array, so `COPY TO` stores an empty array (`[]`)
+    for a `NULL`.
+*   ClickHouse represents the equivalents of `lseg`, `path`, or `polygon` as
+    arrays; thus NULL values of these types also `COPY TO` an empty array
+    (`[]`).
+*   NULL values output for a specified [structure](#structure) that doesn't
+    define the column as Nullable will be output as their default values.
+    Always explicitly define nullable columns in the [structure](#structure)
+    to avoid this conversion.
+*   An open `path` whose last point equals its first outputs as a closed path.
+*   Protobuf has no null in a repeated field, so it omits NULL values in
+    arrays.
+*   The chDB [JSON type] supports only JSON objects; override the default
+    `String` mapping for `json` and `jsonb` with `JSON` only if all values are
+    JSON object. (ClickHouse/ClickHouse#68428)
+*   The chDB [JSON type] ignores `null`s; object keys with NULL values will be
+    omitted on output. Override the default `String` mapping for `json` and
+    `jsonb` with `JSON` only if object values aren't `null` or their loss is
+    acceptable. (ClickHouse/ClickHouse#68428)
+*   The JSON, JSONCompact, and JSONColumnsWithMetadata formats always validate
+    UTF-8, so they emit bytea values with replacement characters.
+*   `COPY FROM` reads a Protobuf `Nullable` field containing an empty string
+    or zero as `NULL`. (chdb-io/chdb-core#152)
+*   `COPY TO` Parquet drops `NULL`s from a Nullable Tuple's own null map.
+    (ClickHouse/ClickHouse#112427)
+*   The Parquet, Arrow, ArrowStream, ORC, Avro, Protobuf, ProtobufList,
+    MsgPack and BSONEachRow formats have no type corresponding to Postgres
+    `time` or chDB `Time64`. Configure `time` columns as `String`s in an
+    explicit [structure](#structure) to preserve their values.
+*   Protobuf output truncates timestamp values to the second.
+*   Protobuf output does not support dates prior to 1970-01-01. Configure
+    `time` columns as `String`s in an explicit [structure](#structure) to
+    preserve their values. (ClickHouse/ClickHouse#111860)
+*   The CSVWithNames and CSVWithNamesAndTypes formats cannot currently import
+    `NULL` box or circle values. (ClickHouse/ClickHouse#115523)
+
+## Data Types
+
+[COPY](#copy-overloading) maps the Postgres types of a relation to chDB types,
+while [CREATE TABLE](#create-table-overloading) maps the chDB types of a URL to
+Postgres types.
+
+### Postgres to chDB
+
+In the absence of an explicit [structure](#structure) option, chdb_hook maps
+Postgres types to reasonable chDB equivalents. When they don't match your use
+case, specify the [structure](#structure) to override the generated types with
+those you need.
 
 | Postgres    | chDB                                     | Notes                                                                  |
 | ----------- | ---------------------------------------- | ---------------------------------------------------------------------- |
@@ -388,50 +491,68 @@ Array types map to `Array`s of the mapped element type. ClickHouse constrains
 nullability per column while Postgres constrains it per array, so elements are
 always `Nullable`.
 
-### Limitations
+No Postgres type maps to `Map` or `Tuple`, but [structure](#structure) may name
+one. A `Map` can convert to an array of key value pairs, and a `Tuple` converts
+to an array. Use `text[]` for heterogeneous support.
 
-Due to a few known issues and variations in the behaviors of data types
-between Postgres and chDB, chdb_hook `COPY` support has the following
-limitations:
+### chDB to Postgres
 
-*   Cannot `COPY` relations with [row-level security] policies that apply to
-    the copying role. Postgres applies such policies by rewriting `COPY TO`
-    into a query, which chdb_hook does not support.
-*   ClickHouse has no NULL array, so `COPY TO` stores an empty array (`[]`)
-    for a `NULL`.
-*   ClickHouse represents the equivalents of `lseg`, `path`, or `polygon` as
-    arrays; thus NULL values of these types also `COPY TO` an empty array
-    (`[]`).
-*   NULL values output for a specified [structure](#structure) that doesn't
-    define the column as Nullable will be output as their default values.
-    Always explicitly define nullable columns in the [structure](#structure)
-    to avoid this conversion.
-*   An open `path` whose last point equals its first outputs as a closed path.
-*   Protobuf has no null in a repeated field, so it omits NULL values in
-    arrays.
-*   The chDB [JSON type] supports only JSON objects; override the default
-    `String` mapping for `json` and `jsonb` with `JSON` only if all values are
-    JSON object. (ClickHouse/ClickHouse#68428)
-*   The chDB [JSON type] ignores `null`s; object keys with NULL values will be
-    omitted on output. Override the default `String` mapping for `json` and
-    `jsonb` with `JSON` only if object values aren't `null` or their loss is
-    acceptable. (ClickHouse/ClickHouse#68428)
-*   The JSON, JSONCompact, and JSONColumnsWithMetadata formats always validate
-    UTF-8, so they emit bytea values with replacement characters.
-*   `COPY FROM` reads a Protobuf `Nullable` field containing an empty string
-    or zero as `NULL`. (chdb-io/chdb-core#152)
-*   `COPY TO` Parquet drops `NULL`s from a Nullable Tuple's own null map.
-    (ClickHouse/ClickHouse#112427)
-*   The Parquet, Arrow, ArrowStream, ORC, Avro, Protobuf, ProtobufList,
-    MsgPack and BSONEachRow formats have no type corresponding to Postgres
-    `time` or chDB `Time64`. Configure `time` columns as `String`s in an
-    explicit [structure](#structure) to preserve their values.
-*   Protobuf output truncates timestamp values to the second.
-*   Protobuf output does not support dates prior to 1970-01-01. Configure
-    `time` columns as `String`s in an explicit [structure](#structure) to
-    preserve their values. (ClickHouse/ClickHouse#111860)
-*   The CSVWithNames and CSVWithNamesAndTypes formats cannot currently import
-    `NULL` box or circle values. (ClickHouse/ClickHouse#115523)
+chdb_hook maps the ClickHouse types reported by [`DESCRIBE`] to these Postgres
+types:
+
+<!-- TYPE-TABLE-BEGIN generated by `make type-table` -->
+|       chDB        |          Postgres           |              Notes               |
+|-------------------|-----------------------------|----------------------------------|
+| Array(T)          | T[]                         | One PG array type per depth      |
+| Bool              | boolean                     |                                  |
+| Date              | date                        |                                  |
+| Date32            | date                        |                                  |
+| DateTime          | timestamp with time zone    |                                  |
+| DateTime64(P)     | timestamp(P) with time zone | P over 6 caps at 6               |
+| Decimal(P,S)      | numeric(P,S)                |                                  |
+| Decimal32(S)      | numeric(9,S)                |                                  |
+| Decimal64(S)      | numeric(18,S)               |                                  |
+| Decimal128(S)     | numeric(38,S)               |                                  |
+| Decimal256(S)     | numeric(76,S)               |                                  |
+| Enum8             | text                        |                                  |
+| Enum16            | text                        |                                  |
+| FixedString(N)    | text                        | N counts CH bytes, PG characters |
+| Float32           | real                        |                                  |
+| Float64           | double precision            |                                  |
+| IPv4              | inet                        |                                  |
+| IPv6              | inet                        |                                  |
+| Int8              | smallint                    |                                  |
+| Int16             | smallint                    |                                  |
+| Int32             | integer                     |                                  |
+| Int64             | bigint                      |                                  |
+| JSON              | jsonb                       | Also reads into json             |
+| LineString        | path                        |                                  |
+| LowCardinality(T) | T                           |                                  |
+| Map(K,V)          | text[][]                    | One row of text items per pair   |
+| MultiLineString   | path[]                      |                                  |
+| MultiPolygon      | polygon[][]                 |                                  |
+| Nullable(T)       | T                           | Sets nullable on the column      |
+| Point             | point                       |                                  |
+| Polygon           | polygon[]                   |                                  |
+| Ring              | polygon                     |                                  |
+| String            | text                        | Also reads into bytea            |
+| Time              | time without time zone      |                                  |
+| Time64(P)         | time(P) without time zone   | P over 6 caps at 6               |
+| Tuple(...)        | text[]                      | Fields become text items         |
+| UInt8             | smallint                    |                                  |
+| UInt16            | integer                     |                                  |
+| UInt32            | bigint                      |                                  |
+| UInt64            | bigint                      | Errors on values > BIGINT max    |
+| UUID              | uuid                        |                                  |
+<!-- TYPE-TABLE-END -->
+
+Every chDB type omitted from this table raises an error, among them `Nested`,
+`Variant`, `Dynamic`, `Interval`, and the 128 and 256 bit integers. Use a
+[structure](#structure) that maps them to `String` to read them as text.
+
+Postgres holds a narrower range than chDB in a few of these types; thus copy
+raises an error on a `Time` or `Time64` beyond 24 hours, and on a `Date32`
+outside the Postgres date range.
 
 ## Settings
 
@@ -510,6 +631,10 @@ Copyright (c) 2026, ClickHouse
     "chDB - fast, reliable, and scalable in-process database"
   [Semantic Versioning]: https://semver.org/spec/v2.0.0.html "Semantic Versioning 2.0.0"
   [COPY]: https://www.postgresql.org/docs/current/sql-copy.html "Postgres Docs: COPY"
+  [CREATE TABLE]: https://www.postgresql.org/docs/current/sql-createtable.html
+    "Postgres Docs: CREATE TABLE"
+  [`DESCRIBE`]: https://clickhouse.com/docs/sql-reference/statements/describe-table
+    "ClickHouse Docs: DESCRIBE TABLE"
   [formats]: https://github.com/chdb-io/chdb/blob/main/refs/clickhouse-formats-settings.md#complete-format-names-table
     "chDB Docs: Complete Format Names Table"
   [access key ID and access secret]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html

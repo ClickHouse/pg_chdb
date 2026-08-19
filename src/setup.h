@@ -6,8 +6,9 @@
 
 /* Type of query we ask the helper to execute. */
 typedef uint8_t chdbCmdType;
-#define CHDB_CMD_SELECT 'S' /* SELECT, COPY FROM */
-#define CHDB_CMD_INSERT 'I' /* COPY TO */
+#define CHDB_CMD_SELECT 'S'   /* SELECT, COPY FROM */
+#define CHDB_CMD_INSERT 'I'   /* COPY TO */
+#define CHDB_CMD_DESCRIBE 'D' /* DESCRIBE, CREATE TABLE */
 
 /* Contextual information for the helper. */
 typedef struct chdbHelperContext {

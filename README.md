@@ -78,6 +78,14 @@ After which the `times` table contains the records from each file it loaded:
 (18 rows)
 ```
 
+A [CREATE TABLE] may also derive its columns, and load its rows, from such a URL:
+
+```sql
+CREATE TABLE reviews () WITH (
+    copy_from = 'https://datasets-documentation.s3.eu-west-3.amazonaws.com/amazon_reviews/amazon_reviews_2015.snappy.parquet'
+);
+```
+
 See the [chdb_hook documentation](doc/chdb_hook.md) for details.
 
 Architecture
@@ -223,5 +231,7 @@ Copyright (c) 2026, ClickHouse
   [chDB]: https://clickhouse.com/chdb
     "chDB - fast, reliable, and scalable in-process database"
   [COPY]: https://www.postgresql.org/docs/current/sql-copy.html "Postgres Docs: COPY"
+  [CREATE TABLE]: https://www.postgresql.org/docs/current/sql-createtable.html
+    "Postgres Docs: CREATE TABLE"
   [lib.chdb.io]: https://lib.chdb.io "curl -sL https://lib.chdb.io | bash"
   [`postgresql.conf` parameters]: https://www.postgresql.org/docs/devel/runtime-config-client.html#RUNTIME-CONFIG-CLIENT-OTHER

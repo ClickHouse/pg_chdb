@@ -129,7 +129,7 @@ ERROR: Line feed found where delimiter (,) is expected. It's like your file has 
 And if your file has the right number of columns, maybe it has unescaped quotes in values.
 
 : (in file/uri /tmp/geos.tmp): While executing ParallelParsingBlockInputFormat: While executing File. (CANNOT_PARSE_INPUT_ASSERTION_FAILED)
-CONTEXT:  query: SELECT * FROM file({path:String}, {format:String}, {structure:String}) SETTINGS engine_file_truncate_on_insert=1
+CONTEXT:  query: SELECT * FROM file({path:String}, {format:String}, {structure:String})
 psql:test/utils/round-trip-formats.sql:82: STATEMENT:  COPY "geo_nulls2" FROM 'file:///tmp/geos.tmp' (format 'CSVWithNames');
 f: CSVWithNames
 psql:test/utils/round-trip-formats.sql:90: ERROR:  chdb: error executing chDB query
@@ -164,7 +164,7 @@ ERROR: Line feed found where delimiter (,) is expected. It's like your file has 
 And if your file has the right number of columns, maybe it has unescaped quotes in values.
 
 : (in file/uri /tmp/geos.tmp): While executing ParallelParsingBlockInputFormat: While executing File. (CANNOT_PARSE_INPUT_ASSERTION_FAILED)
-CONTEXT:  query: SELECT * FROM file({path:String}, {format:String}, {structure:String}) SETTINGS engine_file_truncate_on_insert=1
+CONTEXT:  query: SELECT * FROM file({path:String}, {format:String}, {structure:String})
 psql:test/utils/round-trip-formats.sql:90: STATEMENT:  COPY "geo_nulls2" FROM 'file:///tmp/geos.tmp' (format 'CSVWithNamesAndTypes');
 f: CSVWithNamesAndTypes
 t: CustomSeparated

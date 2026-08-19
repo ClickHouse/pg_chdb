@@ -1,9 +1,9 @@
 LOAD 'chdb_hook';
 
 /****************************************************************************/
--- Maps, read only. No Postgres type maps to Map, and the encoder has no arm
--- for composite Datums, so pg_chdb sees a Map only when a structure option
--- names one. That rules out COPY TO, hence no round trip here.
+-- Maps. No Postgres type maps to Map, so pg_chdb sees one only when a
+-- structure option names it. A composite array reads a Map but writes none,
+-- so the round trip below runs through a text array instead.
 CREATE TYPE kv AS (k text, v bigint);
 CREATE TYPE ikv AS (k bigint, v text);
 CREATE TYPE akv AS (k text, v bigint[]);
@@ -52,6 +52,36 @@ COPY map_arrays FROM :'maps_json' (format 'JSONEachRow', structure 'id Int32, am
 SELECT id, array_dims(am), am FROM map_arrays ORDER BY id;
 
 /****************************************************************************/
+-- A text array takes the pairs as items rather than records, so the pair fills
+-- one more dimension, and it writes back into a Map.
+CREATE TABLE text_maps (id int, m text[]);
+COPY text_maps FROM :'maps_json' (format 'JSONEachRow', structure 'id Int32, m Map(String, Int64)');
+SELECT id, array_dims(m), m FROM text_maps ORDER BY id;
+
+\set maps_out file:///tmp/chdb-maps.tmp
+COPY text_maps TO :'maps_out' (format 'JSONEachRow', structure 'id Int32, m Map(String, Int64)');
+CREATE TABLE text_maps2 (LIKE text_maps);
+COPY text_maps2 FROM :'maps_out' (format 'JSONEachRow', structure 'id Int32, m Map(String, Int64)');
+-- Round trip changes no row, so the difference is empty
+SELECT * FROM text_maps EXCEPT ALL SELECT * FROM text_maps2;
+
+-- A Tuple fills one array with its fields, each item parsed as its own field.
+CREATE TABLE tuple_text (id int, tt text[]);
+COPY tuple_text FROM :'maps_json' (format 'JSONEachRow', structure 'id Int32, tt Tuple(String, Int64)');
+SELECT id, array_dims(tt), tt FROM tuple_text ORDER BY id;
+
+COPY tuple_text TO :'maps_out' (format 'JSONEachRow', structure 'id Int32, tt Tuple(String, Int64)');
+CREATE TABLE tuple_text2 (LIKE tuple_text);
+COPY tuple_text2 FROM :'maps_out' (format 'JSONEachRow', structure 'id Int32, tt Tuple(String, Int64)');
+-- Round trip changes no row, so the difference is empty
+SELECT * FROM tuple_text EXCEPT ALL SELECT * FROM tuple_text2;
+
+-- A Tuple takes exactly its fields, and cannot be NULL.
+COPY tuple_text2 TO :'maps_out' (format 'JSONEachRow', structure 'id Int32, tt Tuple(String, Int64, Int64)');
+INSERT INTO tuple_text2 VALUES (4, NULL);
+COPY tuple_text2 TO :'maps_out' (format 'JSONEachRow', structure 'id Int32, tt Tuple(String, Int64)');
+
+/****************************************************************************/
 -- The target composite must match the pair.
 CREATE TYPE wkv AS (k text, v bigint, w int);
 CREATE TABLE bad_width (id int, m wkv[]);
@@ -66,5 +96,5 @@ COPY bad_value FROM :'maps_json' (format 'JSONEachRow', structure 'id Int32, m M
 \getenv ci CI
 SELECT :'ci' = '' AS not_ci \gset
 \if :not_ci
-\! rm -f /tmp/chdb-maps.jsonl
+\! rm -f /tmp/chdb-maps.jsonl /tmp/chdb-maps.tmp 2> /dev/null || true
 \endif

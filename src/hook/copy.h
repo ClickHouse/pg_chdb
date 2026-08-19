@@ -58,4 +58,11 @@ typedef struct chdbCopyContext {
 extern uint64_t
 chdb_copy(chdbCopyContext* ctx);
 
+/*
+ * Return columns reported by DESCRIBE for URL in `ctx`
+ * Infer structure when no structure option was provided
+ */
+extern List*
+chdb_describe(chdbCopyContext* ctx);
+
 #endif /* CHDB_COPY_H */

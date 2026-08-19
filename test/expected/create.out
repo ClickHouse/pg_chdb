@@ -1,0 +1,258 @@
+LOAD 'chdb_hook';
+-- Show COPY row counts and render NULL values explicitly
+\pset null '#null#'
+\set QUIET false
+-- Copy corpus to consistent absolute path
+\! cp -rf test/corpus /tmp/chdb-create
+\set file_base file:///tmp/chdb-create
+\set temp_base file:///tmp/create.tmp
+\set requests_csv :file_base /requests.csv
+/****************************************************************************/
+-- Infer column names and types from CSV without schema
+CREATE TABLE from_csv () WITH (structure_from = :'requests_csv');
+CREATE TABLE
+SELECT attname, format_type(atttypid, atttypmod) AS type, attnotnull
+  FROM pg_attribute WHERE attrelid = 'from_csv'::regclass AND attnum > 0
+ ORDER BY attnum;
+ attname |  type  | attnotnull 
+---------+--------+------------
+ c1      | bigint | f
+ c2      | text   | f
+ c3      | text   | f
+(3 rows)
+
+SELECT count(*) FROM from_csv;
+ count 
+-------
+     0
+(1 row)
+
+/****************************************************************************/
+-- Use explicit structure and preserve PostgreSQL storage options
+CREATE TABLE named_csv () WITH (
+    structure_from = :'requests_csv',
+    format         = 'CSV',
+    structure      = 'req_id UInt32, name String, path Nullable(String)',
+    fillfactor     = 90
+);
+CREATE TABLE
+SELECT attname, format_type(atttypid, atttypmod) AS type, attnotnull
+  FROM pg_attribute WHERE attrelid = 'named_csv'::regclass AND attnum > 0
+ ORDER BY attnum;
+ attname |  type  | attnotnull 
+---------+--------+------------
+ req_id  | bigint | t
+ name    | text   | t
+ path    | text   | f
+(3 rows)
+
+SELECT reloptions FROM pg_class WHERE relname = 'named_csv';
+   reloptions    
+-----------------
+ {fillfactor=90}
+(1 row)
+
+/****************************************************************************/
+-- Infer type modifiers from the leaf below every Array layer
+CREATE TABLE arrayed () WITH (
+    structure_from = :'requests_csv',
+    format         = 'CSV',
+    structure      = $$nums Array(Decimal(12,6)),
+                       nested Array(Array(Decimal(9,4))),
+                       stamps Array(Nullable(DateTime64(3))),
+                       fixed Nullable(FixedString(4))$$
+);
+CREATE TABLE
+SELECT attname, format_type(atttypid, atttypmod) AS type, attndims, attnotnull
+  FROM pg_attribute WHERE attrelid = 'arrayed'::regclass AND attnum > 0
+ ORDER BY attnum;
+ attname |             type              | attndims | attnotnull 
+---------+-------------------------------+----------+------------
+ nums    | numeric(12,6)[]               |        1 | t
+ nested  | numeric(9,4)[]                |        2 | t
+ stamps  | timestamp(3) with time zone[] |        1 | t
+ fixed   | text                          |        0 | f
+(4 rows)
+
+/****************************************************************************/
+-- Derive the fields of a Tuple and the pairs of a Map as text items
+CREATE TABLE spread () WITH (
+    structure_from = :'requests_csv',
+    format         = 'CSV',
+    structure      = $$req_id UInt32, t Tuple(a String, b UInt8),
+                       m Map(String, UInt8), at Array(Tuple(UInt8, UInt8))$$
+);
+NOTICE:  chdb: column "t" of type "Tuple(
+    a String,
+    b UInt8)" converted to text[]
+NOTICE:  chdb: column "m" of type "Map(String, UInt8)" converted to text[][]
+NOTICE:  chdb: column "at" of type "Array(Tuple(UInt8, UInt8))" converted to text[][]
+CREATE TABLE
+SELECT attname, format_type(atttypid, atttypmod) AS type, attndims, attnotnull
+  FROM pg_attribute WHERE attrelid = 'spread'::regclass AND attnum > 0
+ ORDER BY attnum;
+ attname |  type  | attndims | attnotnull 
+---------+--------+----------+------------
+ req_id  | bigint |        0 | t
+ t       | text   |        1 | t
+ m       | text   |        2 | t
+ at      | text   |        2 | t
+(4 rows)
+
+/****************************************************************************/
+-- Keep the case ClickHouse reports and quote names that need it
+-- chDB unescapes a parameter once, so an escape inside a name needs doubling
+CREATE TABLE quoted () WITH (
+    copy_from = :'requests_csv',
+    format    = 'CSV',
+    structure = 'ReqId UInt32, `odd name` String, `Mixed \\`Case\\\\` Nullable(String)'
+);
+CREATE TABLE
+SELECT attname, format_type(atttypid, atttypmod) AS type, attnotnull
+  FROM pg_attribute WHERE attrelid = 'quoted'::regclass AND attnum > 0
+ ORDER BY attnum;
+   attname    |  type  | attnotnull 
+--------------+--------+------------
+ ReqId        | bigint | t
+ odd name     | text   | t
+ Mixed `Case\ | text   | f
+(3 rows)
+
+SELECT * FROM quoted ORDER BY "ReqId";
+ ReqId |  odd name   |   Mixed `Case\   
+-------+-------------+------------------
+     1 | page_view   | /users/profile
+     2 | Page_View   | /users/settings
+     3 | PAGE_VIEW   | /admin/dashboard
+     4 | add_to_cart | /products/shoes
+(4 rows)
+
+/****************************************************************************/
+-- Infer columns and copy rows
+CREATE TABLE loaded_csv () WITH (copy_from = :'requests_csv');
+CREATE TABLE
+SELECT * FROM loaded_csv ORDER BY c1;
+ c1 |     c2      |        c3        
+----+-------------+------------------
+  1 | page_view   | /users/profile
+  2 | Page_View   | /users/settings
+  3 | PAGE_VIEW   | /admin/dashboard
+  4 | add_to_cart | /products/shoes
+(4 rows)
+
+-- Copy only rows when statement defines columns
+CREATE TABLE given_csv (
+    req_id BIGINT PRIMARY KEY,
+    name   TEXT NOT NULL,
+    path   TEXT NOT NULL
+) WITH (copy_from = :'requests_csv');
+CREATE TABLE
+SELECT * FROM given_csv ORDER BY req_id;
+ req_id |    name     |       path       
+--------+-------------+------------------
+      1 | page_view   | /users/profile
+      2 | Page_View   | /users/settings
+      3 | PAGE_VIEW   | /admin/dashboard
+      4 | add_to_cart | /products/shoes
+(4 rows)
+
+-- Copy rows into partition using columns from parent
+CREATE TABLE parted (req_id BIGINT, name TEXT, path TEXT) PARTITION BY RANGE (req_id);
+CREATE TABLE
+CREATE TABLE parted_low PARTITION OF parted FOR VALUES FROM (MINVALUE) TO (100)
+    WITH (copy_from = :'requests_csv');
+CREATE TABLE
+SELECT * FROM parted ORDER BY req_id;
+ req_id |    name     |       path       
+--------+-------------+------------------
+      1 | page_view   | /users/profile
+      2 | Page_View   | /users/settings
+      3 | PAGE_VIEW   | /admin/dashboard
+      4 | add_to_cart | /products/shoes
+(4 rows)
+
+/****************************************************************************/
+-- Preserve columns and types across COPY TO and CREATE TABLE
+CREATE TABLE typed (
+    i2  INT2        NOT NULL,
+    i4  INT4            NULL,
+    i8  INT8            NULL,
+    num NUMERIC(12,6)   NULL,
+    f4  FLOAT4      NOT NULL,
+    f8  FLOAT8          NULL,
+    b   BOOL        NOT NULL,
+    t   TEXT        NOT NULL,
+    d   DATE        NOT NULL,
+    ts  TIMESTAMPTZ NOT NULL,
+    u   UUID        NOT NULL,
+    arr INT4[]      NOT NULL
+);
+CREATE TABLE
+INSERT INTO typed
+VALUES (1, 2, 3, 4.567890, 8.5, 9.25, true, 'hi', '2026-08-19',
+        '2026-08-19 12:34:56.123456+00', '3f333df6-90a4-4fda-8dd3-9485d27cee36',
+        '{1,2,3}')
+     , (-1, NULL, NULL, NULL, -8.5, NULL, false, 'bye', '1999-12-31',
+        '1999-12-31 23:59:59+00', '00000000-0000-0000-0000-000000000000', '{}')
+;
+INSERT 0 2
+\set typed_out :temp_base /typed.parquet
+COPY typed TO :'typed_out';
+COPY 2
+CREATE TABLE typed2 () WITH (copy_from = :'typed_out');
+CREATE TABLE
+SELECT attname, format_type(atttypid, atttypmod) AS type, attnotnull
+  FROM pg_attribute WHERE attrelid = 'typed2'::regclass AND attnum > 0
+ ORDER BY attnum;
+ attname |            type             | attnotnull 
+---------+-----------------------------+------------
+ i2      | smallint                    | t
+ i4      | integer                     | f
+ i8      | bigint                      | f
+ num     | numeric(12,6)               | f
+ f4      | real                        | t
+ f8      | double precision            | f
+ b       | boolean                     | t
+ t       | text                        | t
+ d       | date                        | t
+ ts      | timestamp(6) with time zone | t
+ u       | uuid                        | t
+ arr     | integer[]                   | t
+(12 rows)
+
+SELECT * FROM typed2 ORDER BY i2;
+ i2 |   i4   |   i8   |   num    |  f4  |   f8   | b |  t  |     d      |                 ts                  |                  u                   |   arr   
+----+--------+--------+----------+------+--------+---+-----+------------+-------------------------------------+--------------------------------------+---------
+ -1 | #null# | #null# |   #null# | -8.5 | #null# | f | bye | 12-31-1999 | Fri Dec 31 15:59:59 1999 PST        | 00000000-0000-0000-0000-000000000000 | {}
+  1 |      2 |      3 | 4.567890 |  8.5 |   9.25 | t | hi  | 08-19-2026 | Wed Aug 19 05:34:56.123456 2026 PDT | 3f333df6-90a4-4fda-8dd3-9485d27cee36 | {1,2,3}
+(2 rows)
+
+/****************************************************************************/
+-- Reject explicit and inferred columns together
+CREATE TABLE oops (id INT) WITH (structure_from = :'requests_csv');
+ERROR:  chdb: option "structure_from" requires a table that names no columns
+DETAIL:  A column list, an INHERITS clause, an OF type, or a partition each define columns.
+-- Reject separate URLs for columns and rows
+CREATE TABLE oops () WITH (structure_from = :'requests_csv', copy_from = :'requests_csv');
+ERROR:  chdb: cannot combine option "structure_from" with option "copy_from"
+DETAIL:  "copy_from" derives the columns from the URL it loads.
+-- Reject URL schemes unsupported by chDB
+CREATE TABLE oops () WITH (structure_from = 'ftp://example.com/requests.csv');
+ERROR:  chdb: cannot read URL "ftp://example.com/requests.csv" specified by option "structure_from"
+-- Reject existing relation regardless of IF NOT EXISTS
+CREATE TABLE from_csv () WITH (structure_from = :'requests_csv');
+ERROR:  relation "from_csv" already exists
+CREATE TABLE IF NOT EXISTS from_csv () WITH (copy_from = :'requests_csv');
+ERROR:  relation "from_csv" already exists
+DETAIL:  CREATE TABLE IF NOT EXISTS neither derives columns nor copies rows from a URL.
+HINT:  Use COPY to load an existing relation.
+-- Reject ClickHouse types without PostgreSQL equivalents
+CREATE TABLE oops () WITH (
+    structure_from = :'requests_csv',
+    structure      = 'req_id UInt32, big Int128'
+);
+ERROR:  chdb: unsupported column type "Int128" (column "big")
+-- Reject options unknown to chDB and PostgreSQL
+CREATE TABLE oops () WITH (structure_from = :'requests_csv', nonesuch = 1);
+ERROR:  unrecognized parameter "nonesuch"
+\set ECHO errors

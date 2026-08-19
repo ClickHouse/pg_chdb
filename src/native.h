@@ -9,6 +9,19 @@
 
 #include "helper.h"
 
+/* Source column name and ClickHouse type returned by DESCRIBE */
+typedef struct chdbDescribedColumn {
+    char* name;
+    char* type;
+} chdbDescribedColumn;
+
+/*
+ * Read DESCRIBE rows from `helper`
+ * Return chdbDescribedColumn list in caller memory context
+ */
+extern List*
+chdb_native_describe(chdbHelper* helper);
+
 /*
  * Scans the `attnums` columns of `rel` into `helper` as Native blocks carrying
  * the columns `structure` declares, which is what ClickHouse matches them

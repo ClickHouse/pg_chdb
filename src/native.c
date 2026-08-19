@@ -35,6 +35,7 @@
 #include "miscadmin.h"
 #include "optimizer/optimizer.h"
 #include "rewrite/rewriteHandler.h"
+#include "utils/builtins.h"
 #include "utils/memutils.h"
 #include "utils/rel.h"
 #include "utils/snapmgr.h"
@@ -85,7 +86,7 @@ writer_for(const char* structure, int nattrs) {
     chc_err err = {};
 
     if (chc_type_parse(tuple, strlen(tuple), &pgch_alloc, &type, &err) != CHC_OK) {
-        pgch_raise(&err, ERRCODE_INVALID_PARAMETER_VALUE, "structure: ");
+        pgch_raise(&err, ERRCODE_INVALID_PARAMETER_VALUE, "structure: ", NULL);
     }
 
     size_t ncols   = chc_type_n_children(type);
@@ -174,7 +175,7 @@ send_block(pgch_writer* w, nativeSink* sink) {
     if (chc_block_write(
             &sink->io, pgch_writer_build(w), &pgch_block_opts_local, &err
         ) != CHC_OK) {
-        pgch_raise(&err, ERRCODE_EXTERNAL_ROUTINE_EXCEPTION, "block write: ");
+        pgch_raise(&err, ERRCODE_EXTERNAL_ROUTINE_EXCEPTION, "block write: ", NULL);
     }
     pgch_writer_reset(w);
     sink_flush(sink);
@@ -339,7 +340,7 @@ source_for(chdbHelper* helper) {
     s->in = pgch_in_alloc();
     if (chc_in_init(s->in, &s->io, &pgch_alloc, CHDB_NATIVE_SOURCE_BYTES, &err) !=
         CHC_OK) {
-        pgch_raise(&err, ERRCODE_EXTERNAL_ROUTINE_EXCEPTION, "reader init: ");
+        pgch_raise(&err, ERRCODE_EXTERNAL_ROUTINE_EXCEPTION, "reader init: ", NULL);
     }
 
     return (pgch_block_source){ .ud         = s,
@@ -530,6 +531,67 @@ report_reader_error(const char* error) {
         errmsg("chdb: error fetching chDB query result"),
         errdetail("%s", error)
     );
+}
+
+/*
+ * Read one source column from each DESCRIBE row
+ * describe_compact_output limits result to String name and type columns
+ */
+List*
+chdb_native_describe(chdbHelper* helper) {
+    /* Keep reader buffers temporary and allocate returned columns in caller context */
+    MemoryContext streamcxt = AllocSetContextCreate(
+        CurrentMemoryContext, "chdb describe", ALLOCSET_SMALL_SIZES
+    );
+    MemoryContext oldcxt  = MemoryContextSwitchTo(streamcxt);
+    pgch_block_source src = source_for(helper);
+    List* columns         = NIL;
+    pgch_reader reader;
+
+    pgch_reader_init(&reader, &src);
+    if (reader.error) {
+        report_reader_error(reader.error);
+    }
+    if (pgch_reader_columns(&reader) != 2) {
+        ereport(
+            ERROR,
+            errcode(ERRCODE_BAD_COPY_FILE_FORMAT),
+            errmsg(
+                "chdb: DESCRIBE returned %zu columns, expected 2",
+                pgch_reader_columns(&reader)
+            )
+        );
+    }
+
+    while (pgch_reader_next(&reader)) {
+        Datum values[2];
+        bool nulls[2];
+
+        pgch_reader_fill(&reader, NULL, values, nulls);
+        if (nulls[0] || nulls[1]) {
+            ereport(
+                ERROR,
+                errcode(ERRCODE_BAD_COPY_FILE_FORMAT),
+                errmsg("chdb: DESCRIBE produced a column with no name or type")
+            );
+        }
+
+        MemoryContextSwitchTo(oldcxt);
+        chdbDescribedColumn* col = palloc(sizeof(*col));
+
+        col->name = TextDatumGetCString(values[0]);
+        col->type = TextDatumGetCString(values[1]);
+        columns   = lappend(columns, col);
+        MemoryContextSwitchTo(streamcxt);
+    }
+    if (reader.error) {
+        report_reader_error(reader.error);
+    }
+
+    MemoryContextSwitchTo(oldcxt);
+    MemoryContextDelete(streamcxt);
+
+    return columns;
 }
 
 /*

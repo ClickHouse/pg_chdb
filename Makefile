@@ -140,6 +140,10 @@ uninstall-libchdb:
 format: $(wildcard src/*.c src/*.h src/helper/*.c)
 	@$(CLANG_FORMAT) --style=file:.clang-format -i $^
 
+.PHONY: type-table # Regenerate the chDB to Postgres table of doc/chdb_hook.md.
+type-table:
+	@(cd $(PGCH_DIR) && ./gen_type_table.awk) | dev/type_table.awk doc/chdb_hook.md
+
 .PHONY: clang-tidy # Run clang-tidy static analysis (requires compile_commands.json)
 clang-tidy: compile_commands.json
 	run-clang-tidy -p . $(wildcard src/*.c src/*.h src/helper/*.c)
@@ -156,7 +160,7 @@ lint: .pre-commit-config.yaml
 # Requires https://github.com/rizsotto/Bear.
 compile_commands.json:
 	$(MAKE) clean -j $$(nproc)
-	bear --config "bear.$$(if [ "$$(bear --version | awk -F'[^0-9]+' '{ print $$2 }')" -eq 3 ]; then echo 'json'; else echo 'yml'; fi)" -- $(MAKE) all -j $$(nproc)
+	bear --config "dev/bear.$$(if [ "$$(bear --version | awk -F'[^0-9]+' '{ print $$2 }')" -eq 3 ]; then echo 'json'; else echo 'yml'; fi)" -- $(MAKE) all -j $$(nproc)
 
 debian-install-lint:
 	@curl -SsLo /tmp/pre-commit.pyz https://github.com/pre-commit/pre-commit/releases/download/v4.6.0/pre-commit-4.6.0.pyz

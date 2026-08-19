@@ -156,13 +156,6 @@ chdb_copy(chdbCopyContext* ctx) {
         if (format_lacks_time64(ctx->format)) {
             ctx->structure = structure_as_string(ctx->structure, "Time64(6)");
         }
-    } else {
-        /* Workaround for https://github.com/chdb-io/chdb-core/issues/158. */
-        for (char* cursor = ctx->structure; *cursor != '\0'; cursor++) {
-            if (*cursor == '\n' || *cursor == '\r') {
-                *cursor = ' ';
-            }
-        }
     }
 
     /* Assemble the chDB query. */
@@ -195,6 +188,37 @@ chdb_copy(chdbCopyContext* ctx) {
     return num_rows;
 }
 
+List*
+chdb_describe(chdbCopyContext* ctx) {
+    /* Build DESCRIBE with read settings without changing COPY context */
+    chdbCopyContext describe = *ctx;
+    StringInfoData ch_query;
+    char* names[CHDB_MAX_TABLEFUNC_ARGS];
+    char* values[CHDB_MAX_TABLEFUNC_ARGS];
+
+    describe.cmd_type = CHDB_CMD_DESCRIBE;
+    /* Ask chDB to infer structure when none was provided */
+    if (describe.structure[0] == '\0') {
+        describe.structure = "auto";
+    }
+    initStringInfo(&ch_query);
+
+    size_t param_count    = make_ch_query(&describe, &ch_query, names, values);
+    chdbHelperContext hcx = {
+        .cmd         = describe.cmd_type,
+        .max_memory  = describe.max_memory,
+        .max_threads = describe.max_threads,
+        .max_parsers = describe.max_parsers,
+    };
+    chdbHelper* helper =
+        chdb_helper_start(&hcx, ch_query.data, names, values, param_count);
+    List* columns = chdb_native_describe(helper);
+
+    chdb_helper_finish(helper);
+
+    return columns;
+}
+
 /* Convenience constant function to append a parameter to a query. */
 #define PARAM(format, name, val)                                                       \
     Assert(i + 1 <= CHDB_MAX_TABLEFUNC_ARGS);                                          \
@@ -206,13 +230,21 @@ chdb_copy(chdbCopyContext* ctx) {
 #define GCS_HOST "storage.googleapis.com"
 #define AWS_HOST ".amazonaws.com"
 
+/* Truncate on insert changes nothing outside INSERT INTO FUNCTION */
+static const char*
+truncate_setting(chdbCopyContext* ctx, const char* setting) {
+    return ctx->cmd_type == CHDB_CMD_INSERT ? setting : "";
+}
+
 static size_t
 make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** values) {
     /* Start the query. */
     appendStringInfo(
         query,
         "%s %s(",
-        ctx->cmd_type == CHDB_CMD_SELECT ? "SELECT * FROM" : "INSERT INTO FUNCTION",
+        ctx->cmd_type == CHDB_CMD_DESCRIBE ? "DESCRIBE TABLE"
+        : ctx->cmd_type == CHDB_CMD_SELECT ? "SELECT * FROM"
+                                           : "INSERT INTO FUNCTION",
         table_function[ctx->scheme]
     );
 
@@ -295,7 +327,8 @@ make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** value
         }
         appendStringInfo(
             query,
-            ") SETTINGS s3_truncate_on_insert = 1, s3_request_timeout_ms = %u",
+            ") SETTINGS %ss3_request_timeout_ms = %u",
+            truncate_setting(ctx, "s3_truncate_on_insert = 1, "),
             ctx->timeout
         );
         break;
@@ -341,7 +374,8 @@ make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** value
         PARAM(", {structure:String}", "structure", ctx->structure);
         appendStringInfo(
             query,
-            ") SETTINGS azure_truncate_on_insert = 1, azure_request_timeout_ms=%u",
+            ") SETTINGS %sazure_request_timeout_ms=%u",
+            truncate_setting(ctx, "azure_truncate_on_insert = 1, "),
             ctx->timeout
         );
         break;
@@ -358,7 +392,11 @@ make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** value
         if (ctx->compression[0] != '\0') {
             PARAM(", {compression:String}", "compression", ctx->compression);
         }
-        appendStringInfo(query, ") SETTINGS engine_file_truncate_on_insert=1");
+        appendStringInfo(
+            query,
+            ")%s",
+            truncate_setting(ctx, " SETTINGS engine_file_truncate_on_insert=1")
+        );
         break;
     case hdfs_scheme:
         /* https://clickhouse.com/docs/sql-reference/table-functions/hdfs#syntax */
@@ -369,11 +407,22 @@ make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** value
         /* Append remaining arguments and settings. */
         PARAM(", {format:String}", "format", format);
         PARAM(", {structure:String}", "structure", ctx->structure);
-        appendStringInfo(query, ") SETTINGS hdfs_truncate_on_insert = 1");
+        appendStringInfo(
+            query, ")%s", truncate_setting(ctx, " SETTINGS hdfs_truncate_on_insert = 1")
+        );
         break;
     default:
         elog(ERROR, "unsupported URL scheme %d", ctx->scheme);
         break;
+    }
+
+    /* file and hdfs name a setting only for INSERT, so DESCRIBE may open the clause */
+    if (ctx->cmd_type == CHDB_CMD_DESCRIBE) {
+        bool joins = ctx->scheme != file_scheme && ctx->scheme != hdfs_scheme;
+
+        appendStringInfo(
+            query, "%sdescribe_compact_output=1", joins ? ", " : " SETTINGS "
+        );
     }
 
     if (
