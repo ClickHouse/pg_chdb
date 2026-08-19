@@ -270,11 +270,11 @@ run_insert(chdb_connection conn, str query, const params* par) {
 int
 main(void) {
     size_t len;
-    char* setup   = read_setup(&len);
-    cursor cur    = { setup, setup + len };
-    bool is_from  = take1(&cur) != 0;
-    str query     = take_str(&cur);
-    uint16_t npar = take2(&cur);
+    char* setup          = read_setup(&len);
+    cursor cur           = { setup, setup + len };
+    chdbCmdType cmd_type = take1(&cur);
+    str query            = take_str(&cur);
+    uint16_t npar        = take2(&cur);
 
     size_t nalloc       = npar ? npar : 1;
     const char** names  = not_null(calloc(nalloc, sizeof(*names)));
@@ -303,8 +303,8 @@ main(void) {
         fail("chdb: unable to connect to chDB");
     }
 
-    int status =
-        is_from ? run_select(*conn, query, &par) : run_insert(*conn, query, &par);
+    int status = cmd_type == CHDB_CMD_SELECT ? run_select(*conn, query, &par)
+                                             : run_insert(*conn, query, &par);
 
     fflush(stderr);
     chdb_close_conn(conn);

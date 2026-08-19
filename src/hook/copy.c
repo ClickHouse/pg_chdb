@@ -174,9 +174,9 @@ chdb_copy(chdbCopyContext* ctx) {
 
     /* Hand off to the helper. */
     chdbHelper* helper =
-        chdb_helper_start(ctx->is_from, ch_query.data, names, values, param_count);
+        chdb_helper_start(ctx->cmd_type, ch_query.data, names, values, param_count);
     uint64_t num_rows =
-        ctx->is_from
+        ctx->cmd_type == CHDB_CMD_SELECT
             ? chdb_native_receive(
                   ctx->rel, ctx->attnums, ctx->rtable, ctx->rteperminfos, helper
               )
@@ -209,7 +209,7 @@ make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** value
     appendStringInfo(
         query,
         "%s %s(",
-        ctx->is_from ? "SELECT * FROM" : "INSERT INTO FUNCTION",
+        ctx->cmd_type == CHDB_CMD_SELECT ? "SELECT * FROM" : "INSERT INTO FUNCTION",
         table_function[ctx->scheme]
     );
 

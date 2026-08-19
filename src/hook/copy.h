@@ -6,6 +6,8 @@
 #include "nodes/pg_list.h"
 #include "utils/relcache.h"
 
+#include "../setup.h"
+
 /* URL schemes that the COPY hook understands. */
 typedef enum scheme {
     http_scheme,
@@ -28,7 +30,7 @@ typedef struct chdbCopyContext {
     List* rtable;
     List* rteperminfos;
     scheme scheme;
-    bool is_from;
+    chdbCmdType cmd_type;
     uint32_t timeout;   /* request timeout in milliseconds */
     int64_t max_memory; /* max_memory_usage setting, 0 for none */
     /* Table function options; keep in sync with CHDB_MAX_TABLEFUNC_ARGS. */

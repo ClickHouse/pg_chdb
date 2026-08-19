@@ -262,7 +262,7 @@ place_fd(int fd, int target) {
  * the backend's Postgres state, so it may only _exit.
  */
 static void
-exec_helper(chdbHelper* h, const char* program, bool is_from) {
+exec_helper(chdbHelper* h, const char* program, chdbCmdType cmd_type) {
     char* const argv[] = { (char*)program, NULL };
     int null           = open("/dev/null", O_RDWR);
 
@@ -271,9 +271,9 @@ exec_helper(chdbHelper* h, const char* program, bool is_from) {
     h->setup_peer = reserve_fd(h->setup_peer);
     null          = reserve_fd(null);
 
-    /* The channel the copy does not use must not reach the backend's own. */
-    if (!place_fd(is_from ? null : h->data_peer, STDIN_FILENO) ||
-        !place_fd(is_from ? h->data_peer : null, STDOUT_FILENO) ||
+    /* The channel the query does not use must not reach the backend's own. */
+    if (!place_fd(cmd_type == CHDB_CMD_INSERT ? h->data_peer : null, STDIN_FILENO) ||
+        !place_fd(cmd_type == CHDB_CMD_INSERT ? null : h->data_peer, STDOUT_FILENO) ||
         !place_fd(h->err_peer, STDERR_FILENO) ||
         !place_fd(h->setup_peer, CHDB_SETUP_FD)) {
         _exit(126);
@@ -348,16 +348,15 @@ append_string(StringInfo buf, const char* str) {
 static void
 build_setup(
     StringInfo buf,
-    bool is_from,
+    chdbCmdType cmd_type,
     const char* query,
     char* const* names,
     char* const* values,
     size_t nparams
 ) {
-    uint8_t flag   = is_from ? 1 : 0;
     uint16_t count = (uint16_t)nparams;
 
-    appendBinaryStringInfo(buf, (char*)&flag, sizeof(flag));
+    appendBinaryStringInfo(buf, (char*)&cmd_type, sizeof(cmd_type));
     append_string(buf, query);
     appendBinaryStringInfo(buf, (char*)&count, sizeof(count));
     for (size_t i = 0; i < nparams; i++) {
@@ -392,7 +391,7 @@ open_channel(int* first, int* second, bool duplex) {
 
 chdbHelper*
 chdb_helper_start(
-    bool is_from,
+    chdbCmdType cmd_type,
     const char* query,
     char* const* names,
     char* const* values,
@@ -429,7 +428,7 @@ chdb_helper_start(
 
     StringInfoData setup;
     initStringInfo(&setup);
-    build_setup(&setup, is_from, query, names, values, nparams);
+    build_setup(&setup, cmd_type, query, names, values, nparams);
 
     open_channel(&h->data, &h->data_peer, true);
     open_channel(&h->err, &h->err_peer, false);
@@ -450,7 +449,7 @@ chdb_helper_start(
         ereport(ERROR, errcode_for_file_access(), errmsg("chdb: could not fork: %m"));
     }
     if (h->pid == 0) {
-        exec_helper(h, program, is_from);
+        exec_helper(h, program, cmd_type);
     }
     elog(DEBUG1, "chdb: chdb_helper pid %d", (int)h->pid);
 

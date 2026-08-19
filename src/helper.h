@@ -2,13 +2,14 @@
 #define CHDB_HELPER_H
 
 #include "postgres.h"
+#include "setup.h"
 
 /*
  * The chdb_helper process answering one COPY. The two sides meet on fixed
  * descriptors:
  *
- *   fd 0   Native blocks in, COPY TO
- *   fd 1   Native blocks out, COPY FROM
+ *   fd 0   Native blocks in, INSERT, COPY TO
+ *   fd 1   Native blocks out, SELECT, COPY FROM
  *   fd 2   error text
  *   fd 3   setup payload, closed once written
  *   exit   0 on success, CHDB_HELPER_LOST_BACKEND when the channel broke and
@@ -24,7 +25,7 @@ typedef struct chdbHelper chdbHelper;
  */
 extern chdbHelper*
 chdb_helper_start(
-    bool is_from,
+    chdbCmdType cmd_type,
     const char* query,
     char* const* names,
     char* const* values,

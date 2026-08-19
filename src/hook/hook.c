@@ -318,9 +318,9 @@ chDBProcessUtilityHook(
                 check_server_file_privileges(copy->is_from);
             }
             chdbCopyContext ctx = {
-                .scheme  = scheme,
-                .is_from = copy->is_from,
-                .url     = copy->filename,
+                .scheme   = scheme,
+                .cmd_type = copy->is_from ? CHDB_CMD_SELECT : CHDB_CMD_INSERT,
+                .url      = copy->filename,
             };
 
             open_copy_relation(copy, &ctx);
