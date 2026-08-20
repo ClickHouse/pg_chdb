@@ -456,12 +456,8 @@ limitations:
 *   Protobuf output does not support dates prior to 1970-01-01. Configure
     `time` columns as `String`s in an explicit [structure](#structure) to
     preserve their values. (ClickHouse/ClickHouse#111860)
-*   The ORC format incorrectly writes out dates after 2059-09-18 due to an
-    integer overflow. Override dates with the `String` type to avoid this
-    issue.
-*   The ORC format raises an error on `timestamp` values from 2262 and later.
-    Will be fixed when [chDB] upgrades to ClickHouse v26.7 or greater.
-    (ClickHouse/ClickHouse#109295)
+*   The CSVWithNames and CSVWithNamesAndTypes formats cannot currently import
+    `NULL` box or circle values. (ClickHouse/ClickHouse#115523)
 
 ## Versioning Policy
 

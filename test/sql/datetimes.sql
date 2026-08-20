@@ -34,7 +34,6 @@ INSERT INTO datetimes
 VALUES ('2026-07-23 20:43:10.836612', '2026-07-23 20:43:27.363', '2026-07-23 20:43:50.944042+00', '2026-07-23 13:44:46.8445-07', '2026-07-23', '13:45:15.416013', '13:45:24.282', '13:45:35.306886-07', '13:45:49.17-07', '1 day');
 \i test/utils/round-trip-formats.sql
 
--- Try again with greater time spans, which ORC and Protobuf dislike.
 -- Protobuf chokes on dates prior to 1970-01-01, so avoid them. https://github.com/ClickHouse/ClickHouse/issues/111860
 INSERT INTO datetimes
 VALUES (NULL, NULL, '2299-12-31 23:59:59.999999Z', '1970-01-01 00:00:00Z', '1900-01-01', '00:00:00', '24:00:00', '00:00:00+1559', '24:00:00-1559', '-178000000 years');

@@ -44,9 +44,7 @@ VALUES ('0,0', '(1,1),(2,2)', '((11,11),(12,12))', '((11,11),(13,13))', '((11,12
      , (NULL, NULL, NULL, NULL, NULL, NULL, NULL)
 ;
 
--- Execute round-trip to all supported formats. Parquet drops a Nullable
--- Tuple's own null map, so a NULL point cannot be read back:
--- https://github.com/ClickHouse/ClickHouse/issues/112427
+-- Execute round-trip to all supported formats.
 -- Protobuf reads a Nullable field holding its default back as NULL, so the
 -- point at the origin does not survive:
 -- https://github.com/chdb-io/chdb-core/issues/152

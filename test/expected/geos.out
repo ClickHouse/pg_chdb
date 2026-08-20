@@ -30,8 +30,8 @@ t: TabSeparatedWithNamesAndTypes
 t: TabSeparatedRawWithNames
 t: TabSeparatedRawWithNamesAndTypes
 t: CSV
-t: CSVWithNames
-t: CSVWithNamesAndTypes
+f: CSVWithNames
+f: CSVWithNamesAndTypes
 t: CustomSeparated
 t: CustomSeparatedWithNames
 t: CustomSeparatedWithNamesAndTypes
@@ -80,9 +80,7 @@ INSERT INTO geo_nulls
 VALUES ('0,0', '(1,1),(2,2)', '((11,11),(12,12))', '((11,11),(13,13))', '((11,12),(13,13),(14,14))', '((11,12),(13,13),(14,14))', '1,1,1')
      , (NULL, NULL, NULL, NULL, NULL, NULL, NULL)
 ;
--- Execute round-trip to all supported formats. Parquet drops a Nullable
--- Tuple's own null map, so a NULL point cannot be read back:
--- https://github.com/ClickHouse/ClickHouse/issues/112427
+-- Execute round-trip to all supported formats.
 -- Protobuf reads a Nullable field holding its default back as NULL, so the
 -- point at the origin does not survive:
 -- https://github.com/chdb-io/chdb-core/issues/152
@@ -99,8 +97,76 @@ t: TabSeparatedWithNamesAndTypes
 t: TabSeparatedRawWithNames
 t: TabSeparatedRawWithNamesAndTypes
 t: CSV
-t: CSVWithNames
-t: CSVWithNamesAndTypes
+psql:test/utils/round-trip-formats.sql:82: ERROR:  chdb: error executing chDB query
+DETAIL:  Code: 27. DB::Exception: Cannot parse input: expected ',' before: '\n': (at row 2)
+: 
+Row 1:
+Column 0,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "0"
+Column 1,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "0"
+Column 2,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "1"
+Column 3,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "-1"
+Column 4,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "0"
+Column 5,   name: lseg, type: LineString,                                       parsed text: "<DOUBLE QUOTE>[(11,11),(12,12)]<DOUBLE QUOTE>"
+Column 6,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "13"
+Column 7,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "13"
+Column 8,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "11"
+Column 9,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "11"
+Column 10,  name: path, type: LineString,                                       parsed text: "<DOUBLE QUOTE>[(11,12),(13,13),(14,14),(11,12)]<DOUBLE QUOTE>"
+Column 11,  name: poly, type: Ring,                                             parsed text: "<DOUBLE QUOTE>[(11,12),(13,13),(14,14)]<DOUBLE QUOTE>"
+Column 12,  name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "1"
+Column 13,  name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "1"
+Column 14,  name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "1"
+
+Row 2:
+Column 0,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "<BACKSLASH>N"
+Column 1,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "<BACKSLASH>N"
+Column 2,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "<DOUBLE QUOTE>[]<DOUBLE QUOTE>"
+Column 3,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "<BACKSLASH>N"
+Column 4,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "<DOUBLE QUOTE>[]<DOUBLE QUOTE>"
+Column 5,   name: lseg, type: LineString,                                       parsed text: "<DOUBLE QUOTE>[]<DOUBLE QUOTE>"
+Column 6,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "<BACKSLASH>N"
+ERROR: Line feed found where delimiter (,) is expected. It's like your file has less columns than expected.
+And if your file has the right number of columns, maybe it has unescaped quotes in values.
+
+: (in file/uri /tmp/geos.tmp): While executing ParallelParsingBlockInputFormat: While executing File. (CANNOT_PARSE_INPUT_ASSERTION_FAILED)
+CONTEXT:  query: SELECT * FROM file({path:String}, {format:String}, {structure:String}) SETTINGS allow_experimental_nullable_tuple_type=1, output_format_json_quote_denormals=1, output_format_native_encode_types_in_binary_format=0,output_format_native_write_json_as_string=1, engine_file_truncate_on_insert=1
+psql:test/utils/round-trip-formats.sql:82: STATEMENT:  COPY "geo_nulls2" FROM 'file:///tmp/geos.tmp' (format 'CSVWithNames');
+f: CSVWithNames
+psql:test/utils/round-trip-formats.sql:90: ERROR:  chdb: error executing chDB query
+DETAIL:  Code: 27. DB::Exception: Cannot parse input: expected ',' before: '\n': (at row 2)
+: 
+Row 1:
+Column 0,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "0"
+Column 1,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "0"
+Column 2,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "1"
+Column 3,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "-1"
+Column 4,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "0"
+Column 5,   name: lseg, type: LineString,                                       parsed text: "<DOUBLE QUOTE>[(11,11),(12,12)]<DOUBLE QUOTE>"
+Column 6,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "13"
+Column 7,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "13"
+Column 8,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "11"
+Column 9,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "11"
+Column 10,  name: path, type: LineString,                                       parsed text: "<DOUBLE QUOTE>[(11,12),(13,13),(14,14),(11,12)]<DOUBLE QUOTE>"
+Column 11,  name: poly, type: Ring,                                             parsed text: "<DOUBLE QUOTE>[(11,12),(13,13),(14,14)]<DOUBLE QUOTE>"
+Column 12,  name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "1"
+Column 13,  name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "1"
+Column 14,  name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "1"
+
+Row 2:
+Column 0,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "<BACKSLASH>N"
+Column 1,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "<BACKSLASH>N"
+Column 2,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "<DOUBLE QUOTE>[]<DOUBLE QUOTE>"
+Column 3,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "<BACKSLASH>N"
+Column 4,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "<DOUBLE QUOTE>[]<DOUBLE QUOTE>"
+Column 5,   name: lseg, type: LineString,                                       parsed text: "<DOUBLE QUOTE>[]<DOUBLE QUOTE>"
+Column 6,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "<BACKSLASH>N"
+ERROR: Line feed found where delimiter (,) is expected. It's like your file has less columns than expected.
+And if your file has the right number of columns, maybe it has unescaped quotes in values.
+
+: (in file/uri /tmp/geos.tmp): While executing ParallelParsingBlockInputFormat: While executing File. (CANNOT_PARSE_INPUT_ASSERTION_FAILED)
+CONTEXT:  query: SELECT * FROM file({path:String}, {format:String}, {structure:String}) SETTINGS allow_experimental_nullable_tuple_type=1, output_format_json_quote_denormals=1, output_format_native_encode_types_in_binary_format=0,output_format_native_write_json_as_string=1, engine_file_truncate_on_insert=1
+psql:test/utils/round-trip-formats.sql:90: STATEMENT:  COPY "geo_nulls2" FROM 'file:///tmp/geos.tmp' (format 'CSVWithNamesAndTypes');
+f: CSVWithNamesAndTypes
 t: CustomSeparated
 t: CustomSeparatedWithNames
 t: CustomSeparatedWithNamesAndTypes
@@ -124,11 +190,7 @@ t: Native
 t: RowBinary
 t: RowBinaryWithNames
 t: RowBinaryWithNamesAndTypes
-psql:test/utils/round-trip-formats.sql:352: ERROR:  chdb: error executing chDB query
-DETAIL:  Code: 53. DB::Exception: Requested type of column p doesn't match parquet schema: parquet type is Tuple, requested type is Nullable(Point): (in file/uri /tmp/geos.tmp): While executing ParquetV3BlockInputFormat: While executing File. (TYPE_MISMATCH)
-CONTEXT:  query: SELECT * FROM file({path:String}, {format:String}, {structure:String}) SETTINGS allow_experimental_nullable_tuple_type=1, output_format_json_quote_denormals=1, output_format_native_encode_types_in_binary_format=0,output_format_native_write_json_as_string=1, engine_file_truncate_on_insert=1
-psql:test/utils/round-trip-formats.sql:352: STATEMENT:  COPY "geo_nulls2" FROM 'file:///tmp/geos.tmp' (format 'Parquet');
-f: Parquet
+t: Parquet
 t: Arrow
 t: ArrowStream
 t: ORC
@@ -194,11 +256,7 @@ t: Native
 t: RowBinary
 t: RowBinaryWithNames
 t: RowBinaryWithNamesAndTypes
-psql:test/utils/round-trip-formats.sql:352: ERROR:  chdb: error executing chDB query
-DETAIL:  Code: 53. DB::Exception: Requested type of column p doesn't match parquet schema: parquet type is Tuple, requested type is Nullable(Point): (in file/uri /tmp/geos.tmp): While executing ParquetV3BlockInputFormat: While executing File. (TYPE_MISMATCH)
-CONTEXT:  query: SELECT * FROM file({path:String}, {format:String}, {structure:String}) SETTINGS allow_experimental_nullable_tuple_type=1, output_format_json_quote_denormals=1, output_format_native_encode_types_in_binary_format=0,output_format_native_write_json_as_string=1, engine_file_truncate_on_insert=1
-psql:test/utils/round-trip-formats.sql:352: STATEMENT:  COPY "geo_arrays2" FROM 'file:///tmp/geos.tmp' (format 'Parquet');
-f: Parquet
+t: Parquet
 t: Arrow
 t: ArrowStream
 t: ORC

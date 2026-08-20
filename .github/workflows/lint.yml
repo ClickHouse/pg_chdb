@@ -10,7 +10,7 @@ jobs:
   lint:
     name: 🔎 Lint Code
     runs-on: ubuntu-latest
-    env: { pg: 19, chdb_version: v26.5.1-rc.3 }
+    env: { pg: 19, chdb_version: 26.7.0 }
     steps:
       - name: Checkout the Repository
         uses: actions/checkout@v7
@@ -35,6 +35,7 @@ jobs:
       - name: Install chDB
         run: ${{ steps.cache-chdb.outputs.cache-hit != 'true' && 'curl -sL https://lib.chdb.io | sudo -E bash' || 'sudo ldconfig' }}
         env: { INSTALL_VERSION: "${{ env.chdb_version }}" }
+      - run: sudo chmod +r /usr/local/include/chdb.*
       - name: Add Postgres to Path
         run: echo /usr/lib/postgresql/${{ env.pg }}/bin >> "$GITHUB_PATH"
       - name: Generate compile_commands.json

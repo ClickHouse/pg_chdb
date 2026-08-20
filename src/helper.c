@@ -150,7 +150,8 @@ stop_helper(void* arg) {
 
 /*
  * The helper's error text, minus a Request ID line that would differ between
- * runs and swamp the message. NULL when the helper said nothing.
+ * runs and swamp the message and minus a chDB version. NULL when the helper
+ * said nothing.
  *
  * The capture stops at whatever byte filled the buffer, so pull the cut back
  * to a character boundary: half a character reaches the client as text and
@@ -174,6 +175,13 @@ helper_error(chdbHelper* h) {
     const char* eol = id ? strchr(id, '\n') : NULL;
     if (eol) {
         memmove((char*)id, eol + 1, strlen(eol + 1) + 1);
+        h->err_len = strlen(h->err_buf);
+    }
+
+    const char* version = strstr(h->err_buf, " (version ");
+    const char* close   = version ? strchr(version, ')') : NULL;
+    if (close) {
+        memmove((char*)version, close + 1, strlen(close + 1) + 1);
         h->err_len = strlen(h->err_buf);
     }
 

@@ -10,7 +10,7 @@ CREATE EXTENSION
 # SELECT * FROM chdb_query('version()') AS (version text);
  version
 ----------
- 26.5.1.1
+ 26.7.2.1
 (1 row)
 ```
 

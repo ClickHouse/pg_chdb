@@ -17,7 +17,7 @@ jobs:
         arch: [amd64, arm64]
     name: 🐘 PostgreSQL ${{ matrix.pg }} ${{ matrix.arch == 'amd64' && '🧰' || '🦾' }} ${{ matrix.arch }}
     runs-on: ubuntu-${{ matrix.arch == 'amd64' && 'latest' || '24.04-arm' }}
-    env: { chdb_version: v26.5.1-rc.3 }
+    env: { chdb_version: v26.7.0 }
     services:
       kv-rest:
         image: ghcr.io/theory/kv-rest
@@ -44,6 +44,7 @@ jobs:
       - name: Install chDB
         run: ${{ steps.cache-chdb.outputs.cache-hit != 'true' && 'curl -sL https://lib.chdb.io | sudo -E bash' || 'sudo ldconfig' }}
         env: { INSTALL_VERSION: "${{ env.chdb_version }}" }
+      - run: sudo chmod +r /usr/local/include/chdb.*
       - name: Build
         run: make -j $(nproc)
       - name: Install
