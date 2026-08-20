@@ -1,9 +1,14 @@
+SET DateStyle = 'ISO, MDY';
+----------------------------------------------------------------------------
+-- pgchdb_version
+----------------------------------------------------------------------------
 SELECT pgchdb_version() ~ '^\d+\.\d+\.\d+$';
  ?column? 
 ----------
  t
 (1 row)
 
+-- pgchdb_version should be the same as pg_get_loaded_modules() version.
 \set ECHO errors
 SELECT version = pgchdb_version() 
   FROM pg_get_loaded_modules()
@@ -13,3 +18,118 @@ SELECT version = pgchdb_version()
  t
 (1 row)
 
+----------------------------------------------------------------------------
+-- chdb_query
+----------------------------------------------------------------------------
+-- Should fail with no definition list.
+SELECT * FROM chdb_query('SELECT 1');
+ERROR:  a column definition list is required for functions returning "record"
+LINE 1: SELECT * FROM chdb_query('SELECT 1');
+                      ^
+SELECT chdb_query('SELECT 1');
+ERROR:  chdb: a column definition list is required for chdb_query
+-- Should fail with column count mismatch.
+SELECT * FROM chdb_query('SELECT 1') AS (a int, b text);
+ERROR:  chdb: chDB returned 1 columns, expected 2
+SELECT * FROM chdb_query('SELECT 1, 2') AS (a int);
+ERROR:  chdb: chDB returned 2 columns, expected 1
+SELECT * FROM chdb_query('SELECT 1 WHERE 0') AS (x int, y text);
+ x | y 
+---+---
+(0 rows)
+
+-- Should fail with column type mismatch.
+SELECT * FROM chdb_query('SELECT version()') AS (version int);
+ERROR:  invalid input syntax for type integer: "26.5.1.1"
+-- Working examples.
+SELECT * FROM chdb_query('SELECT version()') AS (version text);
+ version  
+----------
+ 26.5.1.1
+(1 row)
+
+SELECT * FROM chdb_query('SELECT 42, version()') AS (id int, version text);
+ id | version  
+----+----------
+ 42 | 26.5.1.1
+(1 row)
+
+SELECT * FROM chdb_query(
+    'SELECT number AS n, number * number FROM numbers(5) ORDER BY n'
+) AS (n int2, p int);
+ n | p  
+---+----
+ 0 |  0
+ 1 |  1
+ 2 |  4
+ 3 |  9
+ 4 | 16
+(5 rows)
+
+SELECT * FROM chdb_query(
+    'SELECT toInt32(number) AS n, toString(number) AS s FROM numbers(3) ORDER BY n'
+) AS (n int, s text);
+ n | s 
+---+---
+ 0 | 0
+ 1 | 1
+ 2 | 2
+(3 rows)
+
+-- Various types.
+SELECT * FROM chdb_query($$
+    SELECT number,
+           number + 2147483647,
+           toDecimal64(concat('1.5241578753238836', number), 17),
+           number * 98.6,
+           number * pi(),
+           'num_' || number,
+           toDate32('2025-12-1' || number),
+           toDateTime64('2025-12-19 10:42:00.00' || number, 3, 'UTC'),
+           number % 2 = 0,
+           toIPv4('1.2.3.' || number),
+           toUUID('61f0c404-5cb3-11e7-907b-a6006ad3dba' || number)
+      FROM numbers(4)
+     ORDER BY number
+$$) AS (
+  integer int,
+  int64   int8,
+  decimal numeric,
+  float32 float4,
+  float64 float8,
+  string  text,
+  date    date,
+  dt64    timestamptz,
+  even    bool,
+  ipv4    inet,
+  uuid    uuid
+);
+ integer |   int64    |       decimal       | float32 |      float64      | string |    date    |            dt64            | even |  ipv4   |                 uuid                 
+---------+------------+---------------------+---------+-------------------+--------+------------+----------------------------+------+---------+--------------------------------------
+       0 | 2147483647 | 1.52415787532388360 |       0 |                 0 | num_0  | 2025-12-10 | 2025-12-19 02:42:00-08     | t    | 1.2.3.0 | 61f0c404-5cb3-11e7-907b-a6006ad3dba0
+       1 | 2147483648 | 1.52415787532388361 |    98.6 | 3.141592653589793 | num_1  | 2025-12-11 | 2025-12-19 02:42:00.001-08 | f    | 1.2.3.1 | 61f0c404-5cb3-11e7-907b-a6006ad3dba1
+       2 | 2147483649 | 1.52415787532388362 |   197.2 | 6.283185307179586 | num_2  | 2025-12-12 | 2025-12-19 02:42:00.002-08 | t    | 1.2.3.2 | 61f0c404-5cb3-11e7-907b-a6006ad3dba2
+       3 | 2147483650 | 1.52415787532388363 |   295.8 |  9.42477796076938 | num_3  | 2025-12-13 | 2025-12-19 02:42:00.003-08 | f    | 1.2.3.3 | 61f0c404-5cb3-11e7-907b-a6006ad3dba3
+(4 rows)
+
+-- Clean up after any previous failed run.
+SET client_min_messages = error;
+DROP ROLE IF EXISTS chdb_not_querier;
+DROP ROLE IF EXISTS chdb_yes_querier;
+RESET client_min_messages;
+CREATE ROLE chdb_not_querier;
+CREATE ROLE chdb_yes_querier;
+GRANT EXECUTE ON FUNCTION chdb_query(text) TO chdb_yes_querier;
+-- A role not granted execute on chdb_query() should fail.
+SET ROLE chdb_not_querier;
+SELECT * FROM chdb_query('SELECT 1') AS (x int);
+ERROR:  permission denied for function chdb_query
+-- But it should work if we grant it.
+SET ROLE chdb_yes_querier;
+SELECT * FROM chdb_query('SELECT 1') AS (x int);
+ x 
+---
+ 1
+(1 row)
+
+RESET ROLE;

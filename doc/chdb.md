@@ -7,21 +7,20 @@ chdb 0.0.1
 # CREATE EXTENSION chdb;
 CREATE EXTENSION
 
-# SELECT pgchdb_version();
- pgchdb_version
-----------------
- 0.0.1
+# SELECT * FROM chdb_query('version()') AS (version text);
+ version
+----------
+ 26.5.1.1
 (1 row)
 ```
 
 ## Description
 
-The `chdb` extension which runs [chDB] queries in a helper process. It
-currently only provides a function to fetch its library version.
+The `chdb` extension runs [chDB] queries in a helper process.
 
 ## Functions
 
-#### `pgchdb_version`
+### `pgchdb_version`
 
 ```sql
 SELECT pgchdb_version();
@@ -37,6 +36,50 @@ be the same as that returned by the Postgres 18 and later
 SELECT version
   FROM pg_get_loaded_modules()
  WHERE module_name = 'chdb';
+```
+
+### `chdb_query`
+
+```sql
+SELECT * FROM chdb_query('SELECT version()') AS (version text);
+```
+
+Executes a [chDB] query return its rows as a relation. Each call creates a
+temporary chDB database on disk and deletes it once the query completes. As a
+result, no objects created by previous `chdb_query()` calls, such as DDL,
+persist to subsequent calls.
+
+A column definition list (`AS (col type, ...)`) is required: PostgreSQL
+requires the row structure definition before fetching rows, and that structure
+must match the columns the query returns. Values are converted from chDB to
+the declared types.
+
+No role has `EXECUTE` access by default; `GRANT` to a role to allow it to use
+the function.
+
+```sql
+GRANT EXECUTE ON FUNCTION chdb_query(text) TO chdb_admin;
+```
+
+**Example:**
+
+```sql
+SELECT * FROM chdb_query(
+    'SELECT number AS n, number * number FROM numbers(5) ORDER BY n'
+) AS (n int2, p int);
+```
+
+Output:
+
+```
+ n | p
+---+----
+ 0 |  0
+ 1 |  1
+ 2 |  4
+ 3 |  9
+ 4 | 16
+(5 rows)
 ```
 
 ## Versioning Policy

@@ -3,6 +3,7 @@
 
 #include "postgres.h"
 
+#include "funcapi.h"
 #include "nodes/pg_list.h"
 #include "utils/relcache.h"
 
@@ -14,12 +15,7 @@
  * against. Returns the rows sent.
  */
 extern uint64_t
-chdb_native_send(
-    Relation rel,
-    const char* structure,
-    List* attnums,
-    chdbHelper* helper
-);
+chdb_copy_send(Relation rel, const char* structure, List* attnums, chdbHelper* helper);
 
 /*
  * Inserts the rows `helper` streams as Native blocks into the `attnums` columns
@@ -28,11 +24,24 @@ chdb_native_send(
  * any a BEFORE trigger suppressed.
  */
 extern uint64_t
-chdb_native_receive(
+chdb_copy_receive(
     Relation rel,
     List* attnums,
     List* rtable,
     List* rteperminfos,
+    chdbHelper* helper
+);
+
+/*
+ * Execute a query against a temporary chDB database and return its rows,
+ * mapping chDB values to the Postgres types named in the caller's column
+ * definition list and streaming the results back to the client.
+ */
+Datum
+chdb_select_receive(
+    char* query,
+    ReturnSetInfo* rsinfo,
+    TupleDesc tupdesc,
     chdbHelper* helper
 );
 

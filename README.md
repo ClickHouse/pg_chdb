@@ -4,10 +4,41 @@ chdb Postgres Extension
 [![PGXN version](https://badge.fury.io/pg/chdb.svg)](https://badge.fury.io/pg/chdb)
 [![Build Status](https://github.com/ClickHouse/pg_chdb/actions/workflows/ci.yml/badge.svg)](https://github.com/ClickHouse/pg_chdb/actions/workflows/ci.yml)
 
-This library contains a single PostgreSQL extension, `chdb`, which runs [chDB]
-queries in a helper process. It currently only supports [COPY] to or from an S3,
-GCS, Azure Blob, file, or http URL. This example loads records from multiple CSV
-files on S3 in a single [COPY] command:
+Description
+-----------
+
+This library provides PostgreSQL extensions for executing [chDB] queries in
+Postgres, and for copying data from external sources into a PostgreSQL table.
+
+### chdb Extension
+
+The `chdb` extension runs [chDB] queries. The `chdb_query()` function executes
+a single query. For example, this query:
+
+```sql
+SELECT * FROM chdb_query($$
+  SELECT * FROM s3('s3://datasets-documentation/my-test-bucket-768/some_prefix/some_file_1.csv')
+$$) AS (id int, months int, days int);
+```
+
+Outputs:
+
+```
+ id | months | days
+----+--------+------
+  1 |      2 |    3
+  3 |      2 |    1
+  4 |      5 |    6
+(3 rows)
+```
+
+See the [chdb documentation](doc/chdb.md) for details.
+
+### chdb_hook Module
+
+The `chdb_hook` module hooks into the [COPY] command to copy data to or
+from an S3, GCS, Azure Blob, file, or http URL. This example loads records
+from multiple CSV files on S3 in a single [COPY] command:
 
 ```sql
 CREATE TABLE times (
@@ -16,8 +47,38 @@ CREATE TABLE times (
     days   INT NOT NULL
 );
 
+LOAD 'chdb_hook';
 COPY times FROM 's3://datasets-documentation/my-test-bucket-768/{some,another}_prefix/some_file_{1..3}.csv';
 ```
+
+After which the `times` table contains the records from each file it loaded:
+
+```pgsql
+# SELECT * FROM times;
+ id | months | days
+----+--------+------
+  1 |      2 |    3
+  3 |      2 |    1
+  4 |      5 |    6
+  1 |      2 |    3
+  3 |      2 |    1
+  4 |      5 |    6
+  1 |      2 |    3
+  3 |      2 |    1
+  4 |      5 |    6
+  1 |      2 |    3
+  3 |      2 |    1
+  4 |      5 |    6
+  1 |      2 |    3
+  3 |      2 |    1
+  4 |      5 |    6
+  1 |      2 |    3
+  3 |      2 |    1
+  4 |      5 |    6
+(18 rows)
+```
+
+See the [chdb_hook documentation](doc/chdb_hook.md) for details.
 
 Dependencies
 ------------
@@ -112,21 +173,6 @@ parameters]:
 ```ini
 extension_control_path = '/usr/local/extras/postgresql/share:$system'
 dynamic_library_path   = '/usr/local/extras/postgresql/lib:$libdir'
-```
-
-Once the chdb extension is installed, you can add it to a database by
-connecting as a super user and running:
-
-``` sql
-CREATE EXTENSION chdb;
-```
-
-If you want to install chdb and all of its supporting objects into a
-specific schema, use the `SCHEMA` clause to specify the schema, like so:
-
-``` sql
-CREATE SCHEMA chdb;
-CREATE EXTENSION chdb SCHEMA chdb;
 ```
 
 Author

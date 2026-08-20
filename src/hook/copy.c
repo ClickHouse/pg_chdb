@@ -2,6 +2,7 @@
  * Turning a COPY into a chDB query and running it through a helper process.
  */
 
+#include <inttypes.h>
 #include <math.h>
 
 #include "postgres.h"
@@ -177,10 +178,10 @@ chdb_copy(chdbCopyContext* ctx) {
         chdb_helper_start(ctx->cmd_type, ch_query.data, names, values, param_count);
     uint64_t num_rows =
         ctx->cmd_type == CHDB_CMD_SELECT
-            ? chdb_native_receive(
+            ? chdb_copy_receive(
                   ctx->rel, ctx->attnums, ctx->rtable, ctx->rteperminfos, helper
               )
-            : chdb_native_send(ctx->rel, ctx->structure, ctx->attnums, helper);
+            : chdb_copy_send(ctx->rel, ctx->structure, ctx->attnums, helper);
     chdb_helper_finish(helper);
 
     AtEOXact_GUC(true, nestlevel);
@@ -380,7 +381,7 @@ make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** value
 
     /* Every branch above ends in a SETTINGS clause, so this joins it. */
     if (ctx->max_memory > 0) {
-        appendStringInfo(query, ", max_memory_usage=" INT64_FORMAT, ctx->max_memory);
+        appendStringInfo(query, ", max_memory_usage=%" PRId64, ctx->max_memory);
     }
 
     if (
