@@ -31,12 +31,6 @@ jobs:
         with:
           version: ${{ matrix.pg }}
           packages: libkrb5-dev libipc-run-perl
-      - name: Configure AWS credentials # for s3.sql round-trip test
-        uses: aws-actions/configure-aws-credentials@v6
-        with:
-          role-to-assume: ${{ secrets.aws_role_to_assume }}
-          role-session-name: ${{ github.run_id }}
-          aws-region: us-east-2
       - name: Tweak Permissions # for cache restore
         run: sudo chmod a+rwx /usr/local/lib /usr/local/include
       - name: Cache chDB
@@ -54,6 +48,12 @@ jobs:
         run: make -j $(nproc)
       - name: Install
         run: sudo make install
+      - name: Configure AWS credentials # for s3.sql round-trip test
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.aws_role_to_assume }}
+          role-session-name: ${{ github.run_id }}
+          aws-region: us-east-2
       - name: Test
         run: make installcheck
         # https://console.cloud.google.com/storage/settings;tab=interoperability?project=ch-pg-test
