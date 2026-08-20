@@ -25,8 +25,6 @@ PG_MODULE_MAGIC_EXT(.name = "chdb", .version = PGCHCB_VERSION);
 PG_MODULE_MAGIC;
 #endif
 
-PG_FUNCTION_INFO_V1(chdb_query);
-
 /*
  * Function returns the full chdb extension library version.
  */
@@ -71,6 +69,7 @@ _PG_init(void) {
  * mapping chDB values to the Postgres types named in the caller's column
  * definition list.
  */
+PG_FUNCTION_INFO_V1(chdb_query);
 Datum
 chdb_query(PG_FUNCTION_ARGS) {
     char* sql             = text_to_cstring(PG_GETARG_TEXT_P(0));

@@ -4,8 +4,6 @@ EXTVERSION   = $(shell grep -m 1 'default_version' chdb.control | \
 DISTVERSION  = $(shell grep -m 1 '^[[:space:]]\{2\}"version":' META.json | \
                sed -e 's/[[:space:]]*"version":[[:space:]]*"\([^"]*\)",\{0,1\}/\1/')
 
-MAX_CONCURRENT_TESTS ?= 6
-
 # Header-only dependencies, vendored as submodules. clickhouse-c comes from
 # pg-clickhouse-c's own pin, its signatures naming clickhouse-c types, so a
 # second checkout on the include path would silently win.
@@ -16,7 +14,7 @@ DATA         = $(sort $(wildcard sql/$(EXTENSION)--*.sql) sql/$(EXTENSION)--$(EX
 DOCS         = $(wildcard doc/*.md)
 TESTS        ?= $(wildcard test/sql/*.sql)
 REGRESS      = --schedule test/schedule
-REGRESS_OPTS = --inputdir=test --load-extension=$(EXTENSION) --max-concurrent-tests $(MAX_CONCURRENT_TESTS)
+REGRESS_OPTS = --inputdir=test --load-extension=$(EXTENSION)
 MODULE_big   = $(EXTENSION)
 PG_CONFIG   ?= pg_config
 TAP_TESTS   ?= 1
@@ -97,7 +95,7 @@ uninstall: uninstall-helper
 
 .PHONY: test/schedule # Depends on $(TESTS), so always rebuild.
 test/schedule:
-	@perl -E 'say "test: ", join " ", splice @ARGV, 0, $(MAX_CONCURRENT_TESTS) while @ARGV' $(patsubst test/sql/%.sql,%,$(TESTS)) > $@
+	@echo "test: $(patsubst test/sql/%.sql,%,$(TESTS))" > $@
 
 installcheck: test/schedule
 
