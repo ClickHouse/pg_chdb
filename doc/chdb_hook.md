@@ -67,7 +67,6 @@ makes the most sense for your use case:
     shared_preload_libraries = chdb_hook
     ```
 
-
 > [!WARNING]
 > Be aware that loading chdb_hook allows users in the `pg_read_server_files`
 > or `pg_write_server_files` roles to `COPY` data to and from files on the
@@ -89,31 +88,6 @@ CREATE TABLE times (
 );
 
 COPY times FROM 's3://datasets-documentation/my-test-bucket-768/some_prefix/some_file_1.csv';
-```
-
-### Helper Process
-
-When chdb_hook detects a `COPY` command it can handle, it starts a
-`chdb_helper` process to do so. The helper keeps the resource consumption of
-[chDB] separate from the main Postgres process, an advantage for an
-occasionally-used workflow such as loading data from a data lake.
-
-Unlike a background worker, the helper holds no Postgres shared memory and the
-postmaster does not manage it. This isolates crashes from affecting Postgres.
-A helper that dies instead fails one `COPY` and leaves other sessions untouched.
-
-The `COPY` itself runs in the session that issued it, so it takes that
-transaction's snapshot, sees its uncommitted rows, and rolls back with it.
-
-### Memory Settings
-
-`chdb_hook.max_memory` limits how much memory a helper may claim. It is a
-superuser setting, zero by default, which leaves chDB to decide. It becomes
-ClickHouse's `max_memory_usage` for the query, so exceeding it raises a
-memory-limit error:
-
-```sql
-ALTER SYSTEM SET chdb_hook.max_memory = '4GB';
 ```
 
 ### Privileges
@@ -467,9 +441,9 @@ limitations:
 SET chdb_hook.max_memory = '1 GB';
 ```
 
-The maximum amount of memory for a chDB query, used to set the chDB
-[`max_memory_usage`] setting. Use an integer for the number of megabytes or
-one of the following memory units:
+Defines the maximum amount of memory for a chDB query, used to set the chDB
+[`max_memory_usage`] setting. Requires superuser privileges. Use an integer
+for the number of megabytes or one of the following memory units:
 
 *   `B` (bytes)
 *   `kB` (kilobytes)
@@ -486,8 +460,8 @@ SET chdb_hook.max_threads = 4;
 ```
 
 The maximum number of query processing threads for a chDB query, used to set
-the chDB [`max_threads`] setting. Defaults to `0`, which allows chDB to
-determine the value.
+the chDB [`max_threads`] setting. Requires superuser privileges. Defaults to
+`0`, which allows chDB to determine the value.
 
 We strongly encourage setting `chdb_hook.max_threads` before executing a major
 `COPY` in order to prevent chDB from maxing out CPU usage at the expense of
@@ -501,7 +475,8 @@ SET chdb_hook.max_parsing_threads = 2;
 
 The maximum number of threads chDB can use to parse data in input formats that
 support parallel parsing, used to set the chDB [`max_parsing_threads`]
-setting. Defaults to `0`, which allows chDB to determine the value.
+setting. Requires superuser privileges. Defaults to `0`, which allows chDB to
+determine the value.
 
 We encourage setting `chdb_hook.max_parsing_threads` before `COPY`ing a lot of
 data in order to prevent chDB from maxing out CPU usage at the expense of
@@ -576,3 +551,11 @@ Copyright (c) 2026, ClickHouse
     "ClickHouse Docs: Data Types in ClickHouse"
   [log_min_messages]: https://www.postgresql.org/docs/current/runtime-config-logging.html#GUC-LOG-MIN-MESSAGES
     "PostgreSQL Docs: log_min_messages"
+  [`pg_get_loaded_modules()`]: https://pgpedia.info/g/pg_get_loaded_modules.html
+    "pgPedia: pg_get_loaded_modules()"
+  [`max_memory_usage`]: https://clickhouse.com/docs/reference/settings/session-settings/max-memory-usage
+    "ClickHouse Docs: max_memory_usage_* session settings"
+  [`max_threads`]: https://clickhouse.com/docs/reference/settings/session-settings/max-threads
+    "ClickHouse Docs: max_threads_* session settings"
+  [`max_parsing_threads`]: https://clickhouse.com/docs/reference/settings/session-settings/max#max_parsing_threads
+    "ClickHouse Docs: max_parsing_threads session setting"

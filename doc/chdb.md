@@ -30,7 +30,7 @@ Returns the current [semantic version][semver] of the chdb extension library.
 While the chdb extension version uses only the `x.y` part of the version, the
 library provides the full `x.y.z` [semantic version][semver]. This value will
 be the same as that returned by the Postgres 18 and later
-`pg_get_loaded_modules()` function:
+[`pg_get_loaded_modules()`] function:
 
 ```sql
 SELECT version
@@ -91,8 +91,8 @@ SET chdb.max_memory = '1 GB';
 ```
 
 The maximum amount of memory for a chDB query, used to set the chDB
-[`max_memory_usage`] setting. Use an integer for the number of megabytes or
-one of the following memory units:
+[`max_memory_usage`] setting. Requires superuser privileges. Use an integer
+for the number of megabytes or one of the following memory units:
 
 *   `B` (bytes)
 *   `kB` (kilobytes)
@@ -109,8 +109,8 @@ SET chdb.max_threads = 4;
 ```
 
 The maximum number of query processing threads for a chDB query, used to set
-the chDB [`max_threads`] setting. Defaults to `0`, which allows chDB to
-determine the value.
+the chDB [`max_threads`] setting. Requires superuser privileges. Defaults to
+`0`, which allows chDB to determine the value.
 
 We strongly encourage setting `chdb.max_threads` before executing a major
 query in order to prevent chDB from maxing out CPU usage at the expense of
@@ -124,7 +124,8 @@ SET chdb.max_parsing_threads = 2;
 
 The maximum number of threads chDB can use to parse data in input formats that
 support parallel parsing, used to set the chDB [`max_parsing_threads`]
-setting. Defaults to `0`, which allows chDB to determine the value.
+setting. Requires superuser privileges. Defaults to `0`, which allows chDB to
+determine the value.
 
 We encourage setting `chdb.max_parsing_threads` before executing a query that
 parses a lot of data, such as loading data from [table functions], in order to
@@ -170,6 +171,8 @@ Copyright (c) 2026, ClickHouse
 
   [chDB]: https://clickhouse.com/chdb
     "chDB - fast, reliable, and scalable in-process database"
+  [`pg_get_loaded_modules()`]: https://pgpedia.info/g/pg_get_loaded_modules.html
+    "pgPedia: pg_get_loaded_modules()"
   [`max_memory_usage`]: https://clickhouse.com/docs/reference/settings/session-settings/max-memory-usage
     "ClickHouse Docs: max_memory_usage_* session settings"
   [`max_threads`]: https://clickhouse.com/docs/reference/settings/session-settings/max-threads

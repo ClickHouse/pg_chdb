@@ -80,6 +80,36 @@ After which the `times` table contains the records from each file it loaded:
 
 See the [chdb_hook documentation](doc/chdb_hook.md) for details.
 
+Architecture
+------------
+
+The chdb and chdb_hook extensions rely on a `chdb_helper` process to execute
+[chDB] queries. The helper keeps the resource consumption of [chDB] separate
+from the main Postgres process, an advantage for an occasionally-used workflow
+such as loading data from a data lake.
+
+```
+                  +-------------+
+                  |   helper    |
++----------+      |    app      |      +------+
+| Postgres |      | +---------+ |      | chDB |
+| Backend  |----->| |  chDB   | |----->| Data |
++----------+      | | Library | |      +------+
+                  | +---------+ |
+                  +-------------+
+```
+
+Unlike a background worker, the helper holds no Postgres shared memory and the
+postmaster does not manage it. This isolates crashes from affecting Postgres.
+A helper that dies triggers an error only in the backend that started it,
+leaving other sessions untouched.
+
+> [!IMPORTANT]
+> For each query, the helper connects to a new in-memory database to execute
+> it. As a consequence, each query currently runs in complete isolation from
+> all other queries. Don't create a table and expect to query it in a
+> subsequent query.
+
 Dependencies
 ------------
 
