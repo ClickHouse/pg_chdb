@@ -174,8 +174,14 @@ chdb_copy(chdbCopyContext* ctx) {
     size_t param_count = make_ch_query(ctx, &ch_query, names, values);
 
     /* Hand off to the helper. */
+    chdbHelperContext hcx = {
+        .cmd         = ctx->cmd_type,
+        .max_memory  = ctx->max_memory,
+        .max_threads = ctx->max_threads,
+        .max_parsers = ctx->max_parsers,
+    };
     chdbHelper* helper =
-        chdb_helper_start(ctx->cmd_type, ch_query.data, names, values, param_count);
+        chdb_helper_start(&hcx, ch_query.data, names, values, param_count);
     uint64_t num_rows =
         ctx->cmd_type == CHDB_CMD_SELECT
             ? chdb_copy_receive(
@@ -196,10 +202,6 @@ chdb_copy(chdbCopyContext* ctx) {
     names[i]  = name;                                                                  \
     values[i] = val;                                                                   \
     i++;
-
-static const char settings[] =
-    "allow_experimental_nullable_tuple_type=1, "
-    "output_format_json_quote_denormals=1, " PGCH_NATIVE_SETTINGS;
 
 #define GCS_HOST "storage.googleapis.com"
 #define AWS_HOST ".amazonaws.com"
@@ -293,8 +295,7 @@ make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** value
         }
         appendStringInfo(
             query,
-            ") SETTINGS %s, s3_truncate_on_insert = 1, s3_request_timeout_ms = %u",
-            settings,
+            ") SETTINGS s3_truncate_on_insert = 1, s3_request_timeout_ms = %u",
             ctx->timeout
         );
         break;
@@ -308,8 +309,7 @@ make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** value
         PARAM(", {structure:String}", "structure", ctx->structure);
         appendStringInfo(
             query,
-            ") SETTINGS %s, http_connection_timeout=%u, http_max_tries=1",
-            settings,
+            ") SETTINGS http_connection_timeout=%u, http_max_tries=1",
             (uint32_t)ceil(ctx->timeout / (double)1000)
         );
         break;
@@ -341,8 +341,7 @@ make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** value
         PARAM(", {structure:String}", "structure", ctx->structure);
         appendStringInfo(
             query,
-            ") SETTINGS %s, azure_truncate_on_insert = 1, azure_request_timeout_ms=%u",
-            settings,
+            ") SETTINGS azure_truncate_on_insert = 1, azure_request_timeout_ms=%u",
             ctx->timeout
         );
         break;
@@ -359,9 +358,7 @@ make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** value
         if (ctx->compression[0] != '\0') {
             PARAM(", {compression:String}", "compression", ctx->compression);
         }
-        appendStringInfo(
-            query, ") SETTINGS %s, engine_file_truncate_on_insert=1", settings
-        );
+        appendStringInfo(query, ") SETTINGS engine_file_truncate_on_insert=1");
         break;
     case hdfs_scheme:
         /* https://clickhouse.com/docs/sql-reference/table-functions/hdfs#syntax */
@@ -372,16 +369,11 @@ make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** value
         /* Append remaining arguments and settings. */
         PARAM(", {format:String}", "format", format);
         PARAM(", {structure:String}", "structure", ctx->structure);
-        appendStringInfo(query, ") SETTINGS %s, hdfs_truncate_on_insert = 1", settings);
+        appendStringInfo(query, ") SETTINGS hdfs_truncate_on_insert = 1");
         break;
     default:
         elog(ERROR, "unsupported URL scheme %d", ctx->scheme);
         break;
-    }
-
-    /* Every branch above ends in a SETTINGS clause, so this joins it. */
-    if (ctx->max_memory > 0) {
-        appendStringInfo(query, ", max_memory_usage=%" PRId64, ctx->max_memory);
     }
 
     if (

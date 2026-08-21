@@ -31,8 +31,10 @@ typedef struct chdbCopyContext {
     List* rteperminfos;
     scheme scheme;
     chdbCmdType cmd_type;
-    uint32_t timeout;   /* request timeout in milliseconds */
-    int64_t max_memory; /* max_memory_usage setting, 0 for none */
+    uint32_t timeout;     /* request timeout in milliseconds */
+    uint16_t max_memory;  /* max_memory_usage in MB, 0 for auto */
+    uint16_t max_threads; /* max_threads, 0 for auto */
+    uint16_t max_parsers; /* max_parsing_threads, 0 for auto */
     /* Table function options; keep in sync with CHDB_MAX_TABLEFUNC_ARGS. */
     char* url;
     char* access_key;

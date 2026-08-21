@@ -459,6 +459,54 @@ limitations:
 *   The CSVWithNames and CSVWithNamesAndTypes formats cannot currently import
     `NULL` box or circle values. (ClickHouse/ClickHouse#115523)
 
+## Settings
+
+### `chdb_hook.max_memory`
+
+```sql
+SET chdb_hook.max_memory = '1 GB';
+```
+
+The maximum amount of memory for a chDB query, used to set the chDB
+[`max_memory_usage`] setting. Use an integer for the number of megabytes or
+one of the following memory units:
+
+*   `B` (bytes)
+*   `kB` (kilobytes)
+*   `MB` (megabytes)
+*   `GB` (gigabytes)
+*   `TB` (terabytes)
+
+Defaults to `0`, which does not limit the memory.
+
+### `chdb_hook.max_threads`
+
+```sql
+SET chdb_hook.max_threads = 4;
+```
+
+The maximum number of query processing threads for a chDB query, used to set
+the chDB [`max_threads`] setting. Defaults to `0`, which allows chDB to
+determine the value.
+
+We strongly encourage setting `chdb_hook.max_threads` before executing a major
+`COPY` in order to prevent chDB from maxing out CPU usage at the expense of
+PostgreSQL.
+
+### `chdb_hook.max_parsing_threads`
+
+```sql
+SET chdb_hook.max_parsing_threads = 2;
+```
+
+The maximum number of threads chDB can use to parse data in input formats that
+support parallel parsing, used to set the chDB [`max_parsing_threads`]
+setting. Defaults to `0`, which allows chDB to determine the value.
+
+We encourage setting `chdb_hook.max_parsing_threads` before `COPY`ing a lot of
+data in order to prevent chDB from maxing out CPU usage at the expense of
+PostgreSQL.
+
 ## Versioning Policy
 
 chdb_hook adheres to [Semantic Versioning] for its public releases.

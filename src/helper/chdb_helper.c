@@ -12,6 +12,7 @@
  */
 
 #include <errno.h>
+#include <inttypes.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -165,13 +166,13 @@ run_select(chdb_connection conn, str query, const params* par) {
         par->count
     );
     const char* error = chdb_result_error(stream);
-    int status        = 0;
+    int status        = EXIT_SUCCESS;
 
     if (error) {
         fprintf(stderr, "%s\n", error);
         chdb_destroy_query_result(stream);
 
-        return 1;
+        return EXIT_FAILURE;
     }
 
     for (;;) {
@@ -180,7 +181,7 @@ run_select(chdb_connection conn, str query, const params* par) {
 
         if (chunk_error) {
             fprintf(stderr, "%s\n", chunk_error);
-            status = 1;
+            status = EXIT_FAILURE;
         } else {
             size_t len = chdb_result_length(chunk);
 
@@ -264,7 +265,39 @@ run_insert(chdb_connection conn, str query, const params* par) {
     chdb_destroy_query_result(done);
     chdb_destroy_insert_stream(stream);
 
-    return error ? 1 : 0;
+    return error ? EXIT_FAILURE : EXIT_SUCCESS;
+}
+
+static int
+setup_session(
+    chdb_connection conn,
+    uint16_t max_mem,
+    uint16_t max_threads,
+    uint16_t max_parsers
+) {
+    char settings[1024];
+    snprintf(
+        settings,
+        1024,
+        "SET allow_experimental_nullable_tuple_type,"
+        "output_format_json_quote_denormals,"
+        "output_format_native_write_json_as_string,"
+        "output_format_native_encode_types_in_binary_format=0,"
+        "max_threads=%" PRIu16 ",max_parsing_threads=%" PRIu16
+        ",max_memory_usage=%" PRIu64,
+        max_threads,
+        max_parsers,
+        (uint64_t)max_mem * 1024 * 1024
+    );
+    chdb_result* res = chdb_query(conn, settings, native_format);
+    const char* err  = chdb_result_error(res);
+    if (err) {
+        fprintf(stderr, "%s\n", err);
+        chdb_destroy_query_result(res);
+        return EXIT_FAILURE;
+    }
+    chdb_destroy_query_result(res);
+    return EXIT_SUCCESS;
 }
 
 int
@@ -273,6 +306,9 @@ main(void) {
     char* setup          = read_setup(&len);
     cursor cur           = { setup, setup + len };
     chdbCmdType cmd_type = take1(&cur);
+    uint16_t max_mem     = take2(&cur);
+    uint16_t max_threads = take2(&cur);
+    uint16_t max_parsers = take2(&cur);
     str query            = take_str(&cur);
     uint16_t npar        = take2(&cur);
 
@@ -303,8 +339,15 @@ main(void) {
         fail("chdb: unable to connect to chDB");
     }
 
-    int status = cmd_type == CHDB_CMD_SELECT ? run_select(*conn, query, &par)
+    /*
+     * Unfortunately, setting via argv doesn't work, so we have to set them a
+     * an initial query. https://github.com/chdb-io/chdb-core/issues/191
+     */
+    int status = setup_session(*conn, max_mem, max_threads, max_parsers);
+    if (!status) {
+        status = cmd_type == CHDB_CMD_SELECT ? run_select(*conn, query, &par)
                                              : run_insert(*conn, query, &par);
+    }
 
     fflush(stderr);
     chdb_close_conn(conn);

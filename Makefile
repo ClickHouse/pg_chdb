@@ -94,8 +94,9 @@ install: install-helper
 uninstall: uninstall-helper
 
 .PHONY: test/schedule # Depends on $(TESTS), so always rebuild.
+test/schedule: schedule = $(if $(TESTS),test: $(patsubst test/sql/%.sql,%,$(TESTS)),)
 test/schedule:
-	@echo "test: $(patsubst test/sql/%.sql,%,$(TESTS))" > $@
+	@echo $(schedule) > $@
 
 installcheck: test/schedule
 

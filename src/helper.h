@@ -25,7 +25,7 @@ typedef struct chdbHelper chdbHelper;
  */
 extern chdbHelper*
 chdb_helper_start(
-    chdbCmdType cmd_type,
+    chdbHelperContext* ctx,
     const char* query,
     char* const* names,
     char* const* values,

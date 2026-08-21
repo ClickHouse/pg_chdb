@@ -82,6 +82,54 @@ Output:
 (5 rows)
 ```
 
+## Settings
+
+### `chdb.max_memory`
+
+```sql
+SET chdb.max_memory = '1 GB';
+```
+
+The maximum amount of memory for a chDB query, used to set the chDB
+[`max_memory_usage`] setting. Use an integer for the number of megabytes or
+one of the following memory units:
+
+*   `B` (bytes)
+*   `kB` (kilobytes)
+*   `MB` (megabytes)
+*   `GB` (gigabytes)
+*   `TB` (terabytes)
+
+Defaults to `0`, which does not limit the memory.
+
+### `chdb.max_threads`
+
+```sql
+SET chdb.max_threads = 4;
+```
+
+The maximum number of query processing threads for a chDB query, used to set
+the chDB [`max_threads`] setting. Defaults to `0`, which allows chDB to
+determine the value.
+
+We strongly encourage setting `chdb.max_threads` before executing a major
+query in order to prevent chDB from maxing out CPU usage at the expense of
+PostgreSQL.
+
+### `chdb.max_parsing_threads`
+
+```sql
+SET chdb.max_parsing_threads = 2;
+```
+
+The maximum number of threads chDB can use to parse data in input formats that
+support parallel parsing, used to set the chDB [`max_parsing_threads`]
+setting. Defaults to `0`, which allows chDB to determine the value.
+
+We encourage setting `chdb.max_parsing_threads` before executing a query that
+parses a lot of data, such as loading data from [table functions], in order to
+prevent chDB from maxing out CPU usage at the expense of PostgreSQL.
+
 ## Versioning Policy
 
 The chdb extension adheres to [Semantic Versioning][semver] for its public
@@ -122,4 +170,12 @@ Copyright (c) 2026, ClickHouse
 
   [chDB]: https://clickhouse.com/chdb
     "chDB - fast, reliable, and scalable in-process database"
+  [`max_memory_usage`]: https://clickhouse.com/docs/reference/settings/session-settings/max-memory-usage
+    "ClickHouse Docs: max_memory_usage_* session settings"
+  [`max_threads`]: https://clickhouse.com/docs/reference/settings/session-settings/max-threads
+    "ClickHouse Docs: max_threads_* session settings"
+  [`max_parsing_threads`]: https://clickhouse.com/docs/reference/settings/session-settings/max#max_parsing_threads
+    "ClickHouse Docs: max_parsing_threads session setting"
+  [table functions]: https://clickhouse.com/docs/reference/functions/table-functions
+    "ClickHouse Docs: Table Functions"
   [semver]: https://semver.org/spec/v2.0.0.html "Semantic Versioning 2.0.0"

@@ -1,0 +1,153 @@
+-- Load chdb and chdb_hook to ensure they don't conflict.
+LOAD 'chdb';
+LOAD 'chdb_hook';
+PREPARE show_all AS
+    SELECT 'chdb' AS extension,
+        current_setting('chdb.max_memory') AS memory,
+        current_setting('chdb.max_threads') AS threads,
+        current_setting('chdb.max_parsing_threads') AS parsers
+    UNION SELECT 'chdb_hook',
+        current_setting('chdb_hook.max_memory'),
+        current_setting('chdb_hook.max_threads'),
+        current_setting('chdb_hook.max_parsing_threads')
+;
+PREPARE show_chdb(bool) AS
+ SELECT * FROM chdb_query(
+    format($$
+        SELECT name, %s AS value
+        FROM system.settings
+        WHERE name IN (
+            'max_memory_usage', 'max_threads', 'max_parsing_threads',
+            'allow_experimental_nullable_tuple_type',
+            'output_format_native_encode_types_in_binary_format',
+            'output_format_native_write_json_as_string'
+        )
+        ORDER BY name
+    $$,
+    -- max_threads maxes out at the max hardware threads, so if we've set it
+    -- to the max value ($1 = true), just report it as "MAX" if it's not zero.
+    CASE WHEN $1
+        THEN $$CASE WHEN name = 'max_threads' AND value <> '0' THEN 'MAX' ELSE replaceRegexpOne(value, '[(][0-9]+[)]$', '') END$$
+        ELSE $$replaceRegexpOne(value, '[(][0-9]+[)]$', '')$$
+    END
+    )
+) AS (name text, value text);
+-- Look at the default values;
+EXECUTE show_all;
+ extension | memory | threads | parsers 
+-----------+--------+---------+---------
+ chdb      | 0      | 0       | 0
+ chdb_hook | 0      | 0       | 0
+(2 rows)
+
+EXECUTE show_chdb(false);
+                        name                        | value 
+----------------------------------------------------+-------
+ allow_experimental_nullable_tuple_type             | 1
+ max_memory_usage                                   | 0
+ max_parsing_threads                                | auto
+ max_threads                                        | auto
+ output_format_native_encode_types_in_binary_format | 0
+ output_format_native_write_json_as_string          | 1
+(6 rows)
+
+-- Set integer values.
+SET chdb.max_memory = 5000;
+SET chdb.max_threads = 42;
+SET chdb.max_parsing_threads = 12;
+SET chdb_hook.max_memory = 100;
+SET chdb_hook.max_threads = 12;
+SET chdb_hook.max_parsing_threads = 6;
+EXECUTE show_all;
+ extension | memory | threads | parsers 
+-----------+--------+---------+---------
+ chdb      | 5000MB | 42      | 12
+ chdb_hook | 100MB  | 12      | 6
+(2 rows)
+
+EXECUTE show_chdb(false);
+                        name                        |   value    
+----------------------------------------------------+------------
+ allow_experimental_nullable_tuple_type             | 1
+ max_memory_usage                                   | 5242880000
+ max_parsing_threads                                | 12
+ max_threads                                        | 42
+ output_format_native_encode_types_in_binary_format | 0
+ output_format_native_write_json_as_string          | 1
+(6 rows)
+
+-- And again using size syntax for the memory
+SET chdb.max_memory = '100MB';
+SET chdb.max_threads = 88;
+SET chdb.max_parsing_threads = 10;
+SET chdb_hook.max_memory = '1 GB';
+SET chdb_hook.max_threads = 900;
+SET chdb_hook.max_parsing_threads = 1000;
+EXECUTE show_all;
+ extension | memory | threads | parsers 
+-----------+--------+---------+---------
+ chdb      | 100MB  | 88      | 10
+ chdb_hook | 1GB    | 900     | 1000
+(2 rows)
+
+EXECUTE show_chdb(false);
+                        name                        |   value   
+----------------------------------------------------+-----------
+ allow_experimental_nullable_tuple_type             | 1
+ max_memory_usage                                   | 104857600
+ max_parsing_threads                                | 10
+ max_threads                                        | 88
+ output_format_native_encode_types_in_binary_format | 0
+ output_format_native_write_json_as_string          | 1
+(6 rows)
+
+-- Set max values.
+SET chdb.max_memory = 65535;
+SET chdb.max_threads = 65535;
+SET chdb.max_parsing_threads = 65535;
+SET chdb_hook.max_memory = 65535;
+SET chdb_hook.max_threads = 65535;
+SET chdb_hook.max_parsing_threads = 65535;
+EXECUTE show_all;
+ extension | memory  | threads | parsers 
+-----------+---------+---------+---------
+ chdb      | 65535MB | 65535   | 65535
+ chdb_hook | 65535MB | 65535   | 65535
+(2 rows)
+
+EXECUTE show_chdb(true);
+                        name                        |    value    
+----------------------------------------------------+-------------
+ allow_experimental_nullable_tuple_type             | 1
+ max_memory_usage                                   | 68718428160
+ max_parsing_threads                                | 65535
+ max_threads                                        | MAX
+ output_format_native_encode_types_in_binary_format | 0
+ output_format_native_write_json_as_string          | 1
+(6 rows)
+
+-- Set invalid values.
+SET chdb.max_memory = -1;
+ERROR:  -1 MB is outside the valid range for parameter "chdb.max_memory" (0 MB .. 65535 MB)
+SET chdb.max_threads = -1;
+ERROR:  -1 is outside the valid range for parameter "chdb.max_threads" (0 .. 65535)
+SET chdb.max_parsing_threads = -1;
+ERROR:  -1 is outside the valid range for parameter "chdb.max_parsing_threads" (0 .. 65535)
+SET chdb_hook.max_memory = -1;
+ERROR:  -1 MB is outside the valid range for parameter "chdb_hook.max_memory" (0 MB .. 65535 MB)
+SET chdb_hook.max_threads = -1;
+ERROR:  -1 is outside the valid range for parameter "chdb_hook.max_threads" (0 .. 65535)
+SET chdb_hook.max_parsing_threads = -1;
+ERROR:  -1 is outside the valid range for parameter "chdb_hook.max_parsing_threads" (0 .. 65535)
+SET chdb.max_memory = 65536;
+ERROR:  65536 MB is outside the valid range for parameter "chdb.max_memory" (0 MB .. 65535 MB)
+SET chdb.max_threads = 65536;
+ERROR:  65536 is outside the valid range for parameter "chdb.max_threads" (0 .. 65535)
+SET chdb.max_parsing_threads = 65536;
+ERROR:  65536 is outside the valid range for parameter "chdb.max_parsing_threads" (0 .. 65535)
+SET chdb_hook.max_memory = 65536;
+ERROR:  65536 MB is outside the valid range for parameter "chdb_hook.max_memory" (0 MB .. 65535 MB)
+SET chdb_hook.max_threads = 65536;
+ERROR:  65536 is outside the valid range for parameter "chdb_hook.max_threads" (0 .. 65535)
+SET chdb_hook.max_parsing_threads = 65536;
+ERROR:  65536 is outside the valid range for parameter "chdb_hook.max_parsing_threads" (0 .. 65535)
