@@ -4,12 +4,6 @@ EXTVERSION   = $(shell grep -m 1 'default_version' chdb.control | \
 DISTVERSION  = $(shell grep -m 1 '^[[:space:]]\{2\}"version":' META.json | \
                sed -e 's/[[:space:]]*"version":[[:space:]]*"\([^"]*\)",\{0,1\}/\1/')
 
-# Header-only dependencies, vendored as submodules. clickhouse-c comes from
-# pg-clickhouse-c's own pin, its signatures naming clickhouse-c types, so a
-# second checkout on the include path would silently win.
-PGCH_DIR     = $(CURDIR)/vendor/pg-clickhouse-c
-CH_C_DIR     = $(PGCH_DIR)/clickhouse-c
-
 DATA         = $(sort $(wildcard sql/$(EXTENSION)--*.sql) sql/$(EXTENSION)--$(EXTVERSION).sql)
 DOCS         = $(wildcard doc/*.md)
 TESTS        ?= $(wildcard test/sql/*.sql)
@@ -18,11 +12,21 @@ REGRESS_OPTS = --inputdir=test --load-extension=$(EXTENSION)
 MODULE_big   = $(EXTENSION)
 PG_CONFIG   ?= pg_config
 TAP_TESTS   ?= 1
+OBJS 		 = $(subst .c,.o, $(wildcard src/*.c))
 
 CLANG_FORMAT ?= clang-format
 
-# Collect all the C files to compile into MODULE_big.
-OBJS = $(subst .c,.o, $(wildcard src/*.c))
+# Version of libchdb to bundle.
+LIBCHDB_VERSION = v26.7.0
+
+# Header-only dependencies, vendored as submodules. clickhouse-c comes from
+# pg-clickhouse-c's own pin, its signatures naming clickhouse-c types, so a
+# second checkout on the include path would silently win.
+PGCH_DIR     = $(CURDIR)/vendor/pg-clickhouse-c
+CH_C_DIR     = $(PGCH_DIR)/clickhouse-c
+
+# Downloaded copy of libchdb.
+LIBCHDB_DIR = vendor/libchdb
 
 # Suppress annoying pre-c99 warning, error on 	/other warnings.
 PG_CFLAGS    = -Wno-declaration-after-statement -Wall -Werror
@@ -43,6 +47,16 @@ include $(PGXS)
 # Set default prove flags.
 ifeq ($(PROVE_FLAGS),)
 PROVE_FLAGS = -fwvj $(shell nproc)
+endif
+
+# Build against, install, uninstall a local copy of libchdb.
+ifneq ($(BUNDLE_LIBCHDB),)
+OS         ?= $(shell uname -s | tr A-Z a-z)
+ARCH        = $(shell uname -m)
+LIBCHDB_DIR = vendor/libchdb-$(OS)-$(ARCH)
+src/helper/chdb_helper: $(LIBCHDB_DIR)/lib/libchdb.so
+install: install-libchdb
+uninstall: uninstall-libchdb
 endif
 
 # Require the versioned SQL script.
@@ -80,7 +94,7 @@ $(CH_C_DIR)/clickhouse.h: .gitmodules
 
 # The only program linking libchdb, kept beside the library that starts it.
 src/helper/chdb_helper: $(wildcard src/helper/*.c) src/setup.h
-	@$(MAKE) -C $(dir $@) all
+	@$(MAKE) -C $(dir $@) all LIBCHDB_DIR=$(LIBCHDB_DIR)
 
 # Install the helper. Write beside the live copy and rename over it: install
 # unlinks its target first, so a COPY starting in that moment finds no helper.
@@ -99,6 +113,28 @@ test/schedule:
 	@echo $(schedule) > $@
 
 installcheck: test/schedule
+
+# libchdb
+$(LIBCHDB_DIR)/lib/libchdb.so: vendor/get-libchdb.sh
+	@env INSTALL_VERSION="$(LIBCHDB_VERSION)" DESTDIR=$(LIBCHDB_DIR) bash vendor/get-libchdb.sh
+
+$(LIBCHDB_DIR)/lib/libchdb.a: vendor/get-libchdb.sh
+	env INSTALL_VERSION="$(LIBCHDB_VERSION)" DESTDIR=$(LIBCHDB_DIR) STATIC=1 bash vendor/get-libchdb.sh
+
+# GitHub stuff.
+libchdb-version:
+	@echo $(LIBCHDB_VERSION)
+libchdb-variables:
+	@echo VERSION=$(LIBCHDB_VERSION)
+	@echo DIRECTORY=$(LIBCHDB_DIR)
+
+# Install and uninstall libchdb, which is configured to live in /usr/local/lib.
+install-libchdb: $(LIBCHDB_DIR)/lib/libchdb.so
+	$(MKDIR_P) $(DESTDIR)/usr/local/lib
+	$(INSTALL_SHLIB) $< $(DESTDIR)/usr/local/lib
+	if [ "$$(uname -s)" = "Linux" ]; then ldconfig; fi
+uninstall-libchdb:
+	rm -f $(DESTDIR)/usr/local/lib/libchdb.so
 
 .PHONY: format # Format .c and .h files to project standard in .clang-format.
 format: $(wildcard src/*.c src/*.h src/helper/*.c)
@@ -131,7 +167,7 @@ debian-install-lint:
 dist-test: $(EXTENSION)-$(DISTVERSION).zip
 	unzip $(EXTENSION)-$(DISTVERSION).zip
 	cd $(EXTENSION)-$(DISTVERSION)
-	make && make install && make installcheck
+	$(MAKE) && $(MAKE) install && $(MAKE) installcheck
 
 .PHONY: release-notes # Show release notes for current version (must have `mknotes` in PATH).
 release-notes: CHANGELOG.md

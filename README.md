@@ -121,6 +121,10 @@ shell script:
 curl -sL https://lib.chdb.io | bash
 ```
 
+On Linux, you can also have the installation process download and install it
+by setting `export BUNDLE_LIBCHDB=1` before running the
+[Installation](#installation) `make` commands
+
 Installation
 ------------
 

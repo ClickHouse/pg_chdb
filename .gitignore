@@ -24,3 +24,4 @@ log/
 /tmp_check/
 *.tmp
 .DS_Store
+/vendor/libchdb-*

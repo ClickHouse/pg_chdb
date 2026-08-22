@@ -10,7 +10,7 @@ jobs:
   lint:
     name: 🔎 Lint Code
     runs-on: ubuntu-latest
-    env: { pg: 19, chdb_version: 26.7.0 }
+    env: { pg: 19, BUNDLE_LIBCHDB: 1 }
     steps:
       - name: Checkout the Repository
         uses: actions/checkout@v7
@@ -22,22 +22,18 @@ jobs:
           packages: libkrb5-dev clang-tidy bear
       - name: Install pre-commit
         run: make debian-install-lint
-      - name: Tweak Permissions # for cache restore
-        run: sudo chmod a+rwx /usr/local/lib /usr/local/include
+      # make BUNDLE_LIBCHDB=1 installs libchdb if missing.
+      - name: Get chDB Version
+        id: chdb
+        run: make libchdb-variables >> $GITHUB_OUTPUT
       - name: Cache chDB
         id: cache-chdb
         uses: actions/cache@v6
         with:
-          key: chdb-${{ env.chdb_version }}-${{ runner.os }}-${{ runner.arch }}
+          key: ${{ steps.chdb.outputs.directory }}
           path: |
-            /usr/local/lib/libchdb.so
-            /usr/local/include/chdb.*
-      - name: Install chDB
-        run: ${{ steps.cache-chdb.outputs.cache-hit != 'true' && 'curl -sL https://lib.chdb.io | sudo -E bash' || 'sudo ldconfig' }}
-        env: { INSTALL_VERSION: "${{ env.chdb_version }}" }
-      - run: sudo chmod +r /usr/local/include/chdb.*
-      - name: Add Postgres to Path
-        run: echo /usr/lib/postgresql/${{ env.pg }}/bin >> "$GITHUB_PATH"
+            ${{ steps.chdb.outputs.directory }}/lib/libchdb.*
+            ${{ steps.chdb.outputs.directory }}/include/chdb.h
       - name: Generate compile_commands.json
         run: make compile_commands.json
       - name: Lint the Code

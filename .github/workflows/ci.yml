@@ -17,7 +17,7 @@ jobs:
         arch: [amd64, arm64]
     name: 🐘 PostgreSQL ${{ matrix.pg }} ${{ matrix.arch == 'amd64' && '🧰' || '🦾' }} ${{ matrix.arch }}
     runs-on: ubuntu-${{ matrix.arch == 'amd64' && 'latest' || '24.04-arm' }}
-    env: { chdb_version: v26.7.0 }
+    env: { BUNDLE_LIBCHDB: 1 }
     services:
       kv-rest:
         image: ghcr.io/theory/kv-rest
@@ -31,24 +31,22 @@ jobs:
         with:
           version: ${{ matrix.pg }}
           packages: libkrb5-dev libipc-run-perl
-      - name: Tweak Permissions # for cache restore
-        run: sudo chmod a+rwx /usr/local/lib /usr/local/include
+      # make BUNDLE_LIBCHDB=1 installs libchdb if missing.
+      - name: Get chDB Version
+        id: chdb
+        run: make libchdb-variables >> $GITHUB_OUTPUT
       - name: Cache chDB
         id: cache-chdb
         uses: actions/cache@v6
         with:
-          key: chdb-${{ env.chdb_version }}-${{ runner.os }}-${{ runner.arch }}
+          key: ${{ steps.chdb.outputs.directory }}
           path: |
-            /usr/local/lib/libchdb.so
-            /usr/local/include/chdb.*
-      - name: Install chDB
-        run: ${{ steps.cache-chdb.outputs.cache-hit != 'true' && 'curl -sL https://lib.chdb.io | sudo -E bash' || 'sudo ldconfig' }}
-        env: { INSTALL_VERSION: "${{ env.chdb_version }}" }
-      - run: sudo chmod +r /usr/local/include/chdb.*
+            ${{ steps.chdb.outputs.directory }}/lib/libchdb.*
+            ${{ steps.chdb.outputs.directory }}/include/chdb.h
       - name: Build
         run: make -j $(nproc)
       - name: Install
-        run: sudo make install
+        run: sudo --preserve-env=BUNDLE_LIBCHDB make install
       - name: Configure AWS credentials # for s3.sql round-trip test
         uses: aws-actions/configure-aws-credentials@v6
         with:

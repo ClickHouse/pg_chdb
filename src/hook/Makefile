@@ -9,7 +9,6 @@ PG_CFLAGS    = -Wno-declaration-after-statement -Wall -Werror
 # default, so match chdb_capture_error's buffer. native.c asserts the pairing.
 PG_CPPFLAGS  = -isystem $(CH_C_DIR) -isystem $(PGCH_DIR) -DPGCH_MSG_PREFIX='"chdb: "' \
                -DCHC_ERR_MSG_LEN=4096
-PG_LDFLAGS   = -lchdb
 PG_CONFIG   ?= pg_config
 
 PGXS := $(shell $(PG_CONFIG) --pgxs)

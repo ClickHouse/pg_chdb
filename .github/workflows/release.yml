@@ -9,32 +9,31 @@ jobs:
     name: Release on GitHub and PGXN
     runs-on: ubuntu-latest
     container: pgxn/pgxn-tools
-    env: { pg: 19, chdb_version: 26.7.0 }
+    env: { pg: 19, BUNDLE_LIBCHDB: 1 }
     steps:
       - name: Check out the repo
         uses: actions/checkout@v7
         with: { submodules: recursive }
       - name: Start Postgres
         run: pg-start ${{ env.pg }} libkrb5-dev
-      - name: Tweak Permissions # for cache restore
-        run: sudo chmod a+rwx /usr/local/lib /usr/local/include
+      # make BUNDLE_LIBCHDB=1 installs libchdb if missing.
+      - name: Get chDB Version
+        id: chdb
+        run: make libchdb-variables >> $GITHUB_OUTPUT
       - name: Cache chDB
         id: cache-chdb
         uses: actions/cache@v6
         with:
-          key: chdb-${{ env.chdb_version }}-${{ runner.os }}-${{ runner.arch }}
+          key: ${{ steps.chdb.outputs.directory }}
           path: |
-            /usr/local/lib/libchdb.so
-            /usr/local/include/chdb.*
-      - name: Install chDB
-        run: ${{ steps.cache-chdb.outputs.cache-hit != 'true' && 'curl -sL https://lib.chdb.io | sudo -E bash' || 'sudo ldconfig' }}
-        env: { INSTALL_VERSION: "${{ env.chdb_version }}" }
-      - run: sudo chmod +r /usr/local/include/chdb.*
+            ${{ steps.chdb.outputs.directory }}/lib/libchdb.*
+            ${{ steps.chdb.outputs.directory }}/include/chdb.h
       - name: Bundle the Release
         id: bundle
         run: pgxn-bundle
-      # - name: Test the Bundle
-      #   run: make dist-test
+      - name: Test the Bundle
+        env: { TAP_TESTS: "" }
+        run: make dist-test
       - name: Release on PGXN
         if: startsWith( github.ref, 'refs/tags/v' )
         env:
