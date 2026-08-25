@@ -132,7 +132,7 @@ libchdb-variables:
 install-libchdb: $(LIBCHDB_DIR)/lib/libchdb.$(if $(filter $(LIBCHDB_BUILD),static),a,so)
 	$(MKDIR_P) $(DESTDIR)/usr/local/lib
 	$(INSTALL_SHLIB) $< $(DESTDIR)/usr/local/lib
-	if [ "$$(uname -s)" = "Linux" ]; then ldconfig; fi
+	if [ "$(LIBCHDB_BUILD)" != "static" ] && [ "$$(uname -s)" = "Linux" ]; then ldconfig; fi
 uninstall-libchdb:
 	rm -f $(DESTDIR)/usr/local/lib/libchdb.$(if $(filter $(LIBCHDB_BUILD),static),a,so)
 
