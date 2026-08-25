@@ -7,8 +7,55 @@ All notable changes to this project will be documented in this file. It uses the
   [Semantic Versioning]: https://semver.org/spec/v2.0.0.html
     "Semantic Versioning 2.0.0"
 
-## [v0.1.0] — Unreleased
+## [v0.1.0] — 2026-08-25
 
-The theme of this release is *Experimentation.*
+The theme of this release is *Shakedown.*
+
+### ⚡ Improvements
+
+*   New extension, everything fresh!
+*   Relies on a helper app, `chdb_helper`, to encapsulate all interaction with
+    [chDB]
+*   chdb extension provides `chdb_query()` to execute a single, stateless
+    query.
+*   chdb_hooks module hooks into the `COPY` command to copy data from a remote
+    URL in any of the [formats] supported by chDB
+*   chdb_hooks also hooks into the `CREATE TABLE` command to copy and or
+    define the column structure for the table from a remote URL in any of the
+    [formats] supported by chDB
+*   The `COPY` and `CREATE TABLE` hooks support a variety of URL schemes,
+    including:
+    *   `file`
+    *   `http` and `https`
+    *   `s3` for [AWS S3]
+    *   `gs` for [Google Cloud Storage]
+    *   `az` for [Azure Blob Storage]
+    *   `abfs` for [Azure ABFS]
+*   Data type mapping provided by the [pg-clickhouse-c] header-only library
+
+### 🏗️ Build Setup
+
+*   Requires [chDB] v26.7.0
+*   PGXS build pipeline
+*   PGXN and GitHub release workflows
+*   Limited to macOS and Linux (only platforms supported by [chDB])
+*   Dynamic linking to [chDB] by default
+*   Statically link [chDB] with `LIBCHDB_BUILD=static`
+*   Automatically download [chDB] with `BUNDLE_LIBCHDB=1`
+
+### 📚 Documentation
+
+*   chdb extension reference documentation in [doc/chdb.md](doc/chdb.md)
+*   chdb_hook module reference documentation in [doc/chdb_hook.md](doc/chdb_hook.md)
 
   [v0.1.0]: https://github.com/clickhouse/pg_chdb/compare/a1487bd...v0.1.0
+  [chDB]: https://clickhouse.com/chdb "chDB - fast, reliable, and scalable in-process database"
+  [formats]: https://github.com/chdb-io/chdb/blob/main/refs/clickhouse-formats-settings.md#complete-format-names-table
+    "chDB Docs: Complete Format Names Table"
+  [AWS S3]: https://aws.amazon.com/s3/ "Cloud Object Storage - Amazon S3 - Amazon Web Services"
+  [Google Cloud Storage]: https://cloud.google.com/storage "Cloud Storage - Google Cloud"
+  [Azure Blob Storage]: https://azure.microsoft.com/en-us/products/storage/blobs/
+  [Azure ABFS]: https://learn.microsoft.com/en-us/azure/storage/blobs/data-lake-storage-introduction-abfs-uri
+    "Use the Azure Data Lake Storage URI (ABFS) - Azure Storage"
+  [pg-clickhouse-c]: https://github.com/ClickHouse/pg-clickhouse-c/
+    "Turn a ClickHouse Native block into PostgreSQL `Datum`s and back."

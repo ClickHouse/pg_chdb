@@ -36,9 +36,9 @@ See the [chdb documentation](doc/chdb.md) for details.
 
 ### chdb_hook Module
 
-The `chdb_hook` module hooks into the [COPY] command to copy data to or
-from an S3, GCS, Azure Blob, file, or http URL. This example loads records
-from multiple CSV files on S3 in a single [COPY] command:
+The `chdb_hook` module hooks into the [COPY] command to copy data to or from
+an S3, GCS, Azure Blob, file, or http URL. This example loads records from
+multiple CSV files on S3 in a single [COPY] command:
 
 ```sql
 CREATE TABLE times (
@@ -78,7 +78,8 @@ After which the `times` table contains the records from each file it loaded:
 (18 rows)
 ```
 
-A [CREATE TABLE] may also derive its columns, and load its rows, from such a URL:
+A [CREATE TABLE] may also derive its columns, and load its rows, from such a
+URL:
 
 ```sql
 CREATE TABLE reviews () WITH (
@@ -227,8 +228,8 @@ extension_control_path = '/usr/local/extras/postgresql/share:$system'
 dynamic_library_path   = '/usr/local/extras/postgresql/lib:$libdir'
 ```
 
-Author
-------
+Authors
+-------
 
 *   [David E. Wheeler](https://justatheory.com/)
 *   [serprex](https://github.com/serprex)

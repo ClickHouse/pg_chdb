@@ -2,7 +2,7 @@
   "name": "chdb",
   "abstract": "Execute queries in chDB.",
   "description": "Execute queries in chDB.",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "maintainer": "David E. Wheeler <david.wheeler@clickhouse.com>",
   "license": "apache_2_0",
   "provides": {
@@ -10,13 +10,13 @@
       "abstract": "Execute queries in chDB.",
       "file": "chdb.control",
       "docfile": "doc/chdb.md",
-      "version": "0.0.1"
+      "version": "0.1.0"
     },
     "chdb_hook": {
       "abstract": "Hook into PostgreSQL commands to execute chDB queries.",
       "file": "src/hook/hook.c",
       "docfile": "doc/chdb_hook.md",
-      "version": "0.0.1"
+      "version": "0.1.0"
     }
   },
   "prereqs": {

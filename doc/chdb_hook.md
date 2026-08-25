@@ -1,4 +1,4 @@
-chdb_hook 0.0.1
+chdb_hook 0.1.0
 ===============
 
 ## Synopsis
@@ -20,11 +20,12 @@ COPY 16
 
 ## Description
 
-The chdb_hook module hooks into the PostgreSQL [COPY](#copy-overloading) command to command to
-use [chDB] copy data `TO` or `FROM` any of the supported [data formats
-provided by chDB][formats] in local files, [AWS S3] buckets, [Google Cloud
-Storage], and more. It also hooks into [CREATE TABLE], so that a table can
-derive its columns, and load its rows, from any of those same targets.
+The chdb_hook module hooks into the PostgreSQL [COPY](#copy-overloading)
+command to command to use [chDB] copy data `TO` or `FROM` any of the supported
+[data formats provided by chDB][formats] in local files, [AWS S3] buckets,
+[Google Cloud Storage], and more. It also hooks into [CREATE TABLE], so that a
+table can derive its columns, and load its rows, from any of those same
+targets.
 
 ## Loading
 
@@ -37,7 +38,8 @@ makes the most sense for your use case:
     LOAD 'chdb_hook';
     ```
 
-*   For all sessions, via the [session_preload_libraries] setting, via `postgresql.conf`:
+*   For all sessions, via the [session_preload_libraries] setting, via
+    `postgresql.conf`:
 
     ```ini
     session_preload_libraries = chdb_hook
@@ -244,16 +246,16 @@ The chdb_hook `COPY` command supports the following options:
 
 #### `format`:
 
-The format to read or write. Must be one of the [formats] provided by
-[chDB], which include TSV, CSV, Parquet, Iceberg, JSON, and more. Omit or
-set to `auto` to have chDB determine the format from file name extension
-at the end of the URL.
+The format to read or write. Must be one of the [formats] provided by [chDB],
+which include TSV, CSV, Parquet, Iceberg, JSON, and more. Omit or set to
+`auto` to have chDB determine the format from file name extension at the end
+of the URL.
 
 #### `structure`
 
 The [chDB] data structure for a row. Consists of a list of column names and
-[ClickHouse data types] and modifiers. If omitted, chdb_hook maps the
-Postgres data types to generally-appropriate ClickHouse types; see [Postgres to
+[ClickHouse data types] and modifiers. If omitted, chdb_hook maps the Postgres
+data types to generally-appropriate ClickHouse types; see [Postgres to
 chDB](#postgres-to-chdb) for details. If set to `auto`, chDB attempts to infer
 the types.
 
@@ -282,8 +284,8 @@ URLs.
 
 #### `compression`
 
-File compression format. Use if the compression cannot be inferred from
-the file name. Supported values:
+File compression format. Use if the compression cannot be inferred from the
+file name. Supported values:
 
 *   `auto` (default)
 *   `none`
@@ -356,8 +358,8 @@ CREATE TABLE reviews () WITH (
 );
 ```
 
-`copy_from` infers the columns only when the statement names none of its own. A
-column list, an `INHERITS` clause, an `OF` type, or a partition each define
+`copy_from` infers the columns only when the statement names none of its own.
+A column list, an `INHERITS` clause, an `OF` type, or a partition each define
 columns, so `copy_from` then only copies:
 
 ```sql
@@ -383,8 +385,8 @@ CREATE TABLE users () WITH (
 );
 ```
 
-Neither `structure_from` nor `copy_from` works with `IF NOT EXISTS`. Use [COPY]
-to load an existing relation.
+Neither `structure_from` nor `copy_from` works with `IF NOT EXISTS`. Use
+[COPY] to load an existing relation.
 
 ## Limitations
 
@@ -433,8 +435,8 @@ between Postgres and chDB, chdb_hook has the following limitations:
 ## Data Types
 
 [COPY](#copy-overloading) maps the Postgres types of a relation to chDB types,
-while [CREATE TABLE](#create-table-overloading) maps the chDB types of a URL to
-Postgres types.
+while [CREATE TABLE](#create-table-overloading) maps the chDB types of a URL
+to Postgres types.
 
 ### Postgres to chDB
 
@@ -491,9 +493,9 @@ Array types map to `Array`s of the mapped element type. ClickHouse constrains
 nullability per column while Postgres constrains it per array, so elements are
 always `Nullable`.
 
-No Postgres type maps to `Map` or `Tuple`, but [structure](#structure) may name
-one. A `Map` can convert to an array of key value pairs, and a `Tuple` converts
-to an array. Use `text[]` for heterogeneous support.
+No Postgres type maps to `Map` or `Tuple`, but [structure](#structure) may
+name one. A `Map` can convert to an array of key value pairs, and a `Tuple`
+converts to an array. Use `text[]` for heterogeneous support.
 
 ### chDB to Postgres
 
