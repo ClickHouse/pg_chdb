@@ -84,18 +84,14 @@ fi
 
 DESTDIR="${DESTDIR:-/usr/local}"
 
-# Make sure the library and header directory exists
-mkdir -p "${DESTDIR}/lib" || true
+# Install the library and headers.
+mkdir -p "${DESTDIR}/lib" "${DESTDIR}/include" || true
 /bin/cp libchdb.* "${DESTDIR}/lib/"
+/bin/cp chdb.h* "${DESTDIR}/include/"
+
 if [ -z "$STATIC" ]; then
-    mkdir -p "${DESTDIR}/include" || true
-    /bin/cp chdb.h* "${DESTDIR}/include/"
-else
-    # Set execute permission for libchdb.so and update the library cache
+    # Set execute permission for libchdb.so.
     chmod +x "${DESTDIR}/lib/libchdb.so"
-    if [[ "$(uname -s)" == "Linux" ]]; then
-        ldconfig
-    fi
 fi
 
 # Clean up

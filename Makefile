@@ -16,17 +16,17 @@ OBJS 		 = $(subst .c,.o, $(wildcard src/*.c))
 
 CLANG_FORMAT ?= clang-format
 
-# Version of libchdb to bundle.
-LIBCHDB_VERSION = v26.7.0
+# Binary dependency on specific version (for now) of libchdb. Optionally
+# download locally by setting BUNDLE_LIBCHDB and compile statically with
+# LIBCHDB_BUILD=static.
+LIBCHDB_VERSION ?= v26.7.0
+LIBCHDB_BUILD   ?= dynamic
 
 # Header-only dependencies, vendored as submodules. clickhouse-c comes from
 # pg-clickhouse-c's own pin, its signatures naming clickhouse-c types, so a
 # second checkout on the include path would silently win.
 PGCH_DIR     = $(CURDIR)/vendor/pg-clickhouse-c
 CH_C_DIR     = $(PGCH_DIR)/clickhouse-c
-
-# Downloaded copy of libchdb.
-LIBCHDB_DIR = vendor/libchdb
 
 # Suppress annoying pre-c99 warning, error on 	/other warnings.
 PG_CFLAGS    = -Wno-declaration-after-statement -Wall -Werror
@@ -54,7 +54,7 @@ ifneq ($(BUNDLE_LIBCHDB),)
 OS         ?= $(shell uname -s | tr A-Z a-z)
 ARCH        = $(shell uname -m)
 LIBCHDB_DIR = vendor/libchdb-$(OS)-$(ARCH)
-src/helper/chdb_helper: $(LIBCHDB_DIR)/lib/libchdb.so
+src/helper/chdb_helper: $(LIBCHDB_DIR)/lib/libchdb.$(if $(filter $(LIBCHDB_BUILD),static),a,so)
 install: install-libchdb
 uninstall: uninstall-libchdb
 endif
@@ -94,7 +94,7 @@ $(CH_C_DIR)/clickhouse.h: .gitmodules
 
 # The only program linking libchdb, kept beside the library that starts it.
 src/helper/chdb_helper: $(wildcard src/helper/*.c) src/setup.h
-	@$(MAKE) -C $(dir $@) all LIBCHDB_DIR=$(LIBCHDB_DIR)
+	@$(MAKE) -C $(dir $@) all LIBCHDB_DIR=$(LIBCHDB_DIR) LIBCHDB_BUILD=$(LIBCHDB_BUILD)
 
 # Install the helper. Write beside the live copy and rename over it: install
 # unlinks its target first, so a COPY starting in that moment finds no helper.
@@ -115,10 +115,10 @@ test/schedule:
 installcheck: test/schedule
 
 # libchdb
-$(LIBCHDB_DIR)/lib/libchdb.so: vendor/get-libchdb.sh
+$(LIBCHDB_DIR)/lib/libchdb.so:
 	@env INSTALL_VERSION="$(LIBCHDB_VERSION)" DESTDIR=$(LIBCHDB_DIR) bash vendor/get-libchdb.sh
 
-$(LIBCHDB_DIR)/lib/libchdb.a: vendor/get-libchdb.sh
+$(LIBCHDB_DIR)/lib/libchdb.a:
 	env INSTALL_VERSION="$(LIBCHDB_VERSION)" DESTDIR=$(LIBCHDB_DIR) STATIC=1 bash vendor/get-libchdb.sh
 
 # GitHub stuff.
@@ -129,12 +129,12 @@ libchdb-variables:
 	@echo DIRECTORY=$(LIBCHDB_DIR)
 
 # Install and uninstall libchdb, which is configured to live in /usr/local/lib.
-install-libchdb: $(LIBCHDB_DIR)/lib/libchdb.so
+install-libchdb: $(LIBCHDB_DIR)/lib/libchdb.$(if $(filter $(LIBCHDB_BUILD),static),a,so)
 	$(MKDIR_P) $(DESTDIR)/usr/local/lib
 	$(INSTALL_SHLIB) $< $(DESTDIR)/usr/local/lib
 	if [ "$$(uname -s)" = "Linux" ]; then ldconfig; fi
 uninstall-libchdb:
-	rm -f $(DESTDIR)/usr/local/lib/libchdb.so
+	rm -f $(DESTDIR)/usr/local/lib/libchdb.$(if $(filter $(LIBCHDB_BUILD),static),a,so)
 
 .PHONY: format # Format .c and .h files to project standard in .clang-format.
 format: $(wildcard src/*.c src/*.h src/helper/*.c)

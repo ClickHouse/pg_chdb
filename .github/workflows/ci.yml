@@ -15,9 +15,10 @@ jobs:
       matrix:
         pg: [19, 18, 17, 16]
         arch: [amd64, arm64]
-    name: 🐘 PostgreSQL ${{ matrix.pg }} ${{ matrix.arch == 'amd64' && '🧰' || '🦾' }} ${{ matrix.arch }}
+        build: [dynamic, static]
+    name: 🐘 PgSQL ${{ matrix.pg }} ${{ matrix.arch == 'amd64' && '🧰' || '🦾' }} ${{ matrix.arch }} ${{ matrix.build }}
     runs-on: ubuntu-${{ matrix.arch == 'amd64' && 'latest' || '24.04-arm' }}
-    env: { BUNDLE_LIBCHDB: 1 }
+    env: { BUNDLE_LIBCHDB: 1, LIBCHDB_BUILD: "${{ matrix.build }}" }
     services:
       kv-rest:
         image: ghcr.io/theory/kv-rest
@@ -39,14 +40,14 @@ jobs:
         id: cache-chdb
         uses: actions/cache@v6
         with:
-          key: ${{ steps.chdb.outputs.directory }}
+          key: ${{ steps.chdb.outputs.directory }}-${{ matrix.build }}
           path: |
             ${{ steps.chdb.outputs.directory }}/lib/libchdb.*
             ${{ steps.chdb.outputs.directory }}/include/chdb.h
       - name: Build
         run: make -j $(nproc)
       - name: Install
-        run: sudo --preserve-env=BUNDLE_LIBCHDB make install
+        run: sudo --preserve-env=BUNDLE_LIBCHDB,LIBCHDB_BUILD make install
       - name: Configure AWS credentials # for s3.sql round-trip test
         uses: aws-actions/configure-aws-credentials@v6
         with:

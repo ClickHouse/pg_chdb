@@ -122,16 +122,26 @@ Dependencies
 ------------
 
 The `chdb` extension requires PostgreSQL 16 or higher and the [chDB] library
-v26.7.0 or greater. The simplest way to install it is via the [lib.chdb.io]
-shell script:
+v26.7.0 or greater (currently available only for Linux and macOS). The
+simplest way to install it is via the [lib.chdb.io] shell script:
 
 ```sh
 curl -sL https://lib.chdb.io | bash
 ```
 
-On Linux, you can also have the installation process download and install it
-by setting `export BUNDLE_LIBCHDB=1` before running the
-[Installation](#installation) `make` commands
+To statically compile [chDB] into the helper app, set the following variables
+before running the [Installation](#installation) `make` commands.
+
+```sh
+export BUNDLE_LIBCHDB=1 LIBCHDB_BUILD=static
+```
+
+The `Makefile` will download the static `libchdb` library and compile it into
+the app.
+
+On Linux, you can also have the installation process download and install the
+dynamic `libchdb` library by setting `export BUNDLE_LIBCHDB=1` before running
+the [Installation](#installation) `make` commands.
 
 Installation
 ------------
