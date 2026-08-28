@@ -20,7 +20,8 @@ PREPARE show_chdb(bool) AS
             'max_memory_usage', 'max_threads', 'max_parsing_threads',
             'allow_experimental_nullable_tuple_type',
             'output_format_native_encode_types_in_binary_format',
-            'output_format_native_write_json_as_string'
+            'output_format_native_write_json_as_string',
+            'date_time_output_format'
         )
         ORDER BY name
     $$,
@@ -44,12 +45,13 @@ EXECUTE show_chdb(false);
                         name                        | value 
 ----------------------------------------------------+-------
  allow_experimental_nullable_tuple_type             | 1
+ date_time_output_format                            | iso
  max_memory_usage                                   | 0
  max_parsing_threads                                | auto
  max_threads                                        | auto
  output_format_native_encode_types_in_binary_format | 0
  output_format_native_write_json_as_string          | 1
-(6 rows)
+(7 rows)
 
 -- Set integer values.
 SET chdb.max_memory = 5000;
@@ -69,12 +71,13 @@ EXECUTE show_chdb(false);
                         name                        |   value    
 ----------------------------------------------------+------------
  allow_experimental_nullable_tuple_type             | 1
+ date_time_output_format                            | iso
  max_memory_usage                                   | 5242880000
  max_parsing_threads                                | 12
  max_threads                                        | 42
  output_format_native_encode_types_in_binary_format | 0
  output_format_native_write_json_as_string          | 1
-(6 rows)
+(7 rows)
 
 -- And again using size syntax for the memory
 SET chdb.max_memory = '100MB';
@@ -94,12 +97,13 @@ EXECUTE show_chdb(false);
                         name                        |   value   
 ----------------------------------------------------+-----------
  allow_experimental_nullable_tuple_type             | 1
+ date_time_output_format                            | iso
  max_memory_usage                                   | 104857600
  max_parsing_threads                                | 10
  max_threads                                        | 88
  output_format_native_encode_types_in_binary_format | 0
  output_format_native_write_json_as_string          | 1
-(6 rows)
+(7 rows)
 
 -- Set max values.
 SET chdb.max_memory = 65535;
@@ -119,12 +123,13 @@ EXECUTE show_chdb(true);
                         name                        |    value    
 ----------------------------------------------------+-------------
  allow_experimental_nullable_tuple_type             | 1
+ date_time_output_format                            | iso
  max_memory_usage                                   | 68718428160
  max_parsing_threads                                | 65535
  max_threads                                        | MAX
  output_format_native_encode_types_in_binary_format | 0
  output_format_native_write_json_as_string          | 1
-(6 rows)
+(7 rows)
 
 -- Set invalid values.
 SET chdb.max_memory = -1;

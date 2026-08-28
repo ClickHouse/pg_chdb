@@ -319,6 +319,7 @@ setup_session(
         "output_format_json_quote_denormals,"
         "output_format_native_write_json_as_string,"
         "output_format_native_encode_types_in_binary_format=0,"
+        "date_time_output_format='iso',"
         "max_threads=%" PRIu16 ",max_parsing_threads=%" PRIu16
         ",max_memory_usage=%" PRIu64,
         max_threads,

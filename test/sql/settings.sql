@@ -22,7 +22,8 @@ PREPARE show_chdb(bool) AS
             'max_memory_usage', 'max_threads', 'max_parsing_threads',
             'allow_experimental_nullable_tuple_type',
             'output_format_native_encode_types_in_binary_format',
-            'output_format_native_write_json_as_string'
+            'output_format_native_write_json_as_string',
+            'date_time_output_format'
         )
         ORDER BY name
     $$,

@@ -477,8 +477,8 @@ those you need.
 | date        | Date32                                   |                                                                        |
 | time        | Time64(6)                                | Override with `String` for formats that don't support times.           |
 | timetz      | String                                   |                                                                        |
-| timestamp   | DateTime64(6)                            | Declared with the `UTC` time zone; values cross as UTC instants.       |
-| timestamptz | DateTime64(6)                            | Declared with the `UTC` time zone; values cross as UTC instants.       |
+| timestamp   | DateTime64(6)                            | Declared with the `UTC` time zone, converted from session time zone.   |
+| timestamptz | DateTime64(6)                            | Declared with the `UTC` time zone.                                     |
 | numeric     | Decimal                                  |                                                                        |
 | uuid        | UUID                                     |                                                                        |
 | point       | `Point`                                  | Same two coordinates as Postgres.                                      |
@@ -496,6 +496,40 @@ always `Nullable`.
 No Postgres type maps to `Map` or `Tuple`, but [structure](#structure) may
 name one. A `Map` can convert to an array of key value pairs, and a `Tuple`
 converts to an array. Use `text[]` for heterogeneous support.
+
+### Timestamp Conversion
+
+In plain text formats (TSV, CSV, etc.), the `COPY` hook emits DateTime and
+DateTime64 values in ISO-8601 format, `YYYY-MM-DDThh:mm:ssZ`, without regard
+to the current `datestyle` setting. This ensures that timestamptz values
+remain consistent, even if a source importing the values uses a different time
+zone. Using a different type in the `structure` output, such as `Datetime64(3,
+'America/Los_Angeles')`, has no impact on the offset of the output, but does
+change the precision.
+
+Timestamp TZ Examples:
+
+| timestamptz                               | `DateTime64(6, 'UTC')`        | `DateTime64(3 'Japan')`    |
+| ----------------------------------------- | ----------------------------- | -------------------------- |
+| `2026-08-28T12:00:00Z`                    | `2026-08-28T12:00:00.000000Z` | `2026-08-28T12:00:00.000Z` |
+| `2026-08-28T11:00:00 America/Los_Angeles` | `2026-08-28T18:00:00.000000Z` | `2026-08-28T18:00:00.000Z` |
+| `2026-08-28T10:00:00.723923 Asia/Tokyo`   | `2026-08-28T01:00:00.723923Z` | `2026-08-28T01:00:00.723Z` |
+
+The `COPY` hook also converts timestamp values from the session time zone to
+UTC, thus ensuring that they're output relative to that time zone. When loaded
+into a new system, it should convert them to its local time zone. Thus the
+values will differ if the time zone differs, but will be the same relative to
+the time zone difference.
+
+Example of the effect of the `timezone` setting on the timestamp
+`2026-08-28T12:00:00`:
+
+| timezone setting      | `DateTime64(6, 'UTC')`        | `DateTime64(3 'Japan')`    |
+| --------------------- | ----------------------------- | -------------------------- |
+| `UTC`                 | `2026-08-28T12:00:00.000000Z` | `2026-08-28T12:00:00.000Z` |
+| `America/Los_Angeles` | `2026-08-28T19:00:00.000000Z` | `2026-08-28T19:00:00.000Z` |
+| `America/New_York`    | `2026-08-28T16:00:00.000000Z` | `2026-08-28T16:00:00.000Z` |
+| `Japan`               | `2026-08-28T03:00:00.000000Z` | `2026-08-28T03:00:00.000Z` |
 
 ### chDB to Postgres
 

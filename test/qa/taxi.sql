@@ -2,7 +2,7 @@
 DROP TABLE IF EXISTS trips;
 CREATE TABLE trips (
     trip_id                 bigint                    NOT NULL,
-    vendor_id               text                      NOT NULL,
+    vendor_id               bigint                    NOT NULL,
     pickup_date             date                      NOT NULL,
     pickup_datetime         timestamp with time zone  NOT NULL,
     dropoff_date            date                      NOT NULL,
@@ -29,7 +29,7 @@ CREATE TABLE trips (
     dropoff                 character varying(25)     NOT NULL,
     cab_type                text                      NOT NULL,
     pickup_nyct2010_gid     smallint                  NOT NULL,
-    pickup_ctlabel          real                      NOT NULL,
+    pickup_ctlabel          double precision          NOT NULL,
     pickup_borocode         smallint                  NOT NULL,
     pickup_ct2010           text                      NOT NULL,
     pickup_boroct2010       text                      NOT NULL,
@@ -38,7 +38,7 @@ CREATE TABLE trips (
     pickup_ntaname          text                      NOT NULL,
     pickup_puma             integer                   NOT NULL,
     dropoff_nyct2010_gid    smallint                  NOT NULL,
-    dropoff_ctlabel         real                      NOT NULL,
+    dropoff_ctlabel         double precision          NOT NULL,
     dropoff_borocode        smallint                  NOT NULL,
     dropoff_ct2010          text                      NOT NULL,
     dropoff_boroct2010      text                      NOT NULL,

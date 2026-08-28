@@ -138,13 +138,6 @@ chdb_copy(chdbCopyContext* ctx) {
      */
     int nestlevel = NewGUCNestLevel();
 
-    set_config_option(
-        "datestyle", "ISO", PGC_USERSET, PGC_S_SESSION, GUC_ACTION_SAVE, true, 0, false
-    );
-    set_config_option(
-        "timezone", "UTC", PGC_USERSET, PGC_S_SESSION, GUC_ACTION_SAVE, true, 0, false
-    );
-
     /* We always need a structure. */
     if (ctx->structure[0] == '\0') {
         TupleDesc desc = RelationGetDescr(ctx->rel);

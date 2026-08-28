@@ -7,6 +7,31 @@ All notable changes to this project will be documented in this file. It uses the
   [Semantic Versioning]: https://semver.org/spec/v2.0.0.html
     "Semantic Versioning 2.0.0"
 
+## [v0.1.1] — Unreleased
+
+### 🐞 Bug Fixes
+
+*   Added the `date_time_output_format='iso'` setting to each chDB query to
+    always format `timestamp` and `timestamptz` values in plain text formats
+    with the ISO-8601 format in UTC, converting `timestamp` values from the
+    current `timezone` setting.
+
+### 💅🏻 Quality
+
+*   Added comprehensive tests for timestamp and timestamptz `COPY` output and
+    round-tripping, including the impact of the `timezone` setting on
+    `timestamp` values.
+
+### 📚 Documentation
+
+*   Added the "Timestamp Conversion" section to the [chdb_hook docs] to
+    document the ISO-8601 format of plain text exports of `timestamp` and
+    `timestamptz` values, as well as the impact of the `timezone` setting on
+    exported and imported values.
+
+  [v0.1.1]: https://github.com/clickhouse/pg_chdb/compare/v0.1.0...v0.1.1
+  [chdb_hook docs](./doc/chdb_hook.md)
+
 ## [v0.1.0] — 2026-08-25
 
 The theme of this release is *Shakedown.*
@@ -48,7 +73,7 @@ The theme of this release is *Shakedown.*
 *   chdb extension reference documentation in [doc/chdb.md](doc/chdb.md)
 *   chdb_hook module reference documentation in [doc/chdb_hook.md](doc/chdb_hook.md)
 
-  [v0.1.0]: https://github.com/clickhouse/pg_chdb/compare/a1487bd...v0.1.0
+  [v0.1.0]: https://github.com/clickhouse/pg_chdb/compare/fca4dc1...v0.1.0
   [chDB]: https://clickhouse.com/chdb "chDB - fast, reliable, and scalable in-process database"
   [formats]: https://github.com/chdb-io/chdb/blob/main/refs/clickhouse-formats-settings.md#complete-format-names-table
     "chDB Docs: Complete Format Names Table"
