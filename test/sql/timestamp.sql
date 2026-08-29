@@ -76,5 +76,24 @@ SELECT pg_read_file(:'tsv_path');
 COPY date_times TO :'tsv_url' (structure 'id Int8, ts DateTime64(3, ''Japan''), tstz DateTime64(3, ''America/New_York'')');
 SELECT pg_read_file(:'tsv_path');
 
+/************************ Default scales ************************/
+-- A DateTime64 or Time64 named without a scale takes chDB's default of
+-- milliseconds, truncating the microseconds Postgres holds.
+CREATE TABLE default_scales (
+    tstz TIMESTAMPTZ NOT NULL,
+    t    TIME        NOT NULL
+);
+
+INSERT INTO default_scales
+VALUES ('2026-07-23 20:43:50.944042Z', '13:45:15.416013');
+
+COPY default_scales TO :'tsv_url' (structure 'tstz DateTime64, t Time64');
+TRUNCATE default_scales;
+COPY default_scales FROM :'tsv_url' (structure 'tstz DateTime64, t Time64');
+
+SELECT tstz = '2026-07-23 20:43:50.944Z'::timestamptz AS tstz_ms
+     , t = '13:45:15.416'::time AS time_ms
+  FROM default_scales;
+
 
 \! rm -rf /tmp/chdb-timestamp.tmp 2> /dev/null || true

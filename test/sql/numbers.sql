@@ -75,5 +75,19 @@ CREATE TABLE number_arrays2 (LIKE number_arrays INCLUDING ALL);
 \set from_table number_arrays
 \set to_table number_arrays2
 \i test/utils/round-trip-formats.sql
+/****************************************************************************/
+-- BFloat16 keeps the leading 16 bits of a float4, so a write drops the low
+-- mantissa bits.
+CREATE TABLE bfloats (f FLOAT4 NOT NULL);
+
+INSERT INTO bfloats
+VALUES (0), (1.5), (-2.25), (1.1), (3.4028235e38), ('infinity'), ('-infinity'), ('nan');
+
+CREATE TABLE bfloats2 (LIKE bfloats INCLUDING ALL);
+COPY bfloats TO 'file:///tmp/numbers.tmp' (format 'TabSeparated', structure 'f BFloat16');
+COPY bfloats2 FROM 'file:///tmp/numbers.tmp' (format 'TabSeparated', structure 'f BFloat16');
+
+SELECT f FROM bfloats2 ORDER BY f;
+
 \set ECHO errors
 \! rm -rf /tmp/numbers.tmp 2> /dev/null || true

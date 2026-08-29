@@ -66,5 +66,60 @@ CREATE TABLE datetime_arrays2 (LIKE datetime_arrays INCLUDING ALL);
 \set from_table datetime_arrays
 \set to_table datetime_arrays2
 \i test/utils/round-trip-formats.sql
+
+/****************************************************************************/
+CREATE TABLE intervals (
+    y   INTERVAL NOT NULL,
+    q   INTERVAL NOT NULL,
+    mon INTERVAL NOT NULL,
+    w   INTERVAL NOT NULL,
+    d   INTERVAL NOT NULL,
+    h   INTERVAL NOT NULL,
+    mi  INTERVAL NOT NULL,
+    s   INTERVAL NOT NULL,
+    ms  INTERVAL NOT NULL,
+    us  INTERVAL NOT NULL,
+    ns  INTERVAL NOT NULL
+);
+
+INSERT INTO intervals
+VALUES ('6 years', '9 months', '-5 months', '14 days', '-3 days', '4 hours', '-90 minutes', '2 sec', '0.25 sec', '-0.000001 sec', '1.000002 sec');
+
+\set interval_structure 'y IntervalYear, q IntervalQuarter, mon IntervalMonth, w IntervalWeek, d IntervalDay, h IntervalHour, mi IntervalMinute, s IntervalSecond, ms IntervalMillisecond, us IntervalMicrosecond, ns IntervalNanosecond'
+
+CREATE TABLE intervals2 (LIKE intervals INCLUDING ALL);
+COPY intervals TO 'file:///tmp/datetimes.tmp'
+     (format 'TabSeparated', structure :'interval_structure');
+COPY intervals2 FROM 'file:///tmp/datetimes.tmp'
+     (format 'TabSeparated', structure :'interval_structure');
+
+SELECT count(*) AS intervals_mismatch
+  FROM (SELECT * FROM intervals EXCEPT ALL SELECT * FROM intervals2) x;
+
+-- Months mixed with days, or a value which doesn't fit destination interval type.
+CREATE TABLE misfits (iv INTERVAL NOT NULL);
+INSERT INTO misfits VALUES ('1 mon 1 day');
+COPY misfits TO 'file:///tmp/datetimes.tmp'
+     (format 'TabSeparated', structure 'iv IntervalMonth');
+TRUNCATE misfits;
+INSERT INTO misfits VALUES ('1.5 days');
+COPY misfits TO 'file:///tmp/datetimes.tmp'
+     (format 'TabSeparated', structure 'iv IntervalDay');
+
+-- Reading same ticks truncates nanoseconds to microseconds in Postgres
+CREATE TABLE ticks (n INT8 NOT NULL);
+CREATE TABLE tocks (iv INTERVAL NOT NULL);
+INSERT INTO ticks VALUES (1500), (-1500);
+COPY ticks TO 'file:///tmp/datetimes.tmp' (format 'TabSeparated', structure 'n Int64');
+COPY tocks FROM 'file:///tmp/datetimes.tmp'
+     (format 'TabSeparated', structure 'n IntervalNanosecond');
+SELECT iv FROM tocks ORDER BY iv;
+
+TRUNCATE ticks;
+INSERT INTO ticks VALUES (9223372036854775807);
+COPY ticks TO 'file:///tmp/datetimes.tmp' (format 'TabSeparated', structure 'n Int64');
+COPY tocks FROM 'file:///tmp/datetimes.tmp'
+     (format 'TabSeparated', structure 'n IntervalYear');
+
 \set ECHO errors
 \! rm -rf /tmp/datetimes.tmp 2> /dev/null || true

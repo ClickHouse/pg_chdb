@@ -9,8 +9,14 @@ All notable changes to this project will be documented in this file. It uses the
 
 ## [v0.1.1] — Unreleased
 
+### ⚡ Improvements
+
+*   Support mapping `BFloat16` to Postgres `real`, and `Interval` types to
+    Postgres `interval` ([#76]).
+
 ### 🐞 Bug Fixes
 
+*   `DateTime64` or `Time64` now defaults to millisecond precision ([#76]).
 *   Added the `date_time_output_format='iso'` setting to each chDB query to
     always format `timestamp` and `timestamptz` values in plain text formats
     with the ISO-8601 format in UTC, converting `timestamp` values from the
@@ -30,7 +36,9 @@ All notable changes to this project will be documented in this file. It uses the
     exported and imported values.
 
   [v0.1.1]: https://github.com/clickhouse/pg_chdb/compare/v0.1.0...v0.1.1
-  [chdb_hook docs](./doc/chdb_hook.md)
+  [#76]: https://github.com/clickhouse/pg_chdb/issues/76
+  [chdb_hook docs]: ./doc/chdb_hook.md
+  [structure]: ./doc/chdb_hook.md#structure "chdb_hook Docs: structure"
 
 ## [v0.1.0] — 2026-08-25
 
