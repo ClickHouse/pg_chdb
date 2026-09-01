@@ -14,6 +14,9 @@ All notable changes to this project will be documented in this file. It uses the
 *   Support mapping `BFloat16` to Postgres `real`, and `Interval` types to
     Postgres `interval` ([#76]).
 *   Added PostgreSQL 15 support.
+*   Map `UInt64`, `Int128`, `Int256`, `UInt128`, and `UInt256` to Postgres
+    `numeric`, so values above the `bigint` range no longer raise an error.
+    A derived column carries the precision spanning its chDB type ([#78]).
 
 ### 🐞 Bug Fixes
 
@@ -38,6 +41,7 @@ All notable changes to this project will be documented in this file. It uses the
 
   [v0.1.1]: https://github.com/clickhouse/pg_chdb/compare/v0.1.0...v0.1.1
   [#76]: https://github.com/clickhouse/pg_chdb/issues/76
+  [#78]: https://github.com/clickhouse/pg_chdb/pulls/78
   [chdb_hook docs]: ./doc/chdb_hook.md
   [structure]: ./doc/chdb_hook.md#structure "chdb_hook Docs: structure"
 

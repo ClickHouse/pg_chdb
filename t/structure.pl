@@ -22,7 +22,7 @@ my $port = PostgreSQL::Test::Cluster::get_free_port;
 my $dir = $node->basedir;
 
 NUMBERS: {
-    my ($oid8, $uint64) = $node->pg_version > 19 ? ('OID8', 'UInt64') : ('OID', 'UInt32');
+    my $oid8 = $node->pg_version->major >= 19 ? 'OID8' : 'XID8';
     $node->psql(postgres => qq{
         CREATE TABLE numbers (
             i2  INT2           NOT NULL,
@@ -43,7 +43,7 @@ NUMBERS: {
         qq{COPY numbers FROM 'file://$dir/nonesuch.csv'},
         qr/nonesuch.csv doesn't exist/,
         qr[\QSELECT * FROM file],
-        qr[\Q structure: "i2 Int16, i4 Int32, i8 Nullable(Int64), num Nullable(Decimal256(38)), np Nullable(Decimal(32,0)), nps Nullable(Decimal(12,6)), f4 Float32, f8 Nullable(Float64), b Bool, o UInt32, o8 $uint64" }],
+        qr[\Q structure: "i2 Int16, i4 Int32, i8 Nullable(Int64), num Nullable(Decimal256(38)), np Nullable(Decimal(32,0)), nps Nullable(Decimal(12,6)), f4 Float32, f8 Nullable(Float64), b Bool, o UInt32, o8 UInt64" }],
     );
 
     $node->psql(postgres => qq{
@@ -66,7 +66,7 @@ NUMBERS: {
         qq{COPY number_arrays FROM 'file://$dir/nonesuch.csv'},
         qr/nonesuch.csv doesn't exist/,
         qr[\QSELECT * FROM file],
-        qr[\Q structure: "i2 Array(Nullable(Int16)), i4 Array(Nullable(Int32)), i8 Array(Nullable(Int64)), num Array(Nullable(Decimal256(38))), np Array(Nullable(Decimal(32,0))), nps Array(Nullable(Decimal(12,6))), f4 Array(Nullable(Float32)), f8 Array(Nullable(Float64)), b Array(Nullable(Bool)), o Array(Nullable(UInt32)), o8 Array(Nullable($uint64))" }],
+        qr[\Q structure: "i2 Array(Nullable(Int16)), i4 Array(Nullable(Int32)), i8 Array(Nullable(Int64)), num Array(Nullable(Decimal256(38))), np Array(Nullable(Decimal(32,0))), nps Array(Nullable(Decimal(12,6))), f4 Array(Nullable(Float32)), f8 Array(Nullable(Float64)), b Array(Nullable(Bool)), o Array(Nullable(UInt32)), o8 Array(Nullable(UInt64))" }],
     );
 }
 

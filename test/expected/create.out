@@ -75,6 +75,26 @@ SELECT attname, format_type(atttypid, atttypmod) AS type, attndims, attnotnull
 (4 rows)
 
 /****************************************************************************/
+-- Derive numeric for integers wider than bigint
+CREATE TABLE wides () WITH (
+    structure_from = :'requests_csv',
+    format         = 'CSV',
+    structure      = 'i128 Int128, u128 UInt128, i256 Int256, u256 UInt256, u64 UInt64'
+);
+CREATE TABLE
+SELECT attname, format_type(atttypid, atttypmod) AS type, attnotnull
+  FROM pg_attribute WHERE attrelid = 'wides'::regclass AND attnum > 0
+ ORDER BY attnum;
+ attname |     type      | attnotnull 
+---------+---------------+------------
+ i128    | numeric(39,0) | t
+ u128    | numeric(39,0) | t
+ i256    | numeric(77,0) | t
+ u256    | numeric(78,0) | t
+ u64     | numeric(20,0) | t
+(5 rows)
+
+/****************************************************************************/
 -- Derive the fields of a Tuple and the pairs of a Map as text items
 CREATE TABLE spread () WITH (
     structure_from = :'requests_csv',
@@ -249,9 +269,9 @@ HINT:  Use COPY to load an existing relation.
 -- Reject ClickHouse types without PostgreSQL equivalents
 CREATE TABLE oops () WITH (
     structure_from = :'requests_csv',
-    structure      = 'req_id UInt32, big Int128'
+    structure      = 'req_id UInt32, dyn Dynamic'
 );
-ERROR:  chdb: unsupported column type "Int128" (column "big")
+ERROR:  chdb: unsupported column type "Dynamic" (column "dyn")
 -- Reject options unknown to chDB and PostgreSQL
 CREATE TABLE oops () WITH (structure_from = :'requests_csv', nonesuch = 1);
 ERROR:  unrecognized parameter "nonesuch"

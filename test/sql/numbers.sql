@@ -4,8 +4,8 @@ LOAD 'chdb_hook';
 \set oid8 OID8
 SELECT current_setting('server_version_num')::int < 190000 AS pg18 \gset
 \if :pg18
--- Use OID instead of OID8 prior to Postgres 19.
-\set oid8 OID
+-- Postgres 19 added oid8; xid8 stands in for it before then.
+\set oid8 XID8
 \endif
 \set ECHO all
 
@@ -27,13 +27,13 @@ CREATE TABLE numbers (
 );
 
 INSERT INTO numbers
-VALUES ('00000000-0000-0000-0000-000000000000', 0, 0, 0, 0, 0, 0, 0, 0, false, 0, 0)
-     , ('6ba7b810-9dad-11d1-80b4-00c04fd430c8', 0, 0, NULL, NULL, NULL, NULL, 0, NULL, false, 0, 0)
-     , ('B82601F4-2FF0-4F05-99E4-2CAAC200BA0F', -32768, -2147483648, -9223372036854775808, -987654321.123456789, -987654321, -123456.545675, -1.1, -98.68, false, 0, 0)
-     , ('A411B3DC-76c7-4D5D-92B2-3ab802504f1f', 32767, 2147483647, 9223372036854775807, 987654321.123456789, 987654321, 123456.545675, 1.1, 98.68, true, 0, 0)
-     , ('00000000-0000-0000-0000-000000000000', 42, 42, 42, NULL, NULL, NULL, 'nan', 'nan', true, 0, 0)
-     , ('00000000-0000-0000-0000-000000000000', -42, -42, -42, NULL, NULL, NULL, '-infinity', '-infinity', true, 0, 0)
-     , ('00000000-0000-0000-0000-000000000000', 42, 42, 42, NULL, NULL, NULL, 'infinity', 'infinity', true, 0, 0)
+VALUES ('00000000-0000-0000-0000-000000000000', 0, 0, 0, 0, 0, 0, 0, 0, false, 0, '0')
+     , ('6ba7b810-9dad-11d1-80b4-00c04fd430c8', 0, 0, NULL, NULL, NULL, NULL, 0, NULL, false, 0, '0')
+     , ('B82601F4-2FF0-4F05-99E4-2CAAC200BA0F', -32768, -2147483648, -9223372036854775808, -987654321.123456789, -987654321, -123456.545675, -1.1, -98.68, false, 0, '0')
+     , ('A411B3DC-76c7-4D5D-92B2-3ab802504f1f', 32767, 2147483647, 9223372036854775807, 987654321.123456789, 987654321, 123456.545675, 1.1, 98.68, true, 0, '18446744073709551615')
+     , ('00000000-0000-0000-0000-000000000000', 42, 42, 42, NULL, NULL, NULL, 'nan', 'nan', true, 0, '0')
+     , ('00000000-0000-0000-0000-000000000000', -42, -42, -42, NULL, NULL, NULL, '-infinity', '-infinity', true, 0, '0')
+     , ('00000000-0000-0000-0000-000000000000', 42, 42, 42, NULL, NULL, NULL, 'infinity', 'infinity', true, 0, '0')
 ;
 
 -- Execute round-trip to all supported formats. Protobuf reads a Nullable
@@ -65,7 +65,7 @@ CREATE TABLE number_arrays (
 INSERT INTO number_arrays
 VALUES ('{00000000-0000-0000-0000-000000000000}', '{0}', '{0}', '{0}', '{0}', '{0}', '{0}', '{0}', '{0}', '{false}', '{0}', '{0}')
      , ('{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}')
-     , ('{6ba7b810-9dad-11d1-80b4-00c04fd430c8, NULL}', '{-32768,32767}', '{-2147483648,2147483647}', '{-9223372036854775808,9223372036854775807}', '{-987654321.123456789,987654321.123456789}', '{-987654321,987654321}', '{-123456.545675,123456.545675}', '{-1.1,1.1}', '{-98.68,98.68}', '{false,true}', '{0, 0}', '{0,0}')
+     , ('{6ba7b810-9dad-11d1-80b4-00c04fd430c8, NULL}', '{-32768,32767}', '{-2147483648,2147483647}', '{-9223372036854775808,9223372036854775807}', '{-987654321.123456789,987654321.123456789}', '{-987654321,987654321}', '{-123456.545675,123456.545675}', '{-1.1,1.1}', '{-98.68,98.68}', '{false,true}', '{0, 0}', '{0,18446744073709551615}')
      , ('{B82601F4-2FF0-4F05-99E4-2CAAC200BA0F, A411B3DC-76c7-4D5D-92B2-3ab802504f1f}', '{0, NULL}', '{NULL, 0}', '{NULL}', '{0, NULL}', '{NULL, 0}', '{NULL}', '{0,NULL}', '{NULL,0}', '{false,NULL}', '{NULL}', '{0,NULL}')
 ;
 
@@ -75,6 +75,31 @@ CREATE TABLE number_arrays2 (LIKE number_arrays INCLUDING ALL);
 \set from_table number_arrays
 \set to_table number_arrays2
 \i test/utils/round-trip-formats.sql
+
+/****************************************************************************/
+-- Numeric for integers wider than bigint, UInt64 among them.
+CREATE TABLE wide_ints (
+    i128 numeric NOT NULL,
+    u128 numeric NOT NULL,
+    i256 numeric NOT NULL,
+    u256 numeric NOT NULL,
+    u64  numeric NOT NULL
+);
+
+\set wide_structure 'i128 Int128, u128 UInt128, i256 Int256, u256 UInt256, u64 UInt64'
+
+INSERT INTO wide_ints
+VALUES (0, 0, 0, 0, 0)
+     , (170141183460469231731687303715884105727, 340282366920938463463374607431768211455, 57896044618658097711785492504343953926634992332820282019728792003956564819967, 115792089237316195423570985008687907853269984665640564039457584007913129639935, 18446744073709551615)
+     , (-170141183460469231731687303715884105728, 42, -57896044618658097711785492504343953926634992332820282019728792003956564819968, 42, 42)
+;
+
+CREATE TABLE wide_ints2 (LIKE wide_ints INCLUDING ALL);
+COPY wide_ints TO 'file:///tmp/numbers.tmp' (format 'TabSeparated', structure :'wide_structure');
+COPY wide_ints2 FROM 'file:///tmp/numbers.tmp' (format 'TabSeparated', structure :'wide_structure');
+
+SELECT * FROM wide_ints2 ORDER BY i128;
+
 /****************************************************************************/
 -- BFloat16 keeps the leading 16 bits of a float4, so a write drops the low
 -- mantissa bits.

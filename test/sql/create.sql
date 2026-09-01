@@ -46,6 +46,17 @@ SELECT attname, format_type(atttypid, atttypmod) AS type, attndims, attnotnull
  ORDER BY attnum;
 
 /****************************************************************************/
+-- Derive numeric for integers wider than bigint
+CREATE TABLE wides () WITH (
+    structure_from = :'requests_csv',
+    format         = 'CSV',
+    structure      = 'i128 Int128, u128 UInt128, i256 Int256, u256 UInt256, u64 UInt64'
+);
+SELECT attname, format_type(atttypid, atttypmod) AS type, attnotnull
+  FROM pg_attribute WHERE attrelid = 'wides'::regclass AND attnum > 0
+ ORDER BY attnum;
+
+/****************************************************************************/
 -- Derive the fields of a Tuple and the pairs of a Map as text items
 CREATE TABLE spread () WITH (
     structure_from = :'requests_csv',
@@ -139,7 +150,7 @@ CREATE TABLE IF NOT EXISTS from_csv () WITH (copy_from = :'requests_csv');
 -- Reject ClickHouse types without PostgreSQL equivalents
 CREATE TABLE oops () WITH (
     structure_from = :'requests_csv',
-    structure      = 'req_id UInt32, big Int128'
+    structure      = 'req_id UInt32, dyn Dynamic'
 );
 
 -- Reject options unknown to chDB and PostgreSQL

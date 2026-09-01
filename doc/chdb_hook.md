@@ -470,6 +470,7 @@ those you need.
 | int8        | Int64                                    |                                                                        |
 | oid         | UInt32                                   |                                                                        |
 | oid8        | UInt64                                   |                                                                        |
+| xid8        | UInt64                                   |                                                                        |
 | json        | String                                   | Override with `JSON` if data contains only objects.                    |
 | jsonb       | String                                   | Override with `JSON` if data contains only objects.                    |
 | float4      | Float32                                  |                                                                        |
@@ -562,6 +563,8 @@ types:
 | Int16               | smallint                    |                                  |
 | Int32               | integer                     |                                  |
 | Int64               | bigint                      |                                  |
+| Int128              | numeric(39,0)               |                                  |
+| Int256              | numeric(77,0)               |                                  |
 | IntervalDay         | interval                    |                                  |
 | IntervalHour        | interval                    |                                  |
 | IntervalMicrosecond | interval                    |                                  |
@@ -590,13 +593,15 @@ types:
 | UInt8               | smallint                    |                                  |
 | UInt16              | integer                     |                                  |
 | UInt32              | bigint                      |                                  |
-| UInt64              | bigint                      | Errors on values > BIGINT max    |
+| UInt64              | numeric(20,0)               |                                  |
+| UInt128             | numeric(39,0)               |                                  |
+| UInt256             | numeric(78,0)               |                                  |
 | UUID                | uuid                        |                                  |
 <!-- TYPE-TABLE-END -->
 
 Every chDB type omitted from this table raises an error, among them `Nested`,
-`Variant`, `Dynamic`, and the 128 and 256 bit integers. Use a
-[structure](#structure) that maps them to `String` to read them as text.
+`Variant`, and `Dynamic`. Use a [structure](#structure) that maps them to
+`String` to read them as text.
 
 Postgres holds a narrower range than chDB in a few of these types; thus copy
 raises an error on a `Time` or `Time64` beyond 24 hours, and on a `Date32`
