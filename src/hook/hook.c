@@ -169,8 +169,14 @@ open_copy_relation(CopyStmt* copy, chdbCopyContext* ctx) {
     ParseState* pstate = make_parsestate(NULL);
     ParseNamespaceItem* nsitem =
         addRangeTableEntryForRelation(pstate, rel, lockmode, NULL, false, false);
+#if PG_VERSION_NUM >= 160000
     RTEPermissionInfo* perminfo = nsitem->p_perminfo;
     perminfo->requiredPerms     = copy->is_from ? ACL_INSERT : ACL_SELECT;
+#else
+    /* Delete test/expected/permissions_1.out when Postgres 15 dropped. */
+    RangeTblEntry* perminfo = nsitem->p_rte;
+    perminfo->requiredPerms = (copy->is_from ? ACL_INSERT : ACL_SELECT);
+#endif
 
     ctx->rel     = rel;
     ctx->attnums = CopyGetAttnums(RelationGetDescr(rel), rel, copy->attlist);
@@ -183,11 +189,17 @@ open_copy_relation(CopyStmt* copy, chdbCopyContext* ctx) {
         *cols =
             bms_add_member(*cols, lfirst_int(lc) - FirstLowInvalidHeapAttributeNumber);
     }
+#if PG_VERSION_NUM >= 160000
     ExecCheckPermissions(pstate->p_rtable, pstate->p_rteperminfos, true);
+#else
+    ExecCheckRTPerms(pstate->p_rtable, true);
+#endif
 
     /* A COPY FROM hands this to the executor rather than building its own. */
-    ctx->rtable       = pstate->p_rtable;
+    ctx->rtable = pstate->p_rtable;
+#if PG_VERSION_NUM >= 160000
     ctx->rteperminfos = pstate->p_rteperminfos;
+#endif
 
     /*
      * chDB copies the whole relation, so policies cannot be applied to the

@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        pg: [19, 18, 17, 16]
+        pg: [19, 18, 17, 16, 15]
         arch: [amd64, arm64]
         build: [dynamic, static]
     name: 🐘 PgSQL ${{ matrix.pg }} ${{ matrix.arch == 'amd64' && '🧰' || '🦾' }} ${{ matrix.arch }} ${{ matrix.build }}

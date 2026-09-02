@@ -371,8 +371,10 @@ static inline List*
 insert_index_tuples(ResultRelInfo* rri, TupleTableSlot* slot, EState* estate) {
 #if PG_VERSION_NUM >= 190000
     return ExecInsertIndexTuples(rri, estate, 0, slot, NIL, NULL);
-#else
+#elif PG_VERSION_NUM >= 160000
     return ExecInsertIndexTuples(rri, slot, estate, false, false, NULL, NIL, false);
+#else
+    return ExecInsertIndexTuples(rri, slot, estate, false, false, NULL, NIL);
 #endif
 }
 
@@ -679,8 +681,10 @@ chdb_copy_receive(
 
 #if PG_VERSION_NUM >= 180000
     ExecInitRangeTable(estate, rtable, rteperminfos, bms_make_singleton(1));
-#else
+#elif PG_VERSION_NUM >= 160000
     ExecInitRangeTable(estate, rtable, rteperminfos);
+#else
+    ExecInitRangeTable(estate, rtable);
 #endif
     ResultRelInfo* target = makeNode(ResultRelInfo);
 
@@ -802,8 +806,11 @@ chdb_copy_receive(
                 ins.transition->tcs_original_insert_tuple = before_row ? NULL : slot;
             }
 
+#if PG_VERSION_NUM >= 160000
             TupleConversionMap* map = ExecGetRootToChildMap(rri, estate);
-
+#else
+            TupleConversionMap* map = rri->ri_RootToPartitionMap;
+#endif
             if (map) {
                 slot = execute_attr_map_slot(
                     map->attrMap, slot, rri->ri_PartitionTupleSlot

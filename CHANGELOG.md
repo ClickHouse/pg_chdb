@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file. It uses the
 
 *   Support mapping `BFloat16` to Postgres `real`, and `Interval` types to
     Postgres `interval` ([#76]).
+*   Added PostgreSQL 15 support.
 
 ### 🐞 Bug Fixes
 

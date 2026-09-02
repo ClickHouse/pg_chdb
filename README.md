@@ -122,7 +122,7 @@ leaving other sessions untouched.
 Dependencies
 ------------
 
-The `chdb` extension requires PostgreSQL 16 or higher and the [chDB] library
+The `chdb` extension requires PostgreSQL 15 or higher and the [chDB] library
 v26.7.0 or greater (currently available only for Linux and macOS). The
 simplest way to install it is via the [lib.chdb.io] shell script:
 
