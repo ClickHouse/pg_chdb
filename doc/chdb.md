@@ -82,6 +82,11 @@ Output:
 (5 rows)
 ```
 
+## Text Encoding
+
+See [Text Encoding in the `chdb_hook` documentation][text encoding] for how
+chDB byte strings map to Postgres `text`, `bytea`, and other types.
+
 ## Settings
 
 ### `chdb.max_memory`
@@ -181,4 +186,6 @@ Copyright (c) 2026, ClickHouse
     "ClickHouse Docs: max_parsing_threads session setting"
   [table functions]: https://clickhouse.com/docs/reference/functions/table-functions
     "ClickHouse Docs: Table Functions"
+  [text encoding]: ./chdb_hook.md#text-encoding
+    "chdb_hook Docs: Text Encoding"
   [semver]: https://semver.org/spec/v2.0.0.html "Semantic Versioning 2.0.0"

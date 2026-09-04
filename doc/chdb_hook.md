@@ -576,7 +576,7 @@ types:
 | IntervalSecond      | interval                    |                                  |
 | IntervalWeek        | interval                    |                                  |
 | IntervalYear        | interval                    |                                  |
-| JSON                | jsonb                       | Also reads into json             |
+| JSON                | jsonb                       |                                  |
 | LineString          | path                        |                                  |
 | LowCardinality(T)   | T                           |                                  |
 | Map(K,V)            | text[][]                    | One row of text items per pair   |
@@ -586,7 +586,7 @@ types:
 | Point               | point                       |                                  |
 | Polygon             | polygon[]                   |                                  |
 | Ring                | polygon                     |                                  |
-| String              | text                        | Also reads into bytea            |
+| String              | text                        |                                  |
 | Time                | time without time zone      |                                  |
 | Time64(P)           | time(P) without time zone   | P over 6 caps at 6               |
 | Tuple(...)          | text[]                      | Fields become text items         |
@@ -606,6 +606,31 @@ Every chDB type omitted from this table raises an error, among them `Nested`,
 Postgres holds a narrower range than chDB in a few of these types; thus copy
 raises an error on a `Time` or `Time64` beyond 24 hours, and on a `Date32`
 outside the Postgres date range.
+
+### Text Encoding
+
+chDB reads `String`, `FixedString`, `Enum`, and `JSON` as bytes, with no
+guarantee of an encoding. Copying such a column into `text`, or into any other
+non-binary type, verifies bytes against database encoding and raises an error
+for data that cannot represent:
+
+```
+ERROR:  invalid byte sequence for encoding "UTF8": 0x00
+```
+
+Every encoding rejects NULs, which Postgres cannot store in `text`.
+
+Copy into `bytea` to keep bytes as chDB wrote them. Name such these, as
+[CREATE TABLE](#create-table-overloading) derives `text` for these types:
+
+```sql
+CREATE TABLE logs (id bigint, payload bytea) WITH (
+    copy_from = 's3://my-bucket/logs.parquet'
+);
+```
+
+`FixedString(N)` pads shorter values with NUL bytes. Copying into `text` drops
+trailing NULs, while `bytea` keeps all N bytes.
 
 ## Settings
 

@@ -21,6 +21,9 @@ All notable changes to this project will be documented in this file. It uses the
 ### 🐞 Bug Fixes
 
 *   `DateTime64` or `Time64` now defaults to millisecond precision ([#76]).
+*   Reading a ClickHouse string into a text column validates its bytes against
+    database encoding, raising an error instead of returning unreadable text.
+    Use `bytea` to preserve raw bytes ([#80]).
 *   Added the `date_time_output_format='iso'` setting to each chDB query to
     always format `timestamp` and `timestamptz` values in plain text formats
     with the ISO-8601 format in UTC, converting `timestamp` values from the
@@ -42,6 +45,7 @@ All notable changes to this project will be documented in this file. It uses the
   [v0.1.1]: https://github.com/clickhouse/pg_chdb/compare/v0.1.0...v0.1.1
   [#76]: https://github.com/clickhouse/pg_chdb/issues/76
   [#78]: https://github.com/clickhouse/pg_chdb/pulls/78
+  [#80]: https://github.com/clickhouse/pg_chdb/pulls/80
   [chdb_hook docs]: ./doc/chdb_hook.md
   [structure]: ./doc/chdb_hook.md#structure "chdb_hook Docs: structure"
 
