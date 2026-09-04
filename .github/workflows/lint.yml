@@ -30,7 +30,7 @@ jobs:
         id: cache-chdb
         uses: actions/cache@v6
         with:
-          key: ${{ steps.chdb.outputs.directory }}
+          key: ${{ steps.chdb.outputs.directory }}-${{ steps.chdb.outputs.version }}
           path: |
             ${{ steps.chdb.outputs.directory }}/lib/libchdb.*
             ${{ steps.chdb.outputs.directory }}/include/chdb.h

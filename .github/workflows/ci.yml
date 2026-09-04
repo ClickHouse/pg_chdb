@@ -40,10 +40,23 @@ jobs:
         id: cache-chdb
         uses: actions/cache@v6
         with:
-          key: ${{ steps.chdb.outputs.directory }}-${{ matrix.build }}
+          key: ${{ steps.chdb.outputs.directory }}-${{ steps.chdb.outputs.version }}-${{ matrix.build }}
           path: |
             ${{ steps.chdb.outputs.directory }}/lib/libchdb.*
             ${{ steps.chdb.outputs.directory }}/include/chdb.h
+      # chdb_helper can be shared across PG versions
+      - name: Cache chDB Helper
+        if: matrix.build == 'static'
+        id: cache-helper
+        uses: actions/cache@v6
+        with:
+          key: helper-${{ matrix.arch }}-${{ steps.chdb.outputs.version }}-${{ hashFiles('src/helper/*.c', 'src/setup.h') }}
+          path: |
+            src/helper/chdb_helper
+            src/helper/chdb_helper.o
+      - name: Freshen chDB Helper
+        if: steps.cache-helper.outputs.cache-hit == 'true'
+        run: touch src/helper/chdb_helper.o && touch src/helper/chdb_helper
       - name: Build
         run: make -j $(nproc)
       - name: Install
