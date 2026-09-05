@@ -1,0 +1,8 @@
+*.arrow
+*.avro
+*.json
+*.parquet
+*.tsv
+*.csv
+*.gz
+.DS_Store
