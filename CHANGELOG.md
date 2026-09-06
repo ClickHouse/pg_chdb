@@ -7,7 +7,11 @@ All notable changes to this project will be documented in this file. It uses the
   [Semantic Versioning]: https://semver.org/spec/v2.0.0.html
     "Semantic Versioning 2.0.0"
 
-## [v0.1.1] — Unreleased
+## [v0.1.1] — 2026-09-06
+
+This release makes binary-only changes. Once installed and loaded, any
+existing use of chdb and chdb_hook v0.1 will get the v0.1.1 benefits without
+needing to `ALTER EXTENSION UPDATE`.
 
 ### ⚡ Improvements
 
@@ -41,6 +45,8 @@ All notable changes to this project will be documented in this file. It uses the
     document the ISO-8601 format of plain text exports of `timestamp` and
     `timestamptz` values, as well as the impact of the `timezone` setting on
     exported and imported values.
+*   Added a [benchmark](dev/benchmark/) and documented its results in the
+    README.
 
   [v0.1.1]: https://github.com/clickhouse/pg_chdb/compare/v0.1.0...v0.1.1
   [#76]: https://github.com/clickhouse/pg_chdb/issues/76

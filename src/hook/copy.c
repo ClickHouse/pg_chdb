@@ -277,7 +277,7 @@ make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** value
         if (ctx->scheme == s3_scheme) {
             if (slash && slash - uri >= strlen(AWS_HOST) &&
                 !pg_strncasecmp(slash - strlen(AWS_HOST), AWS_HOST, strlen(AWS_HOST))) {
-                /* s3://{bucket}.{region}.amazonaws.com/{path} */
+                /* s3://{bucket}.s3.{region}.amazonaws.com/{path} */
                 PARAM("{url:String}", "url", psprintf("https://%s", uri));
             } else {
                 /* s3://{bucket}/{path} */

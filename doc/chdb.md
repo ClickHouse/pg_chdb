@@ -1,5 +1,5 @@
-chdb 0.1.0
-===========
+chdb 0.1.1
+==========
 
 ## Synopsis
 
@@ -153,8 +153,8 @@ Once installed, PostgreSQL tracks two variations of the version:
     function.
 *   The extension version (defined in the control file) includes only the
     major and minor versions, visible in the `pg_catalog.pg_extension` table,
-    the output of the `pg_available_extension_versions()` function, and `\dx
-    pg_clickhouse`.
+    the output of the `pg_available_extension_versions()` function, and
+    `\dx chdb`.
 
 In practice this means that a release that increments the patch version, e.g.
 from `v0.1.0` to `v0.1.1`, benefits all databases that have loaded `v0.1` and
@@ -162,8 +162,8 @@ do not need to run `ALTER EXTENSION` to benefit from the upgrade.
 
 A release that increments the minor or major versions, on the other hand, will
 be accompanied by SQL upgrade scripts, and all existing database that contain
-the extension must run `ALTER EXTENSION pg_clickhouse UPDATE` to benefit from
-the upgrade.
+the extension must run `ALTER EXTENSION chdb UPDATE` to benefit from the
+upgrade.
 
 ## Authors
 

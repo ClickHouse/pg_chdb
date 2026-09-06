@@ -1,4 +1,4 @@
-chdb_hook 0.1.0
+chdb_hook 0.1.1
 ===============
 
 ## Synopsis
@@ -152,7 +152,7 @@ s3://{bucket}/{path}
 Or of an object URL:
 
 ```
-s3://{bucket}.{region}.amazonaws.com/{path}
+s3://{bucket}.s3.{region}.amazonaws.com/{path}
 ```
 
 #### GCS
@@ -689,11 +689,11 @@ chdb_hook adheres to [Semantic Versioning] for its public releases.
 *   The minor version increments for backward compatible SQL changes
 *   The patch version increments for binary-only changes
 
-Once installed, PostgreSQL the version via the the Postgres
+Once installed, PostgreSQL the version via the the Postgres 18
 [`pg_get_loaded_modules()`] function.
 
 ```sql
-SELECT version FROM pg_get_loaded_modules() WHERE module_name = 'chdb';
+SELECT version FROM pg_get_loaded_modules() WHERE module_name = 'chdb_hook';
 ```
 
 ## Authors

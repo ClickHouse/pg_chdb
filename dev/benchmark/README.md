@@ -20,15 +20,24 @@ Test configurations:
 
 ### NYC Taxi Data
 
-![NYC Taxi Data Benchmark](taxi-bench.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="taxi-bench-dark.png">
+  <img alt="NYC Taxi Data Benchmark" src="taxi-bench.png">
+</picture>
 
 ### "Logs" Data
 
-!["Logs" Data Benchmark](logs-bench.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="logs-bench-dark.png">
+  <img alt="“Logs” Taxi Data Benchmark" src="logs-bench.png">
+</picture>
 
 ### chdb Data Formats
 
-![chdb Data Formats](chdb-bench.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="chdb-bench-dark.png">
+  <img alt="Import Benchmark" src="chdb-bench.png">
+</picture>
 
 ## Data Sets
 

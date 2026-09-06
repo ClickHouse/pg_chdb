@@ -180,5 +180,7 @@ release-notes: CHANGELOG.md
 $(EXTENSION)-$(DISTVERSION).zip:
 	git archive-all -v --prefix "$(EXTENSION)-$(DISTVERSION)/" --force-submodules $(EXTENSION)-$(DISTVERSION).zip
 
+zip: $(EXTENSION)-$(DISTVERSION).zip
+
 # Run make print-VARIABLE_NAME to print VARIABLE_NAME's flavor and value.
 print-%	: ; $(info $* is $(flavor $*) variable set to "$($*)") @true

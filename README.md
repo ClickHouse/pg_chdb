@@ -89,6 +89,43 @@ CREATE TABLE reviews () WITH (
 
 See the [chdb_hook documentation](doc/chdb_hook.md) for details.
 
+Benchmarking Formats
+--------------------
+
+The contents of [dev/benchmark](dev/benchmark/) compare the performance of
+[chdb_hook] `COPY` to that of [aws_s3], [pg_duckdb], and [pg_lake] for ca. 1m
+rows of [NYC Taxi dataset] in a variety of formats.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="dev/benchmark/taxi-bench-dark.png">
+  <img alt="NYC Taxi Data Benchmark" src="dev/benchmark/taxi-bench.png">
+</picture>
+
+Of the four extensions, [chdb] exhibits the most consistent performance.
+[pg_duckdb] and [pg_lake], both backed by [DuckDB], take around 2-3x as long
+to import data from CSV, JSON, and Parquet. Only [aws_s3] approaches
+[chdb_hook]'s performance, but it supports a much more limited array of data
+formats:
+
+| Extension | Compression                          | Data Formats
+| --------- | ------------------------------------ | -------------------------------- |
+| aws_s3    | none                                 | Text (TSV), CSV, Postgres Binary |
+| pg_lake   | gzip, zstd, snappy (Parquet only)    | CSV, JSON, Parquet               |
+| pg_duckdb | gzip, zstd, snappy (Parquet only)    | CSV, JSON, Parquet               |
+| chdb      | tzip, zstd, lz4, bz2, snappy, brotli | TSV, CSV, JSON, BSON, Prometheus, Protobuf, Avro, Parquet, Arrow, XML, CapnProto, Markdown, MsgPack, ORC, and [more][formats]! |
+
+Additional benchmarking demonstrates relatively consistent performance
+importing the [NYC Taxi dataset] in a variety of formats:
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="dev/benchmark/chdb-bench-dark.png">
+  <img alt="Import Benchmark" src="dev/benchmark/chdb-bench.png">
+</picture>
+
+The benchmark uses the [JSONCompact] format for compatibility with the other
+extensions; Other JSON formats, such as [JSONCompactEachRow], will more
+closely approximate the performance of the other formats.
+
 Architecture
 ------------
 
@@ -114,10 +151,10 @@ A helper that dies triggers an error only in the backend that started it,
 leaving other sessions untouched.
 
 > [!IMPORTANT]
-> For each query, the helper connects to a new in-memory database to execute
-> it. As a consequence, each query currently runs in complete isolation from
-> all other queries. Don't create a table and expect to query it in a
-> subsequent query.
+> For each query, the helper connects to a temporary chDB database on disk to
+> execute it. As a consequence, each query currently runs in complete
+> isolation from all other queries. Don't create a table and expect to query
+> it in a subsequent query.
 
 Dependencies
 ------------
@@ -246,3 +283,12 @@ Copyright (c) 2026, ClickHouse
     "Postgres Docs: CREATE TABLE"
   [lib.chdb.io]: https://lib.chdb.io "curl -sL https://lib.chdb.io | bash"
   [`postgresql.conf` parameters]: https://www.postgresql.org/docs/devel/runtime-config-client.html#RUNTIME-CONFIG-CLIENT-OTHER
+  [chdb_hook]: https://pgxn.org/dist/chdb/doc/chdb_hook.html "chdb_hook Docs on PGXN"
+  [aws_s3]: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_PostgreSQL.S3Import.html
+    "Importing data from Amazon S3 into an RDS for PostgreSQL DB instance"
+  [pg_duckdb]: https://github.com/duckdb/pg_duckdb "DuckDB-powered Postgres for high performance apps & analytics"
+  [pg_lake]: https://github.com/Snowflake-Labs/pg_lake "pg_lake: Postgres with Iceberg and data lake access"
+  [formats]: https://clickhouse.com/docs/reference/formats/index
+    "ClickHouse Docs: Formats for input and output data"
+  [NYC Taxi dataset]: https://clickhouse.com/docs/get-started/quickstarts/tutorial
+    "ClickHouse Docs: Advanced tutorial"
