@@ -218,14 +218,14 @@ The supported wildcards:
 
 For example, to load data from these files in a single command:
 
-*   https://clickhouse-public-datasets.s3.amazonaws.com/my-test-bucket-768/some_prefix/some_file_1.csv
-*   https://clickhouse-public-datasets.s3.amazonaws.com/my-test-bucket-768/some_prefix/some_file_2.csv
-*   https://clickhouse-public-datasets.s3.amazonaws.com/my-test-bucket-768/some_prefix/some_file_3.csv
-*   https://clickhouse-public-datasets.s3.amazonaws.com/my-test-bucket-768/some_prefix/some_file_4.csv
-*   https://clickhouse-public-datasets.s3.amazonaws.com/my-test-bucket-768/another_prefix/some_file_1.csv
-*   https://clickhouse-public-datasets.s3.amazonaws.com/my-test-bucket-768/another_prefix/some_file_2.csv
-*   https://clickhouse-public-datasets.s3.amazonaws.com/my-test-bucket-768/another_prefix/some_file_3.csv
-*   https://clickhouse-public-datasets.s3.amazonaws.com/my-test-bucket-768/another_prefix/some_file_4.csv
+```
+https://clickhouse-public-datasets.s3.amazonaws.com/my-test-bucket-768/some_prefix/some_file_1.csv
+https://clickhouse-public-datasets.s3.amazonaws.com/my-test-bucket-768/some_prefix/some_file_2.csv
+https://clickhouse-public-datasets.s3.amazonaws.com/my-test-bucket-768/some_prefix/some_file_3.csv
+https://clickhouse-public-datasets.s3.amazonaws.com/my-test-bucket-768/another_prefix/some_file_1.csv
+https://clickhouse-public-datasets.s3.amazonaws.com/my-test-bucket-768/another_prefix/some_file_2.csv
+https://clickhouse-public-datasets.s3.amazonaws.com/my-test-bucket-768/another_prefix/some_file_3.csv
+```
 
 Use `{some,another}_prefix` to match the two directory names and
 `some_file_{1..3}.csv'` to match the files, like so:
@@ -723,6 +723,7 @@ Copyright (c) 2026, ClickHouse
     "Azure: Manage storage account access keys"
   [row-level security]: https://www.postgresql.org/docs/current/ddl-rowsecurity.html
     "Postgres Docs: Row Security Policies"
+  [JSON type]: https://clickhouse.com/docs/reference/data-types/newjson "ClickHouse Docs: JSON Data Type"
   [LOAD]: https://www.postgresql.org/docs/current/sql-load.html "Postgres Docs: LOAD"
   [session_preload_libraries]:https://www.postgresql.org/docs/18/runtime-config-client.html#GUC-SESSION-PRELOAD-LIBRARIES
     "Postgres Docs: `session_preload_libraries`"

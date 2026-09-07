@@ -7,6 +7,7 @@ development of the chdb extensions.
 *   `bear.yml`: [Bear Configuration](#bear-configuration)
 *   `README.md`: This file
 *   `type_table.awk`: [Data Type Table](#data-type-table)
+*   `benchmark`: [Postgres Lake Copy Benchmark](benchmark/)
 
 ## Data Type Table
 

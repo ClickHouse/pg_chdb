@@ -292,3 +292,8 @@ Copyright (c) 2026, ClickHouse
     "ClickHouse Docs: Formats for input and output data"
   [NYC Taxi dataset]: https://clickhouse.com/docs/get-started/quickstarts/tutorial
     "ClickHouse Docs: Advanced tutorial"
+  [JSONCompact]: https://clickhouse.com/docs/reference/formats/JSON/JSONCompact
+    "ClickHouse Docs: JSONCompact"
+  [JSONCompactEachRow]: https://clickhouse.com/docs/reference/formats/JSON/JSONCompactEachRow
+    "ClickHouse Docs: JSONCompactEachRow"
+  [DuckDB]: https://duckdb.org "DuckDB: Your universal data wrangling tool"
