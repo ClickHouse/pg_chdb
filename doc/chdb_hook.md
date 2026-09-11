@@ -121,6 +121,11 @@ The format of URLs varies by the target.
 
 #### File
 
+> [!IMPORTANT]
+> The `file://` scheme may not be supported on all systems, such as cloud
+> platforms, where the administrator compiles `chdb_hook` to prevent it (via
+> the `NO_FILE_SCHEME` option to `make`).
+
 Must be an absolute path on the Postgres server. A relative path results in an
 error. The Postgres user must be a member of the `pg_read_server_files` or
 `pg_write_server_files` role, as appropriate. The Postgres system user must

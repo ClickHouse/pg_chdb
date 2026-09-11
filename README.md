@@ -250,6 +250,12 @@ You need to run the test suite using a super user, such as the default
 make installcheck PGUSER=postgres
 ```
 
+To disable the `file://` scheme in the `COPY` hook, define `NO_FILE_SCHEME`:
+
+```sh
+make NO_FILE_SCHEME=1
+```
+
 To install the extension in a custom prefix on PostgreSQL 18 or later, pass
 the `prefix` argument to `install` (but no other `make` targets):
 

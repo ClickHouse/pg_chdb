@@ -9,6 +9,12 @@ All notable changes to this project will be documented in this file. It uses the
 
 ## [v0.1.2] — Unreleased
 
+### 🏗️ Build Setup
+
+*   Added the `NO_FILE_SCHEME` option to `make`. When set, chd_hook will be
+    built without support for the `file://` scheme, which may be useful for
+    Postgres hosting providers.
+
 ### 📚 Documentation
 
 *   Added missing links to the README and docs and simplified the list of

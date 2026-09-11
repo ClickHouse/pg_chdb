@@ -11,6 +11,11 @@ PG_CPPFLAGS  = -isystem $(CH_C_DIR) -isystem $(PGCH_DIR) -DPGCH_MSG_PREFIX='"chd
                -DCHC_ERR_MSG_LEN=4096
 PG_CONFIG   ?= pg_config
 
+# Define CHDB_NO_FILE_SCHEME to disable the chdb_hook file:// scheme.
+ifneq ($(NO_FILE_SCHEME),)
+PG_CPPFLAGS += -DCHDB_NO_FILE_SCHEME=1
+endif
+
 PGXS := $(shell $(PG_CONFIG) --pgxs)
 include $(PGXS)
 

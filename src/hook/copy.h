@@ -15,8 +15,8 @@ typedef enum scheme {
     gcs_scheme,
     az_scheme,
     abfs_scheme,
-    file_scheme,
     hdfs_scheme,
+    file_scheme,
     no_scheme, /* Must be last.*/
 } scheme;
 

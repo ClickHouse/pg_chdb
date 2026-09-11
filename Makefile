@@ -78,7 +78,7 @@ src/version.h: META.json
 # Hook module.
 HOOK_MODULE := src/hook/chdb_hook$(DLSUFFIX)
 $(HOOK_MODULE): $(wildcard src/hook/*.c src/hook/*.h) $(OBJS)
-	@$(MAKE) -C $(dir $@) all -j $$(nproc) CH_C_DIR=$(CH_C_DIR) PGCH_DIR=$(PGCH_DIR)
+	@$(MAKE) -C $(dir $@) all -j $$(nproc) CH_C_DIR=$(CH_C_DIR) PGCH_DIR=$(PGCH_DIR) NO_FILE_SCHEME=$(NO_FILE_SCHEME)
 
 # Install and uninstall the chdb_hook module.
 install-hook: $(HOOK_MODULE)

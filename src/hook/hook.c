@@ -34,6 +34,16 @@ PG_MODULE_MAGIC_EXT(.name = "chdb_hook", .version = PGCHCB_VERSION);
 PG_MODULE_MAGIC;
 #endif
 
+/*
+ * Remove file_scheme if CHDB_NO_FILE_SCHEME is defined. Works because the
+ * `scheme_for()` considers only schemes < `CHDB_NO_SCHEME`.
+ */
+#ifdef CHDB_NO_FILE_SCHEME
+#define CHDB_NO_SCHEME file_scheme
+#else
+#define CHDB_NO_SCHEME no_scheme
+#endif
+
 void
 InitializeUtilityHook(void);
 
@@ -109,7 +119,7 @@ scheme_for(const char* str) {
         if (ptr) {
             size_t len = ptr - str;
 
-            for (size_t sch = http_scheme; sch < no_scheme; sch++) {
+            for (size_t sch = http_scheme; sch < CHDB_NO_SCHEME; sch++) {
                 for (size_t i = 0; scheme_name[sch][i]; i++) {
                     if (strlen(scheme_name[sch][i]) == len &&
                         memcmp(str, scheme_name[sch][i], len) == 0) {

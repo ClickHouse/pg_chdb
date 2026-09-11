@@ -83,3 +83,13 @@ jobs:
         with:
           name: regression-diffs-pg${{ matrix.pg }}
           path: regression.diffs
+      - name: Test No File
+        # NO_FILE_SCHEME disables file://; when set, file test should fail
+        # with output that includes "could not open file". This step fails if
+        # the test output does not include that text.
+        run: |
+          (cd src/hook && rm -rf chdb_hook.* hook.o)
+          make -j $(nproc) NO_FILE_SCHEME=1
+          sudo --preserve-env=BUNDLE_LIBCHDB,LIBCHDB_BUILD make install
+          make installcheck TAP_TESTS= TESTS=test/sql/file.sql || true
+          grep -s 'could not open file' regression.diffs
