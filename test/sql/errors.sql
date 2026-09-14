@@ -34,3 +34,12 @@ BEGIN
 END $$;
 
 DROP TABLE clipped;
+
+/****************************************************************************/
+-- A WHERE clause. chDB filters nothing for a COPY, so the command is refused
+-- rather than importing the rows the condition rejects.
+CREATE TABLE filtered (id INT);
+
+COPY filtered FROM 'file:///tmp/filtered.csv' WHERE id > 3;
+
+DROP TABLE filtered;

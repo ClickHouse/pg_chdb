@@ -9,6 +9,11 @@ All notable changes to this project will be documented in this file. It uses the
 
 ## [v0.1.2] — Unreleased
 
+### 🐞 Bug Fixes
+
+*   Reject `COPY FROM` a URL with a `WHERE` clause, preventing imports from
+    silently ignoring row filters ([#86]).
+
 ### 🏗️ Build Setup
 
 *   Added the `NO_FILE_SCHEME` option to `make`. When set, chd_hook will be
@@ -21,6 +26,7 @@ All notable changes to this project will be documented in this file. It uses the
     files to load in a single command.
 
   [v0.1.2]: https://github.com/clickhouse/pg_chdb/compare/v0.1.1...v0.1.2
+  [#86]: https://github.com/ClickHouse/pg_chdb/pull/86
 
 ## [v0.1.1] — 2026-09-06
 

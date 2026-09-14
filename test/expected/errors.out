@@ -35,3 +35,10 @@ NOTICE:  pad 1 clipped on a character boundary
 NOTICE:  pad 2 clipped on a character boundary
 NOTICE:  pad 3 clipped on a character boundary
 DROP TABLE clipped;
+/****************************************************************************/
+-- A WHERE clause. chDB filters nothing for a COPY, so the command is refused
+-- rather than importing the rows the condition rejects.
+CREATE TABLE filtered (id INT);
+COPY filtered FROM 'file:///tmp/filtered.csv' WHERE id > 3;
+ERROR:  chdb: COPY FROM a URL not supported with a WHERE clause
+DROP TABLE filtered;

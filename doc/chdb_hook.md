@@ -401,6 +401,7 @@ between Postgres and chDB, chdb_hook has the following limitations:
 *   Cannot `COPY` relations with [row-level security] policies that apply to
     the copying role. Postgres applies such policies by rewriting `COPY TO`
     into a query, which chdb_hook does not support.
+*   Cannot `COPY FROM` a URL with a `WHERE` clause.
 *   ClickHouse has no NULL array, so `COPY TO` stores an empty array (`[]`)
     for a `NULL`.
 *   ClickHouse represents the equivalents of `lseg`, `path`, or `polygon` as

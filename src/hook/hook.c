@@ -410,6 +410,14 @@ chDBProcessUtilityHook(
 
         /* Leave COPY TO/FROM PROGRAM to Postgres, which gates it on a role. */
         if (copy->relation && !copy->is_program && scheme != no_scheme) {
+            if (copy->whereClause) {
+                ereport(
+                    ERROR,
+                    errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+                    errmsg("chdb: COPY FROM a URL not supported with a WHERE clause")
+                );
+            }
+
             /* We own this copy, but only if the user may copy the relation. */
             if (copy->is_from) {
                 PreventCommandIfReadOnly("COPY FROM");
