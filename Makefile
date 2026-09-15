@@ -55,8 +55,10 @@ OS         ?= $(shell uname -s | tr A-Z a-z)
 ARCH        = $(shell uname -m)
 LIBCHDB_DIR = vendor/libchdb-$(OS)-$(ARCH)
 src/helper/chdb_helper: $(LIBCHDB_DIR)/lib/libchdb.$(if $(filter $(LIBCHDB_BUILD),static),a,so)
+ifneq ($(LIBCHDB_BUILD),static)
 install: install-libchdb
 uninstall: uninstall-libchdb
+endif
 endif
 
 # Require the versioned SQL script.
@@ -129,12 +131,12 @@ libchdb-variables:
 	@echo DIRECTORY=$(LIBCHDB_DIR)
 
 # Install and uninstall libchdb, which is configured to live in /usr/local/lib.
-install-libchdb: $(LIBCHDB_DIR)/lib/libchdb.$(if $(filter $(LIBCHDB_BUILD),static),a,so)
+install-libchdb: $(LIBCHDB_DIR)/lib/libchdb.so
 	$(MKDIR_P) $(DESTDIR)/usr/local/lib
 	$(INSTALL_SHLIB) $< $(DESTDIR)/usr/local/lib
-	if [ "$(LIBCHDB_BUILD)" != "static" ] && [ "$$(uname -s)" = "Linux" ]; then ldconfig; fi
+	if [ "$$(uname -s)" = "Linux" ]; then ldconfig; fi
 uninstall-libchdb:
-	rm -f $(DESTDIR)/usr/local/lib/libchdb.$(if $(filter $(LIBCHDB_BUILD),static),a,so)
+	rm -f $(DESTDIR)/usr/local/lib/libchdb.so
 
 .PHONY: format # Format .c and .h files to project standard in .clang-format.
 format: $(wildcard src/*.c src/*.h src/helper/*.c)

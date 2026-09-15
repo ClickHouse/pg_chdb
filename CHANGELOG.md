@@ -13,6 +13,9 @@ All notable changes to this project will be documented in this file. It uses the
 
 *   Reject `COPY FROM` a URL with a `WHERE` clause, preventing imports from
     silently ignoring row filters ([#86]).
+*   The `install` target no longer installs `libchdb.a` when using
+    `LIBCHDB_BUILD=static`. Since we statically link it, we do not need to
+    install it.
 
 ### 🏗️ Build Setup
 
