@@ -23,6 +23,10 @@ All notable changes to this project will be documented in this file. It uses the
     built without support for the `file://` scheme, which may be useful for
     Postgres hosting providers.
 
+### ⬆️ Dependencies
+
+*   Added testing for chDB v26.7.3.
+
 ### 📚 Documentation
 
 *   Added missing links to the README and docs and simplified the list of

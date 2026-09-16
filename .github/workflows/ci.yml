@@ -16,7 +16,8 @@ jobs:
         pg: [19, 18, 17, 16, 15]
         arch: [amd64, arm64]
         build: [dynamic, static]
-    name: 🐘 PgSQL ${{ matrix.pg }} ${{ matrix.arch == 'amd64' && '🧰' || '🦾' }} ${{ matrix.arch }} ${{ matrix.build }}
+        libchdb: [v26.7.0, v26.7.3]
+    name: 🐧 ${{ matrix.arch }} 🐘 ${{ matrix.pg }} 🏠 ${{ matrix.libchdb }} ${{ matrix.build }}
     runs-on: ubuntu-${{ matrix.arch == 'amd64' && 'latest' || '24.04-arm' }}
     env: { BUNDLE_LIBCHDB: 1, LIBCHDB_BUILD: "${{ matrix.build }}" }
     services:
@@ -35,12 +36,12 @@ jobs:
       # make BUNDLE_LIBCHDB=1 installs libchdb if missing.
       - name: Get chDB Version
         id: chdb
-        run: make libchdb-variables >> $GITHUB_OUTPUT
+        run: make LIBCHDB_VERSION=${{ matrix.libchdb }} libchdb-variables >> $GITHUB_OUTPUT
       - name: Cache chDB
         id: cache-chdb
         uses: actions/cache@v6
         with:
-          key: ${{ steps.chdb.outputs.directory }}-${{ steps.chdb.outputs.version }}-${{ matrix.build }}
+          key: ${{ steps.chdb.outputs.directory }}-${{ matrix.build }}
           path: |
             ${{ steps.chdb.outputs.directory }}/lib/libchdb.*
             ${{ steps.chdb.outputs.directory }}/include/chdb.h

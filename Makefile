@@ -19,7 +19,7 @@ CLANG_FORMAT ?= clang-format
 # Binary dependency on specific version (for now) of libchdb. Optionally
 # download locally by setting BUNDLE_LIBCHDB and compile statically with
 # LIBCHDB_BUILD=static.
-LIBCHDB_VERSION ?= v26.7.0
+LIBCHDB_VERSION ?= v26.7.3
 LIBCHDB_BUILD   ?= dynamic
 
 # Header-only dependencies, vendored as submodules. clickhouse-c comes from
@@ -53,7 +53,7 @@ endif
 ifneq ($(BUNDLE_LIBCHDB),)
 OS         ?= $(shell uname -s | tr A-Z a-z)
 ARCH        = $(shell uname -m)
-LIBCHDB_DIR = vendor/libchdb-$(OS)-$(ARCH)
+LIBCHDB_DIR = vendor/libchdb-$(LIBCHDB_VERSION)-$(OS)-$(ARCH)
 src/helper/chdb_helper: $(LIBCHDB_DIR)/lib/libchdb.$(if $(filter $(LIBCHDB_BUILD),static),a,so)
 ifneq ($(LIBCHDB_BUILD),static)
 install: install-libchdb
