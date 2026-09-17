@@ -1,0 +1,4 @@
+id	point "value"	labels\\name
+UInt32	Tuple(Int32, String)	Map(String, Int64)
+1	(10,'x')	{'a':7}
+2	(20,'y')	{}

@@ -22,8 +22,8 @@ make type-table
 pg-clickhouse-c maps a chDB type to a Postgres type in `pgch_pg_type_for`,
 which reports pseudo types for Map and Tuple that no Postgres column holds, so
 the filter swaps in the `text` declarations that `CREATE TABLE` writes instead.
-Preserve upstream headers and additional read targets except for `Nested`,
-which `DESCRIBE` flattens into separate columns. Validated by `make lint`.
+Preserve upstream headers and additional read targets. Validated by `make
+lint`.
 
 ## Bear Configuration
 

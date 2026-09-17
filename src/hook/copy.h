@@ -43,6 +43,7 @@ typedef struct chdbCopyContext {
     char* format;
     char* structure;
     char* compression;
+    bool preserve_nested;
 } chdbCopyContext;
 
 /*

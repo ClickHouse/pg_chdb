@@ -7,6 +7,7 @@ LOAD 'chdb_hook';
 \set file_base file:///tmp/chdb-create
 \set temp_base file:///tmp/create.tmp
 \set requests_csv :file_base /requests.csv
+\set maps_jsonl :file_base /maps.jsonl
 /****************************************************************************/
 -- Infer column names and types from CSV without schema
 CREATE TABLE from_csv () WITH (structure_from = :'requests_csv');
@@ -114,9 +115,9 @@ SELECT attname, format_type(atttypid, atttypmod) AS type, attndims, attnotnull
  attname |  type  | attndims | attnotnull 
 ---------+--------+----------+------------
  req_id  | bigint |        0 | t
- t       | text   |        1 | t
- m       | text   |        2 | t
- at      | text   |        2 | t
+ t       | text[] |        1 | t
+ m       | text[] |        2 | t
+ at      | text[] |        2 | t
 (4 rows)
 
 /****************************************************************************/
@@ -146,6 +147,31 @@ SELECT * FROM quoted ORDER BY "ReqId";
      3 | PAGE_VIEW   | /admin/dashboard
      4 | add_to_cart | /products/shoes
 (4 rows)
+
+/****************************************************************************/
+-- Map parameterized JSON to jsonb, honoring typed and skipped paths
+CREATE TABLE json_params () WITH (
+    copy_from = :'maps_jsonl',
+    format    = 'JSONEachRow',
+    structure = 'id Int32, m JSON(max_dynamic_paths=1, a UInt32, SKIP b)'
+);
+CREATE TABLE
+SELECT attname, format_type(atttypid, atttypmod) AS type, attnotnull
+  FROM pg_attribute WHERE attrelid = 'json_params'::regclass AND attnum > 0
+ ORDER BY attnum;
+ attname |  type   | attnotnull 
+---------+---------+------------
+ id      | integer | t
+ m       | jsonb   | t
+(2 rows)
+
+SELECT * FROM json_params ORDER BY id;
+ id |                                      m                                      
+----+-----------------------------------------------------------------------------
+  1 | {"a": 1}
+  2 | {"a": 0}
+  3 | {"a": 0, "c,d": 9223372036854775807, "e\"f": -9223372036854775808, "😀": 0}
+(3 rows)
 
 /****************************************************************************/
 -- Infer columns and copy rows
@@ -272,6 +298,12 @@ CREATE TABLE oops () WITH (
     structure      = 'req_id UInt32, dyn Dynamic'
 );
 ERROR:  chdb: unsupported column type "Dynamic" (column "dyn")
+-- Aggregate states have no PostgreSQL column type
+CREATE TABLE oops () WITH (
+    structure_from = :'requests_csv',
+    structure      = 'req_id UInt32, agg AggregateFunction(sum, Int64)'
+);
+ERROR:  chdb: unsupported column type "AggregateFunction(sum, Int64)" (column "agg")
 -- Reject options unknown to chDB and PostgreSQL
 CREATE TABLE oops () WITH (structure_from = :'requests_csv', nonesuch = 1);
 ERROR:  unrecognized parameter "nonesuch"

@@ -9,6 +9,7 @@ LOAD 'chdb_hook';
 \set file_base file:///tmp/chdb-create
 \set temp_base file:///tmp/create.tmp
 \set requests_csv :file_base /requests.csv
+\set maps_jsonl :file_base /maps.jsonl
 
 /****************************************************************************/
 -- Infer column names and types from CSV without schema
@@ -82,6 +83,18 @@ SELECT attname, format_type(atttypid, atttypmod) AS type, attnotnull
 SELECT * FROM quoted ORDER BY "ReqId";
 
 /****************************************************************************/
+-- Map parameterized JSON to jsonb, honoring typed and skipped paths
+CREATE TABLE json_params () WITH (
+    copy_from = :'maps_jsonl',
+    format    = 'JSONEachRow',
+    structure = 'id Int32, m JSON(max_dynamic_paths=1, a UInt32, SKIP b)'
+);
+SELECT attname, format_type(atttypid, atttypmod) AS type, attnotnull
+  FROM pg_attribute WHERE attrelid = 'json_params'::regclass AND attnum > 0
+ ORDER BY attnum;
+SELECT * FROM json_params ORDER BY id;
+
+/****************************************************************************/
 -- Infer columns and copy rows
 CREATE TABLE loaded_csv () WITH (copy_from = :'requests_csv');
 SELECT * FROM loaded_csv ORDER BY c1;
@@ -151,6 +164,12 @@ CREATE TABLE IF NOT EXISTS from_csv () WITH (copy_from = :'requests_csv');
 CREATE TABLE oops () WITH (
     structure_from = :'requests_csv',
     structure      = 'req_id UInt32, dyn Dynamic'
+);
+
+-- Aggregate states have no PostgreSQL column type
+CREATE TABLE oops () WITH (
+    structure_from = :'requests_csv',
+    structure      = 'req_id UInt32, agg AggregateFunction(sum, Int64)'
 );
 
 -- Reject options unknown to chDB and PostgreSQL

@@ -58,7 +58,7 @@ BEGIN {
     upstream["Map(K,V)"] = "record[]|One record per pair"
     ours["Map(K,V)"] = "text[][]|One row of text items per pair"
     upstream["Nested(...)"] = "record[]|One record per nested row"
-    ours["Nested(...)"] = "T[] per field|Flattens to one column per field"
+    ours["Nested(...)"] = "text[][]|One row of text items per nested row"
     upstream["Tuple(...)"] = "record|Match field order and types"
     ours["Tuple(...)"] = "text[]|Fields become text items"
 
@@ -80,7 +80,6 @@ BEGIN {
             split(ours[type], swap, "|")
             $3 = swap[1]
             $5 = swap[2]
-            if (type == "Nested(...)") $4 = ""
             swapped[type] = 1
         }
         if ($3 ~ /^record(\[\])*$/) die("no swap for pseudo type row " type)

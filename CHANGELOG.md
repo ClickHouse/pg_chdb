@@ -13,6 +13,9 @@ All notable changes to this project will be documented in this file. It uses the
 
 *   Reject `COPY FROM` a URL with a `WHERE` clause, preventing imports from
     silently ignoring row filters ([#86]).
+*   Fix `CREATE TABLE` inference to use `text[]` for `Tuple` and `text[][]`
+    for `Map` and `Nested` instead of `text`. Reuse source types from
+    `DESCRIBE` when loading rows, keeping `Nested` fields in one column ([#89]).
 *   The `install` target no longer installs `libchdb.a` when using
     `LIBCHDB_BUILD=static`. Since we statically link it, we do not need to
     install it.
@@ -32,9 +35,12 @@ All notable changes to this project will be documented in this file. It uses the
 
 *   Added missing links to the README and docs and simplified the list of
     files to load in a single command.
+*   Document [manual enum and composite type mappings](doc/chdb_hook.md#manual-type-mappings)
+    for `Enum`, `Tuple`, `Map`, and `Nested` columns ([#89]).
 
   [v0.1.2]: https://github.com/clickhouse/pg_chdb/compare/v0.1.1...v0.1.2
   [#86]: https://github.com/ClickHouse/pg_chdb/pull/86
+  [#89]: https://github.com/ClickHouse/pg_chdb/pull/89
 
 ## [v0.1.1] — 2026-09-06
 

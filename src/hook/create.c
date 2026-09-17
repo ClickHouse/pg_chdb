@@ -129,6 +129,11 @@ List*
 chdb_url_columns(chdbCopyContext* ctx) {
     List* columns = NIL;
     ListCell* lc;
+    bool infer_structure =
+        ctx->structure[0] == '\0' || strcmp(ctx->structure, "auto") == 0;
+    StringInfoData structure;
+
+    initStringInfo(&structure);
 
     foreach (lc, chdb_describe(ctx)) {
         chdbDescribedColumn* described = lfirst(lc);
@@ -144,14 +149,26 @@ chdb_url_columns(chdbCopyContext* ctx) {
 
         pgch_pg_type type = pgch_pg_type_for(parsed, where);
 
-        /*
-         * Tuple and Map name a pseudo type that no table column holds, so
-         * convert them to text arrays of one or more dimensions
-         */
+        if (infer_structure) {
+            if (structure.len) {
+                appendStringInfoString(&structure, ", ");
+            }
+            appendStringInfo(
+                &structure,
+                "%s %s",
+                pgch_quote_ch_ident(described->name),
+                described->type
+            );
+            if (chc_type_kind(parsed) == CHC_NESTED) {
+                ctx->preserve_nested = true;
+            }
+        }
+
+        /* Convert pseudo types to text arrays valid in table columns */
         if (OidIsValid(type.typid) && !pgch_pg_type_is_column(type)) {
             const char* decl = "text[]";
 
-            type.typid  = TEXTOID;
+            type.typid  = TEXTARRAYOID;
             type.typmod = -1;
             type.ndims++;
             for (int dim = 1; dim < type.ndims; dim++) {
@@ -203,6 +220,21 @@ chdb_url_columns(chdbCopyContext* ctx) {
             errmsg("chdb: no columns found at \"%s\"", ctx->url)
         );
     }
+
+    if (infer_structure) {
+        StringInfoData param;
+        initStringInfo(&param);
+
+        /* chDB unescapes String query parameters before parsing structure */
+        for (const char* p = structure.data; *p; p++) {
+            if (*p == '\\') {
+                appendStringInfoChar(&param, '\\');
+            }
+            appendStringInfoChar(&param, *p);
+        }
+        ctx->structure = param.data;
+    }
+    pfree(structure.data);
 
     return columns;
 }

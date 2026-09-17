@@ -375,18 +375,21 @@ CREATE TABLE times (
 ) WITH (copy_from = 's3://datasets-documentation/my-test-bucket-768/some_prefix/some_file_1.csv');
 ```
 
+When `copy_from` infers columns, it uses source schema returned by `DESCRIBE`.
+This allows `Map`, `Tuple`, and `Nested` values to load as text array columns,
+which do not identify their original ClickHouse types.
+
 Both options support the same [URL schemes](#url-schemes) and
 [options](#options) as `COPY`; credentials, format, compression, timeout, and
 even an explicit [structure](#structure) all apply. Postgres keeps whatever
 storage parameters remain:
 
 ```sql
-CREATE TABLE users () WITH (
-    copy_from     = 's3://my-bucket/users.csv',
-    access_key    = 'AKIAIOSFODNN7EXAMPLE',
-    access_secret = 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY',
-    format        = 'CSVWithNames',
-    fillfactor    = 90
+CREATE TABLE logs () WITH (
+    copy_from  = 's3://chdb-lakedata-public/logs/logs-2026-08-26.csv',
+    format     = 'CSVWithNames',
+    timeout    = 60000,
+    fillfactor = 90
 );
 ```
 
@@ -500,9 +503,13 @@ Array types map to `Array`s of the mapped element type. ClickHouse constrains
 nullability per column while Postgres constrains it per array, so elements are
 always `Nullable`.
 
-No Postgres type maps to `Map` or `Tuple`, but [structure](#structure) may
-name one. A `Map` can convert to an array of key value pairs, and a `Tuple`
-converts to an array. Use `text[]` for heterogeneous support.
+No Postgres type maps directly to `Map`, `Tuple`, or `Nested`, but a
+[structure](#structure) or source file may specify one. A `Tuple` can be read
+into `text[]`, with one element per tuple field, or into a matching
+[composite type] to preserve field types. A `Map` or `Nested` can be read
+into `text[][]`, with one inner array per key-value pair or nested tuple,
+or into an array of a matching composite type. See
+[Manual Type Mappings](#manual-type-mappings) for examples.
 
 ### Timestamp Conversion
 
@@ -601,7 +608,7 @@ writes follow separate conversion rules.
 | Map(K,V)                     | text[][]                    | composite[], T[][], text                  | One row of text items per pair                       |
 | MultiLineString              | path[]                      |                                           |                                                      |
 | MultiPolygon                 | polygon[][]                 |                                           |                                                      |
-| Nested(...)                  | T[] per field               |                                           | Flattens to one column per field                     |
+| Nested(...)                  | text[][]                    | composite[], T[][], text                  | One row of text items per nested row                 |
 | Nullable(T)                  | T                           |                                           | Sets nullable on the column                          |
 | Point                        | point                       |                                           |                                                      |
 | Polygon                      | polygon[]                   |                                           |                                                      |
@@ -624,18 +631,60 @@ Input-compatible types can read strings using their PostgreSQL input function.
 Composite types must have matching fields in matching order. To read a tuple
 as an array, each field must convert to the array's element type, and no field
 can itself be an array.
-When read as an array, `Map` uses one row per key-value pair. `DESCRIBE` reports
-each `Nested` field as a separate array column. To read a tuple as `box`,
-provide two points; for `circle`, provide a point and radius; for `line`,
-provide three coefficients.
+When read as an array, `Map` uses one row per key-value pair and `Nested` uses
+one row per nested row. To read a tuple as `box`, provide two points; for
+`circle`, provide a point and radius; for `line`, provide three coefficients.
 
-Every chDB type omitted from this table raises an error, among them `Variant`
-and `Dynamic`. Use a [structure](#structure) that maps them to `String` to read
-them as text.
+Every chDB type omitted from this table raises an error, among them `Variant`,
+`Dynamic`, and `AggregateFunction`. Use a [structure](#structure) that maps
+them to `String` to read them as text.
 
 Postgres holds a narrower range than chDB in a few of these types; thus copy
 raises an error on a `Time` or `Time64` beyond 24 hours, and on a `Date32`
 outside the Postgres date range.
+
+### Manual Type Mappings
+
+Column inference uses `text` for enums and text arrays for `Tuple`, `Map`,
+and `Nested` values. To preserve field types or constrain enum values, create
+PostgreSQL enum and composite types, then declare columns using those types.
+Specify chDB types with [structure](#structure), or use `structure 'auto'`
+to infer them from source data rather than from the Postgres table. For
+example, use these types to load event statuses, coordinates, labels, and
+nested items:
+
+```sql
+CREATE TYPE event_status AS ENUM ('new', 'done');
+CREATE TYPE event_point AS (x integer, y integer);
+CREATE TYPE event_label AS (key text, value bigint);
+CREATE TYPE event_item AS (id integer, name text);
+
+CREATE TABLE events (
+    status event_status,
+    point  event_point,
+    labels event_label[],
+    items  event_item[]
+);
+
+COPY events FROM 's3://chdb-lakedata-public/examples/events.parquet' (
+    structure $$
+        status Enum8('new' = 1, 'done' = 2),
+        point  Tuple(Int32, Int32),
+        labels Map(String, Int64),
+        items  Array(Tuple(id Int32, name String))
+    $$
+);
+```
+
+Declare composite fields in chDB field order, using compatible PostgreSQL
+types. For `Map` values, declare a key field followed by a value field. Each
+`Tuple` becomes one composite value; each `Map` pair or `Nested` row becomes
+one element of a composite array.
+
+chDB splits `Nested` in an explicit `structure` into one `Array` column per
+field. Use `Array(Tuple(...))` to read nested rows into a single composite
+array column, as shown above, or use `structure 'auto'` for a chDB source
+format that includes type information.
 
 ### Text Encoding
 
@@ -654,8 +703,8 @@ Copy into `bytea` to keep bytes as chDB wrote them. Name such these, as
 [CREATE TABLE](#create-table-overloading) derives `text` for these types:
 
 ```sql
-CREATE TABLE logs (id bigint, payload bytea) WITH (
-    copy_from = 's3://my-bucket/logs.parquet'
+CREATE TABLE logs (req_id numeric(20,0), resource bytea) WITH (
+    copy_from = 's3://chdb-lakedata-public/logs/logs-2026-08-26.parquet'
 );
 ```
 
@@ -783,6 +832,8 @@ Copyright (c) 2026, ClickHouse
     "ClickHouse Docs: hdfs Table Function"
   [ClickHouse data types]: https://clickhouse.com/docs/reference/data-types/index
     "ClickHouse Docs: Data Types in ClickHouse"
+  [composite type]: https://www.postgresql.org/docs/current/rowtypes.html#ROWTYPES-DECLARING
+    "PostgreSQL Docs: Declaring Composite Types"
   [log_min_messages]: https://www.postgresql.org/docs/current/runtime-config-logging.html#GUC-LOG-MIN-MESSAGES
     "PostgreSQL Docs: log_min_messages"
   [`pg_get_loaded_modules()`]: https://pgpedia.info/g/pg_get_loaded_modules.html
