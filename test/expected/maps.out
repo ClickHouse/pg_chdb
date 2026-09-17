@@ -129,7 +129,7 @@ SELECT * FROM tuple_text EXCEPT ALL SELECT * FROM tuple_text2;
 
 -- A Tuple takes exactly its fields, and cannot be NULL.
 COPY tuple_text2 TO :'maps_out' (format 'JSONEachRow', structure 'id Int32, tt Tuple(String, Int64, Int64)');
-ERROR:  chdb: Tuple took 2 of 3 values
+ERROR:  chdb: Tuple requires 3 values, got 2
 INSERT INTO tuple_text2 VALUES (4, NULL);
 COPY tuple_text2 TO :'maps_out' (format 'JSONEachRow', structure 'id Int32, tt Tuple(String, Int64)');
 ERROR:  chdb: cannot encode record into ClickHouse Tuple(String, Int64) (column "tt")
@@ -145,4 +145,63 @@ CREATE TABLE bad_value (id int, m tkv[]);
 COPY bad_value FROM :'maps_json' (format 'JSONEachRow', structure 'id Int32, m Map(String, Int64)');
 ERROR:  could not map tuple to returned type
 DETAIL:  Returned type bigint does not match expected type text in column 2.
+/****************************************************************************/
+-- Infer Nested and SimpleAggregateFunction from source type names
+\! cp -f test/corpus/nested.tsv /tmp/chdb-nested.tsv
+\set nested_tsv file:///tmp/chdb-nested.tsv
+CREATE TABLE nested () WITH (
+    copy_from = :'nested_tsv', format = 'TSVWithNamesAndTypes'
+);
+NOTICE:  chdb: column "items" of type "Nested(a Int32, b Nullable(String))" converted to text[][]
+SELECT attname, format_type(atttypid, atttypmod) AS type, attndims, attnotnull
+  FROM pg_attribute WHERE attrelid = 'nested'::regclass AND attnum > 0
+ ORDER BY attnum;
+ attname |  type   | attndims | attnotnull 
+---------+---------+----------+------------
+ id      | integer |        0 | t
+ items   | text[]  |        2 | t
+ total   | bigint  |        0 | t
+(3 rows)
+
+SELECT id, array_dims(items) AS dims, items, total FROM nested ORDER BY id;
+ id |    dims    |      items      |        total         
+----+------------+-----------------+----------------------
+  1 | [1:2][1:2] | {{10,x},{20,y}} |                    7
+  2 |            | {}              |                    0
+  3 | [1:1][1:2] | {{30,NULL}}     | -9223372036854775808
+(3 rows)
+
+-- Let chDB infer Nested from source metadata to preserve rows
+-- Explicit Nested in structure splits rows into one array per field
+CREATE TYPE ab AS (a int, b text);
+CREATE TABLE nested_rec (id int, items ab[], total bigint);
+COPY nested_rec FROM :'nested_tsv' (format 'TSVWithNamesAndTypes', structure 'auto');
+SELECT id, items, total FROM nested_rec ORDER BY id;
+ id |        items        |        total         
+----+---------------------+----------------------
+  1 | {"(10,x)","(20,y)"} |                    7
+  2 | {}                  |                    0
+  3 | {"(30,)"}           | -9223372036854775808
+(3 rows)
+
+CREATE TABLE nested_create (id int, items ab[], total bigint) WITH (
+    copy_from = :'nested_tsv', format = 'TSVWithNamesAndTypes', structure = 'auto'
+);
+SELECT id, items, total FROM nested_create ORDER BY id;
+ id |        items        |        total         
+----+---------------------+----------------------
+  1 | {"(10,x)","(20,y)"} |                    7
+  2 | {}                  |                    0
+  3 | {"(30,)"}           | -9223372036854775808
+(3 rows)
+
+SELECT id, item.a, item.b, pg_typeof(item.a), pg_typeof(item.b)
+  FROM nested_create, unnest(items) AS item ORDER BY id, item.a;
+ id | a  | b | pg_typeof | pg_typeof 
+----+----+---+-----------+-----------
+  1 | 10 | x | integer   | text
+  1 | 20 | y | integer   | text
+  3 | 30 |   | integer   | text
+(3 rows)
+
 \set ECHO errors

@@ -130,6 +130,14 @@ chdb_url_columns(chdbCopyContext* ctx) {
     List* columns = NIL;
     ListCell* lc;
 
+    /*
+     * Infer every column from source for subsequent COPY FROM, since generated
+     * text arrays cannot recover ClickHouse Tuple, Map, or Nested types.
+     */
+    if (ctx->structure[0] == '\0') {
+        ctx->structure = "auto";
+    }
+
     foreach (lc, chdb_describe(ctx)) {
         chdbDescribedColumn* described = lfirst(lc);
         const char* where              = psprintf("column \"%s\"", described->name);
@@ -144,14 +152,11 @@ chdb_url_columns(chdbCopyContext* ctx) {
 
         pgch_pg_type type = pgch_pg_type_for(parsed, where);
 
-        /*
-         * Tuple and Map name a pseudo type that no table column holds, so
-         * convert them to text arrays of one or more dimensions
-         */
+        /* Convert pseudo types to text arrays valid in table columns */
         if (OidIsValid(type.typid) && !pgch_pg_type_is_column(type)) {
             const char* decl = "text[]";
 
-            type.typid  = TEXTOID;
+            type.typid  = TEXTARRAYOID;
             type.typmod = -1;
             type.ndims++;
             for (int dim = 1; dim < type.ndims; dim++) {

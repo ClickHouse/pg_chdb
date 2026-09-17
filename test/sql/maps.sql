@@ -91,10 +91,37 @@ CREATE TYPE tkv AS (k text, v text);
 CREATE TABLE bad_value (id int, m tkv[]);
 COPY bad_value FROM :'maps_json' (format 'JSONEachRow', structure 'id Int32, m Map(String, Int64)');
 
+/****************************************************************************/
+-- Infer Nested and SimpleAggregateFunction from source type names
+\! cp -f test/corpus/nested.tsv /tmp/chdb-nested.tsv
+\set nested_tsv file:///tmp/chdb-nested.tsv
+
+CREATE TABLE nested () WITH (
+    copy_from = :'nested_tsv', format = 'TSVWithNamesAndTypes'
+);
+SELECT attname, format_type(atttypid, atttypmod) AS type, attndims, attnotnull
+  FROM pg_attribute WHERE attrelid = 'nested'::regclass AND attnum > 0
+ ORDER BY attnum;
+SELECT id, array_dims(items) AS dims, items, total FROM nested ORDER BY id;
+
+-- Let chDB infer Nested from source metadata to preserve rows
+-- Explicit Nested in structure splits rows into one array per field
+CREATE TYPE ab AS (a int, b text);
+CREATE TABLE nested_rec (id int, items ab[], total bigint);
+COPY nested_rec FROM :'nested_tsv' (format 'TSVWithNamesAndTypes', structure 'auto');
+SELECT id, items, total FROM nested_rec ORDER BY id;
+
+CREATE TABLE nested_create (id int, items ab[], total bigint) WITH (
+    copy_from = :'nested_tsv', format = 'TSVWithNamesAndTypes', structure = 'auto'
+);
+SELECT id, items, total FROM nested_create ORDER BY id;
+SELECT id, item.a, item.b, pg_typeof(item.a), pg_typeof(item.b)
+  FROM nested_create, unnest(items) AS item ORDER BY id, item.a;
+
 \set ECHO errors
 \set ci ''
 \getenv ci CI
 SELECT :'ci' = '' AS not_ci \gset
 \if :not_ci
-\! rm -f /tmp/chdb-maps.jsonl /tmp/chdb-maps.tmp 2> /dev/null || true
+\! rm -f /tmp/chdb-maps.jsonl /tmp/chdb-maps.tmp /tmp/chdb-nested.tsv 2> /dev/null || true
 \endif
