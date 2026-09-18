@@ -167,6 +167,13 @@ simplest way to install it is via the [lib.chdb.io] shell script:
 curl -sL https://lib.chdb.io | bash
 ```
 
+On macOS you may need to sign the library before building the extension:
+
+```sh
+sudo install_name_tool -id /usr/local/lib/libchdb.so /usr/local/lib/libchdb.so
+sudo codesign -f -s - /usr/local/lib/libchdb.so
+```
+
 To statically compile [chDB] into the helper app, set the following variables
 before running the [Installation](#installation) `make` commands.
 

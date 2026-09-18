@@ -4,15 +4,26 @@ EXTVERSION   = $(shell grep -m 1 'default_version' chdb.control | \
 DISTVERSION  = $(shell grep -m 1 '^[[:space:]]\{2\}"version":' META.json | \
                sed -e 's/[[:space:]]*"version":[[:space:]]*"\([^"]*\)",\{0,1\}/\1/')
 
+MAX_CONCURRENT_TESTS ?=
+
 DATA         = $(sort $(wildcard sql/$(EXTENSION)--*.sql) sql/$(EXTENSION)--$(EXTVERSION).sql)
 DOCS         = $(wildcard doc/*.md)
 TESTS        ?= $(wildcard test/sql/*.sql)
-REGRESS      = --schedule test/schedule
-REGRESS_OPTS = --inputdir=test --load-extension=$(EXTENSION)
+REGRESS      = --schedule test/schedule$(MAX_CONCURRENT_TESTS)
+REGRESS_OPTS = --inputdir=test --load-extension=$(EXTENSION) $(if $(MAX_CONCURRENT_TESTS),--max-concurrent-tests $(MAX_CONCURRENT_TESTS))
 MODULE_big   = $(EXTENSION)
 PG_CONFIG   ?= pg_config
 TAP_TESTS   ?= 1
-OBJS 		 = $(subst .c,.o, $(wildcard src/*.c))
+OBJS         = $(subst .c,.o, $(wildcard src/*.c))
+
+# Determine the OS and architecture.
+OS         ?= $(shell uname -s | tr A-Z a-z)
+ARCH        = $(shell uname -m)
+ifeq ($(ARCH),aarch64)
+  ARCH       := arm64
+else ifeq ($(ARCH),x86_64)
+  ARCH       := amd64
+endif
 
 CLANG_FORMAT ?= clang-format
 
@@ -39,20 +50,18 @@ PG_CPPFLAGS  = -isystem $(CH_C_DIR) -isystem $(PGCH_DIR) -DPGCH_MSG_PREFIX='"chd
                -DCHC_ERR_MSG_LEN=4096
 
 # Clean up generated files.
-EXTRA_CLEAN  = src/version.h sql/$(EXTENSION)--$(EXTVERSION).sql src/hook/chdb_hook$(DLSUFFIX) src/hook/*.o src/hook/*.bc src/helper/chdb_helper src/helper/*.o test/schedule
+EXTRA_CLEAN  = src/version.h sql/$(EXTENSION)--$(EXTVERSION).sql src/hook/chdb_hook$(DLSUFFIX) src/hook/*.o src/hook/*.bc src/helper/chdb_helper src/helper/*.o test/schedule*
 
 PGXS := $(shell $(PG_CONFIG) --pgxs)
 include $(PGXS)
 
 # Set default prove flags.
 ifeq ($(PROVE_FLAGS),)
-PROVE_FLAGS = -fwvj $(shell nproc)
+PROVE_FLAGS = -fwvj $(if $(MAX_CONCURRENT_TESTS),$(MAX_CONCURRENT_TESTS),$(shell nproc))
 endif
 
 # Build against, install, uninstall a local copy of libchdb.
 ifneq ($(BUNDLE_LIBCHDB),)
-OS         ?= $(shell uname -s | tr A-Z a-z)
-ARCH        = $(shell uname -m)
 LIBCHDB_DIR = vendor/libchdb-$(LIBCHDB_VERSION)-$(OS)-$(ARCH)
 src/helper/chdb_helper: $(LIBCHDB_DIR)/lib/libchdb.$(if $(filter $(LIBCHDB_BUILD),static),a,so)
 ifneq ($(LIBCHDB_BUILD),static)
@@ -109,12 +118,16 @@ uninstall-helper:
 install: install-helper
 uninstall: uninstall-helper
 
-.PHONY: test/schedule # Depends on $(TESTS), so always rebuild.
-test/schedule: schedule = $(if $(TESTS),test: $(patsubst test/sql/%.sql,%,$(TESTS)),)
-test/schedule:
-	@echo $(schedule) > $@
+.PHONY: test/schedule$(MAX_CONCURRENT_TESTS)
+test/schedule$(MAX_CONCURRENT_TESTS): schedule = $(if $(TESTS),$(patsubst test/sql/%.sql,%,$(TESTS)),)
+test/schedule$(MAX_CONCURRENT_TESTS):
+ifneq ($(MAX_CONCURRENT_TESTS),)
+	@perl -E 'say "test: ", join " ", splice @ARGV, 0, $(MAX_CONCURRENT_TESTS) while @ARGV' $(schedule) > $@
+else
+	@echo $(if $(schedule),test: $(schedule),) > $@
+endif
 
-installcheck: test/schedule
+installcheck: test/schedule$(MAX_CONCURRENT_TESTS)
 
 # libchdb
 $(LIBCHDB_DIR)/lib/libchdb.so:
@@ -135,6 +148,7 @@ install-libchdb: $(LIBCHDB_DIR)/lib/libchdb.so
 	$(MKDIR_P) $(DESTDIR)/usr/local/lib
 	$(INSTALL_SHLIB) $< $(DESTDIR)/usr/local/lib
 	if [ "$$(uname -s)" = "Linux" ]; then ldconfig; fi
+
 uninstall-libchdb:
 	rm -f $(DESTDIR)/usr/local/lib/libchdb.so
 
@@ -183,6 +197,12 @@ $(EXTENSION)-$(DISTVERSION).zip:
 	git archive-all -v --prefix "$(EXTENSION)-$(DISTVERSION)/" --force-submodules $(EXTENSION)-$(DISTVERSION).zip
 
 zip: $(EXTENSION)-$(DISTVERSION).zip
+
+kv-rest:
+	curl -Ls https://github.com/theory/kv-rest/releases/download/v0.1.1/kv-rest-v0.1.1-$(OS)-$(ARCH).tar.gz | tar zxf - --strip-components=1 $(if $(filter $(OS),linux),--wildcards) '*/kv-rest'
+
+start-kv-rest: kv-rest
+	KVREST_PORT="$${KVREST_PORT:-9182}" ./kv-rest &
 
 # Run make print-VARIABLE_NAME to print VARIABLE_NAME's flavor and value.
 print-%	: ; $(info $* is $(flavor $*) variable set to "$($*)") @true

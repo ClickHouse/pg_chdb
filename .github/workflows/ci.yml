@@ -19,16 +19,14 @@ jobs:
         build: [dynamic, static]
         libchdb: [v26.7.0, v26.7.3]
         exclude:
-          - { os: 🍎 } # chdb: chDB was terminated by signal 6 (plus kv-rest Docker verboten)
           - { os: 🍎, arch: amd64 } # Unsupported by Homebrew
           - { os: 🍎, pg: 19 } # Not released yet
     name: ${{ matrix.os }} ${{ matrix.arch }} 🐘 ${{ matrix.pg }} 🏠 ${{ matrix.libchdb }} ${{ matrix.build }}
-    runs-on: ${{ matrix.os == '🍎' && 'macos' || 'ubuntu' }}-${{ (matrix.os == '🐧' && matrix.arch == 'arm64') && '24.04-arm' || 'latest' }}
-    env: { BUNDLE_LIBCHDB: 1, LIBCHDB_BUILD: "${{ matrix.build }}" }
-    services:
-      kv-rest:
-        image: ghcr.io/theory/kv-rest
-        ports: [80]
+    runs-on: ${{ case(matrix.os == '🍎', 'macos-latest', matrix.arch == 'amd64', 'ubuntu-latest', 'ubuntu-24.04-arm') }}
+    env:
+      BUNDLE_LIBCHDB: ${{ case(matrix.os == '🐧' || matrix.build == 'static', '1', '') }}
+      LIBCHDB_BUILD: ${{ matrix.build }}
+      MAX_CONCURRENT_TESTS: 15
     steps:
       - name: Checkout the Repository
         uses: actions/checkout@v7
@@ -37,14 +35,13 @@ jobs:
         uses: pgxn/postgres-action@v0
         with:
           version: ${{ matrix.pg }}
-          packages: ${{ matrix.os == '🐧' && 'libkrb5-dev libipc-run-perl' || 'krb5 cpanminus' }}
+          packages: ${{ case(matrix.os == '🐧', 'libkrb5-dev libipc-run-perl', 'krb5 cpanminus') }}
       - name: Install IPC::Run on macOS
         if: matrix.os == '🍎'
         run: cpanm --notest IPC::Run
-      # make BUNDLE_LIBCHDB=1 installs libchdb if missing.
       - name: Get chDB Version
         id: chdb
-        run: make LIBCHDB_VERSION=${{ matrix.libchdb }} libchdb-variables >> $GITHUB_OUTPUT
+        run: make LIBCHDB_VERSION=${{ matrix.libchdb }} libchdb-variables BUNDLE_LIBCHDB=1 >> $GITHUB_OUTPUT
       - name: Cache chDB
         id: cache-chdb
         uses: actions/cache@v6
@@ -66,6 +63,19 @@ jobs:
       - name: Freshen chDB Helper
         if: steps.cache-helper.outputs.cache-hit == 'true'
         run: touch src/helper/chdb_helper*
+      - name: Install libchdb.so
+        if: matrix.build == 'dynamic' && matrix.os == '🍎'
+        # macOS requires libchdb.so to be code signed in its home. For dynamic
+        # builds on macOS, we use BUNDLE_LIBCHDB=1 only here to download,
+        # install, and sign libchdb.so.
+        run: |
+          set -eu
+          make ${{ steps.chdb.outputs.directory }}/lib/libchdb.so BUNDLE_LIBCHDB=1 LIBCHDB_VERSION=${{ matrix.libchdb }}
+          sudo BUNDLE_LIBCHDB=1 LIBCHDB_VERSION=${{ matrix.libchdb }} make install-libchdb
+          sudo mkdir -p /usr/local/include
+          sudo cp ${{ steps.chdb.outputs.directory }}/include/chdb.* /usr/local/include
+          sudo install_name_tool -id /usr/local/lib/libchdb.so /usr/local/lib/libchdb.so
+          sudo codesign -f -s - /usr/local/lib/libchdb.so
       - name: Build
         run: make -j $(nproc)
       - name: Install
@@ -76,6 +86,8 @@ jobs:
           role-to-assume: ${{ secrets.aws_role_to_assume }}
           role-session-name: ${{ github.run_id }}
           aws-region: us-east-2
+      - name: Start kv-rest
+        run: make start-kv-rest KVREST_PORT=9631
       - name: Test
         id: test
         run: make installcheck
@@ -83,7 +95,7 @@ jobs:
         env:
           CLOUDSDK_AUTH_HMAC_KEY: ${{ secrets.gcp_hmac_key }}
           CLOUDSDK_AUTH_HMAC_SECRET: ${{ secrets.gcp_hmac_secret }}
-          PG_CHDB_HTTP_URL: http://localhost:${{ job.services.kv-rest.ports[80] }}
+          PG_CHDB_HTTP_URL: http://localhost:9631
       - name: Show Diffs
         if: failure() && steps.test.outcome == 'failure'
         run: find . -name regression.diffs -exec cat {} +

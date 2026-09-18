@@ -20,8 +20,9 @@ compile_commands.json
 .env
 .cache/
 log/
-/test/schedule
+/test/schedule*
 /tmp_check/
 *.tmp
 .DS_Store
 /vendor/libchdb-*
+/kv-rest
