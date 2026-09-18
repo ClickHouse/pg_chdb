@@ -14,11 +14,16 @@ jobs:
       fail-fast: false
       matrix:
         pg: [19, 18, 17, 16, 15]
+        os: [🐧, 🍎]
         arch: [amd64, arm64]
         build: [dynamic, static]
         libchdb: [v26.7.0, v26.7.3]
-    name: 🐧 ${{ matrix.arch }} 🐘 ${{ matrix.pg }} 🏠 ${{ matrix.libchdb }} ${{ matrix.build }}
-    runs-on: ubuntu-${{ matrix.arch == 'amd64' && 'latest' || '24.04-arm' }}
+        exclude:
+          - { os: 🍎 } # chdb: chDB was terminated by signal 6 (plus kv-rest Docker verboten)
+          - { os: 🍎, arch: amd64 } # Unsupported by Homebrew
+          - { os: 🍎, pg: 19 } # Not released yet
+    name: ${{ matrix.os }} ${{ matrix.arch }} 🐘 ${{ matrix.pg }} 🏠 ${{ matrix.libchdb }} ${{ matrix.build }}
+    runs-on: ${{ matrix.os == '🍎' && 'macos' || 'ubuntu' }}-${{ (matrix.os == '🐧' && matrix.arch == 'arm64') && '24.04-arm' || 'latest' }}
     env: { BUNDLE_LIBCHDB: 1, LIBCHDB_BUILD: "${{ matrix.build }}" }
     services:
       kv-rest:
@@ -29,10 +34,13 @@ jobs:
         uses: actions/checkout@v7
         with: { submodules: recursive }
       - name: Start Postgres ${{ matrix.pg }}
-        uses: ./.github/actions/setup-pg
+        uses: pgxn/postgres-action@v0
         with:
           version: ${{ matrix.pg }}
-          packages: libkrb5-dev libipc-run-perl
+          packages: ${{ matrix.os == '🐧' && 'libkrb5-dev libipc-run-perl' || 'krb5 cpanminus' }}
+      - name: Install IPC::Run on macOS
+        if: matrix.os == '🍎'
+        run: cpanm --notest IPC::Run
       # make BUNDLE_LIBCHDB=1 installs libchdb if missing.
       - name: Get chDB Version
         id: chdb
@@ -51,13 +59,13 @@ jobs:
         id: cache-helper
         uses: actions/cache@v6
         with:
-          key: helper-${{ matrix.arch }}-${{ steps.chdb.outputs.version }}-${{ hashFiles('src/helper/*.c', 'src/setup.h') }}
+          key: helper-${{ runner.os }}-${{ matrix.arch }}-${{ steps.chdb.outputs.version }}-${{ hashFiles('src/helper/*.c', 'src/setup.h') }}
           path: |
             src/helper/chdb_helper
             src/helper/chdb_helper.o
       - name: Freshen chDB Helper
         if: steps.cache-helper.outputs.cache-hit == 'true'
-        run: touch src/helper/chdb_helper.o && touch src/helper/chdb_helper
+        run: touch src/helper/chdb_helper*
       - name: Build
         run: make -j $(nproc)
       - name: Install
@@ -69,6 +77,7 @@ jobs:
           role-session-name: ${{ github.run_id }}
           aws-region: us-east-2
       - name: Test
+        id: test
         run: make installcheck
         # https://console.cloud.google.com/storage/settings;tab=interoperability?project=ch-pg-test
         env:
@@ -76,14 +85,16 @@ jobs:
           CLOUDSDK_AUTH_HMAC_SECRET: ${{ secrets.gcp_hmac_secret }}
           PG_CHDB_HTTP_URL: http://localhost:${{ job.services.kv-rest.ports[80] }}
       - name: Show Diffs
-        if: failure()
+        if: failure() && steps.test.outcome == 'failure'
         run: find . -name regression.diffs -exec cat {} +
       - name: Upload Diffs
-        if: failure()
+        if: failure() && steps.test.outcome == 'failure'
         uses: actions/upload-artifact@v7
         with:
-          name: regression-diffs-pg${{ matrix.pg }}
-          path: regression.diffs
+          name: regression-${{ runner.os }}-${{ matrix.arch }}-pg${{ matrix.pg }}
+          path: |
+            test/pgxs/regression.diffs
+            test/pgxs/results
       - name: Test No File
         # NO_FILE_SCHEME disables file://; when set, file test should fail
         # with output that includes "could not open file". This step fails if
