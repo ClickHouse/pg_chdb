@@ -21,9 +21,7 @@ All notable changes to this project will be documented in this file. It uses the
     silently ignoring row filters ([#86]).
 *   When `CREATE TABLE` infers columns, `Tuple`, `Map`, and `Nested`
     columns now use the `text[]` or `text[][]` type, reported in a `NOTICE`.
-    Previously, it created `text` columns containing ClickHouse syntax.
-    chDB also infers source types when loading rows, since PostgreSQL text
-    arrays do not identify their original ClickHouse types ([#89]).
+    Previously, it created `text` columns containing ClickHouse syntax ([#89]).
 *   The `install` target no longer installs `libchdb.a` when using
     `LIBCHDB_BUILD=static`. Since we statically link it, we do not need to
     install it.

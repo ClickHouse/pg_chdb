@@ -146,6 +146,22 @@ COPY bad_value FROM :'maps_json' (format 'JSONEachRow', structure 'id Int32, m M
 ERROR:  could not map tuple to returned type
 DETAIL:  Returned type bigint does not match expected type text in column "v" (position 2).
 /****************************************************************************/
+-- Reuse inferred source types, including quoted column names
+\! cp -f test/corpus/schema.tsv /tmp/chdb-schema.tsv
+\set schema_tsv file:///tmp/chdb-schema.tsv
+CREATE TABLE inferred_schema () WITH (
+    copy_from = :'schema_tsv', format = 'TSVWithNamesAndTypes', structure = 'auto'
+);
+NOTICE:  chdb: column "point "value"" of type "Tuple(Int32, String)" converted to text[]
+NOTICE:  chdb: column "labels\name" of type "Map(String, Int64)" converted to text[][]
+SELECT * FROM inferred_schema ORDER BY id;
+ id | point "value" | labels\name 
+----+---------------+-------------
+  1 | {10,x}        | {{a,7}}
+  2 | {20,y}        | {}
+(2 rows)
+
+/****************************************************************************/
 -- Infer Nested and SimpleAggregateFunction from source type names
 \! cp -f test/corpus/nested.tsv /tmp/chdb-nested.tsv
 \set nested_tsv file:///tmp/chdb-nested.tsv

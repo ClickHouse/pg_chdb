@@ -416,6 +416,11 @@ make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** value
         appendStringInfo(
             query, "%sdescribe_compact_output=1", joins ? ", " : " SETTINGS "
         );
+    } else if (ctx->cmd_type == CHDB_CMD_SELECT && ctx->preserve_nested) {
+        bool joins = ctx->scheme != file_scheme && ctx->scheme != hdfs_scheme;
+
+        /* ClickHouse otherwise splits explicit Nested into separate columns */
+        appendStringInfo(query, "%sflatten_nested=0", joins ? ", " : " SETTINGS ");
     }
 
     if (

@@ -65,6 +65,19 @@ STRUCTURE: {
     }), 'id bigint t, name text f', 'Should derive the columns from the structure';
 }
 
+CACHED_SCHEMA: {
+    append_to_file("$dir/nested.tsv", slurp_file('test/corpus/nested.tsv'));
+    $node->safe_psql(postgres => qq{
+        CREATE TABLE cached () WITH (
+            copy_from = 'file://$dir/nested.tsv', format = 'TSVWithNamesAndTypes'
+        )
+    });
+    my $log = join "\n", server_log $node;
+    like $log,
+        qr[\QSELECT * FROM file({path:String}, {format:String}, {structure:String}) SETTINGS flatten_nested=0\E\n[^\n]*\Q{ path: "$dir/nested.tsv", format: "TSVWithNamesAndTypes", structure: "id Int32, items Nested(a Int32, b Nullable(String)), total SimpleAggregateFunction(sum, Int64)" }],
+        'Reuse DESCRIBE types when loading rows';
+}
+
 S3: {
     check_query(
         $node, 'structure_from s3',

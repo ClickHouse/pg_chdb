@@ -92,6 +92,15 @@ CREATE TABLE bad_value (id int, m tkv[]);
 COPY bad_value FROM :'maps_json' (format 'JSONEachRow', structure 'id Int32, m Map(String, Int64)');
 
 /****************************************************************************/
+-- Reuse inferred source types, including quoted column names
+\! cp -f test/corpus/schema.tsv /tmp/chdb-schema.tsv
+\set schema_tsv file:///tmp/chdb-schema.tsv
+CREATE TABLE inferred_schema () WITH (
+    copy_from = :'schema_tsv', format = 'TSVWithNamesAndTypes', structure = 'auto'
+);
+SELECT * FROM inferred_schema ORDER BY id;
+
+/****************************************************************************/
 -- Infer Nested and SimpleAggregateFunction from source type names
 \! cp -f test/corpus/nested.tsv /tmp/chdb-nested.tsv
 \set nested_tsv file:///tmp/chdb-nested.tsv
@@ -123,5 +132,5 @@ SELECT id, item.a, item.b, pg_typeof(item.a), pg_typeof(item.b)
 \getenv ci CI
 SELECT :'ci' = '' AS not_ci \gset
 \if :not_ci
-\! rm -f /tmp/chdb-maps.jsonl /tmp/chdb-maps.tmp /tmp/chdb-nested.tsv 2> /dev/null || true
+\! rm -f /tmp/chdb-maps.jsonl /tmp/chdb-maps.tmp /tmp/chdb-nested.tsv /tmp/chdb-schema.tsv 2> /dev/null || true
 \endif

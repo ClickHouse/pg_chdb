@@ -375,10 +375,9 @@ CREATE TABLE times (
 ) WITH (copy_from = 's3://datasets-documentation/my-test-bucket-768/some_prefix/some_file_1.csv');
 ```
 
-When `copy_from` infers columns, chDB infers source types for every column
-when loading rows. This allows `Map`, `Tuple`, and `Nested` values to load
-into text array columns, which do not identify their original ClickHouse
-types.
+When `copy_from` infers columns, it uses source schema returned by `DESCRIBE`.
+This allows `Map`, `Tuple`, and `Nested` values to load as text array columns,
+which do not identify their original ClickHouse types.
 
 Both options support the same [URL schemes](#url-schemes) and
 [options](#options) as `COPY`; credentials, format, compression, timeout, and
