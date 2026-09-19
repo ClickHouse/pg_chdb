@@ -153,6 +153,12 @@ CREATE TABLE oops () WITH (
     structure      = 'req_id UInt32, dyn Dynamic'
 );
 
+-- Aggregate states have no PostgreSQL column type
+CREATE TABLE oops () WITH (
+    structure_from = :'requests_csv',
+    structure      = 'req_id UInt32, agg AggregateFunction(sum, Int64)'
+);
+
 -- Reject options unknown to chDB and PostgreSQL
 CREATE TABLE oops () WITH (structure_from = :'requests_csv', nonesuch = 1);
 

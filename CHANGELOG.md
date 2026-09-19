@@ -9,10 +9,19 @@ All notable changes to this project will be documented in this file. It uses the
 
 ## [v0.1.2] — Unreleased
 
+### ⚡ Improvements
+
+*   When `CREATE TABLE` infers columns, it now maps `Nested` to `text[][]`,
+    with one array per nested row, and `SimpleAggregateFunction` to its
+    argument type ([#89]).
+
 ### 🐞 Bug Fixes
 
 *   Reject `COPY FROM` a URL with a `WHERE` clause, preventing imports from
     silently ignoring row filters ([#86]).
+*   When `CREATE TABLE` infers columns, `Tuple`, `Map`, and `Nested`
+    columns now use the `text[]` or `text[][]` type, reported in a `NOTICE`.
+    Previously, it created `text` columns containing ClickHouse syntax ([#89]).
 *   The `install` target no longer installs `libchdb.a` when using
     `LIBCHDB_BUILD=static`. Since we statically link it, we do not need to
     install it.
@@ -26,14 +35,20 @@ All notable changes to this project will be documented in this file. It uses the
 ### ⬆️ Dependencies
 
 *   Added testing for chDB v26.7.3.
+*   Updated the vendored pg-clickhouse-c, which now parses `Nested`,
+    `SimpleAggregateFunction`, and parameterized `JSON` types ([#89]).
 
 ### 📚 Documentation
 
 *   Added missing links to the README and docs and simplified the list of
     files to load in a single command.
+*   Added a [Manual Type Mappings](doc/chdb_hook.md#manual-type-mappings)
+    section showing how to use PostgreSQL enum and composite types to read
+    `Enum`, `Tuple`, `Map`, and `Nested` columns ([#89]).
 
   [v0.1.2]: https://github.com/clickhouse/pg_chdb/compare/v0.1.1...v0.1.2
   [#86]: https://github.com/ClickHouse/pg_chdb/pull/86
+  [#89]: https://github.com/ClickHouse/pg_chdb/pull/89
 
 ## [v0.1.1] — 2026-09-06
 

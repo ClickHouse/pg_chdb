@@ -114,9 +114,9 @@ SELECT attname, format_type(atttypid, atttypmod) AS type, attndims, attnotnull
  attname |  type  | attndims | attnotnull 
 ---------+--------+----------+------------
  req_id  | bigint |        0 | t
- t       | text   |        1 | t
- m       | text   |        2 | t
- at      | text   |        2 | t
+ t       | text[] |        1 | t
+ m       | text[] |        2 | t
+ at      | text[] |        2 | t
 (4 rows)
 
 /****************************************************************************/
@@ -272,6 +272,12 @@ CREATE TABLE oops () WITH (
     structure      = 'req_id UInt32, dyn Dynamic'
 );
 ERROR:  chdb: unsupported column type "Dynamic" (column "dyn")
+-- Aggregate states have no PostgreSQL column type
+CREATE TABLE oops () WITH (
+    structure_from = :'requests_csv',
+    structure      = 'req_id UInt32, agg AggregateFunction(sum, Int64)'
+);
+ERROR:  chdb: unsupported column type "AggregateFunction(sum, Int64)" (column "agg")
 -- Reject options unknown to chDB and PostgreSQL
 CREATE TABLE oops () WITH (structure_from = :'requests_csv', nonesuch = 1);
 ERROR:  unrecognized parameter "nonesuch"

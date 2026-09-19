@@ -1,0 +1,5 @@
+id	items	total
+Int32	Nested(a Int32, b Nullable(String))	SimpleAggregateFunction(sum, Int64)
+1	[(10,'x'),(20,'y')]	7
+2	[]	0
+3	[(30,NULL)]	-9223372036854775808
