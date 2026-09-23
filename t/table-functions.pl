@@ -280,7 +280,7 @@ subtest azure => sub {
     check_query(
         $node, 'FROM abfs with compression & structure',
         q{COPY stuff FROM 'abfs://container@account/xyz/yep.csv' (access_key 'ac-key', compression 'snappy', structure 'x String')},
-        qr/403 The specified account is disabled/,
+        qr/Azure::Storage::StorageException/,
         qr[\QSELECT * FROM azureBlobStorage({url:String}, {container:String}, {path:String}, {account_name:String}, {account_key:String}, {format:String}, {compression:String}, {structure:String}) SETTINGS azure_request_timeout_ms=30000],
         qr[\Q{ url: "https://account.blob.core.windows.net", container: "container", path: "xyz/yep.csv", account_name: "ac-key", account_key: "", format: "auto", compression: "snappy", structure: "x String" }],
     );

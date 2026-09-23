@@ -43,8 +43,8 @@ needing to `ALTER EXTENSION UPDATE`.
 
 ### ⚡ Improvements
 
-*   Support mapping `BFloat16` to Postgres `real`, and `Interval` types to
-    Postgres `interval` ([#76]).
+*   Support mapping `BFloat16` to `real`, and `Interval` types to `interval`.
+    `Interval` types also map to `bigint` transparently ([#76], [#92]).
 *   Added PostgreSQL 15 support.
 *   Map `UInt64`, `Int128`, `Int256`, `UInt128`, and `UInt256` to Postgres
     `numeric`, so values above the `bigint` range no longer raise an error.
@@ -80,6 +80,7 @@ needing to `ALTER EXTENSION UPDATE`.
   [#76]: https://github.com/clickhouse/pg_chdb/issues/76
   [#78]: https://github.com/clickhouse/pg_chdb/pulls/78
   [#80]: https://github.com/clickhouse/pg_chdb/pulls/80
+  [#92]: https://github.com/ClickHouse/pg_chdb/pull/92
   [chdb_hook docs]: ./doc/chdb_hook.md
   [structure]: ./doc/chdb_hook.md#structure "chdb_hook Docs: structure"
 

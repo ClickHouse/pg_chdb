@@ -57,6 +57,8 @@ BEGIN {
 
     upstream["Map(K,V)"] = "record[]|One record per pair"
     ours["Map(K,V)"] = "text[][]|One row of text items per pair"
+    upstream["Nested(...)"] = "record[]|One record per nested row"
+    ours["Nested(...)"] = "T[] per field|Flattens to one column per field"
     upstream["Tuple(...)"] = "record|Pseudo type, no column takes it"
     ours["Tuple(...)"] = "text[]|Fields become text items"
 

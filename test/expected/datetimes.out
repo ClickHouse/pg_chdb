@@ -294,4 +294,19 @@ COPY ticks TO 'file:///tmp/datetimes.tmp' (format 'TabSeparated', structure 'n I
 COPY tocks FROM 'file:///tmp/datetimes.tmp'
      (format 'TabSeparated', structure 'n IntervalYear');
 ERROR:  chdb: IntervalYear value out of range
+-- Integers convert to intervals
+TRUNCATE ticks;
+INSERT INTO ticks VALUES (1500), (-1500);
+COPY ticks TO 'file:///tmp/datetimes.tmp'
+     (format 'TabSeparated', structure 'n IntervalNanosecond');
+TRUNCATE ticks;
+COPY ticks FROM 'file:///tmp/datetimes.tmp'
+     (format 'TabSeparated', structure 'n IntervalNanosecond');
+SELECT n FROM ticks ORDER BY n;
+   n   
+-------
+ -1500
+  1500
+(2 rows)
+
 \set ECHO errors

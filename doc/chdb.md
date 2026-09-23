@@ -52,7 +52,8 @@ persist to subsequent calls.
 A column definition list (`AS (col type, ...)`) is required: PostgreSQL
 requires the row structure definition before fetching rows, and that structure
 must match the columns the query returns. Values are converted from chDB to
-the declared types.
+the declared types. See [type coercion](chdb_hook.md#chdb-to-postgres) for
+alternate types.
 
 No role has `EXECUTE` access by default; `GRANT` to a role to allow it to use
 the function.

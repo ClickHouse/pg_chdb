@@ -129,7 +129,7 @@ SELECT * FROM tuple_text EXCEPT ALL SELECT * FROM tuple_text2;
 
 -- A Tuple takes exactly its fields, and cannot be NULL.
 COPY tuple_text2 TO :'maps_out' (format 'JSONEachRow', structure 'id Int32, tt Tuple(String, Int64, Int64)');
-ERROR:  chdb: Tuple took 2 of 3 values
+ERROR:  chdb: Tuple requires 3 values, got 2
 INSERT INTO tuple_text2 VALUES (4, NULL);
 COPY tuple_text2 TO :'maps_out' (format 'JSONEachRow', structure 'id Int32, tt Tuple(String, Int64)');
 ERROR:  chdb: cannot encode record into ClickHouse Tuple(String, Int64) (column "tt")

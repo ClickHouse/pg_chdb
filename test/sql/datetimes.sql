@@ -121,5 +121,15 @@ COPY ticks TO 'file:///tmp/datetimes.tmp' (format 'TabSeparated', structure 'n I
 COPY tocks FROM 'file:///tmp/datetimes.tmp'
      (format 'TabSeparated', structure 'n IntervalYear');
 
+-- Integers convert to intervals
+TRUNCATE ticks;
+INSERT INTO ticks VALUES (1500), (-1500);
+COPY ticks TO 'file:///tmp/datetimes.tmp'
+     (format 'TabSeparated', structure 'n IntervalNanosecond');
+TRUNCATE ticks;
+COPY ticks FROM 'file:///tmp/datetimes.tmp'
+     (format 'TabSeparated', structure 'n IntervalNanosecond');
+SELECT n FROM ticks ORDER BY n;
+
 \set ECHO errors
 \! rm -rf /tmp/datetimes.tmp 2> /dev/null || true
