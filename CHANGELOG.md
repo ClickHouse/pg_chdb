@@ -26,6 +26,7 @@ All notable changes to this project will be documented in this file. It uses the
 ### ⬆️ Dependencies
 
 *   Added testing for chDB v26.7.3.
+*   Updated to support PostgreSQL 19 beta 4.
 
 ### 📚 Documentation
 

@@ -689,9 +689,7 @@ chdb_copy_receive(
     ResultRelInfo* target = makeNode(ResultRelInfo);
 
     ExecInitResultRelation(estate, target, 1);
-#if PG_VERSION_NUM >= 190000
-    CheckValidResultRel(target, CMD_INSERT, ONCONFLICT_NONE, NIL, NULL);
-#elif PG_VERSION_NUM >= 180000
+#if PG_VERSION_NUM >= 180000
     CheckValidResultRel(target, CMD_INSERT, ONCONFLICT_NONE, NIL);
 #elif PG_VERSION_NUM >= 170000
     CheckValidResultRel(target, CMD_INSERT, NIL);

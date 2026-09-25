@@ -6,38 +6,48 @@ on:
   schedule:
     - cron: "0 12 10 * *" # Monthly at noon on the tenth
 jobs:
-  build:
+  matrix:
+    name: 📋 Generate Matrix
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - name: Generate Matrix
+        id: matrix
+        uses: pgxn/matrix-action@v0
+        with:
+          min-version: 15
+          beta: true
+          no-os: windows
+
+  test:
+    name: ${{ matrix.pg.emoji }} ${{ matrix.pg.arch }} 🐘 ${{ matrix.pg.version }} 🏠 ${{ matrix.libchdb }} ${{ matrix.build }}
+    needs: matrix
+    runs-on: ${{ matrix.pg.runner }}
     permissions:
       contents: read
       id-token: write
     strategy:
       fail-fast: false
       matrix:
-        pg: [19, 18, 17, 16, 15]
-        os: [🐧, 🍎]
-        arch: [amd64, arm64]
+        pg: ${{ fromJson(needs.matrix.outputs.matrix) }}
         build: [dynamic, static]
         libchdb: [v26.7.0, v26.7.3]
-        exclude:
-          - { os: 🍎, arch: amd64 } # Unsupported by Homebrew
-          - { os: 🍎, pg: 19 } # Not released yet
-    name: ${{ matrix.os }} ${{ matrix.arch }} 🐘 ${{ matrix.pg }} 🏠 ${{ matrix.libchdb }} ${{ matrix.build }}
-    runs-on: ${{ case(matrix.os == '🍎', 'macos-latest', matrix.arch == 'amd64', 'ubuntu-latest', 'ubuntu-24.04-arm') }}
     env:
-      BUNDLE_LIBCHDB: ${{ case(matrix.os == '🐧' || matrix.build == 'static', '1', '') }}
+      BUNDLE_LIBCHDB: ${{ case(matrix.pg.os == 'linux' || matrix.build == 'static', '1', '') }}
       LIBCHDB_BUILD: ${{ matrix.build }}
-      MAX_CONCURRENT_TESTS: 15
+      MAX_CONCURRENT_TESTS: 10
     steps:
       - name: Checkout the Repository
         uses: actions/checkout@v7
         with: { submodules: recursive }
-      - name: Start Postgres ${{ matrix.pg }}
+      - name: Start Postgres ${{ matrix.pg.version }}
         uses: pgxn/postgres-action@v0
         with:
-          version: ${{ matrix.pg }}
-          packages: ${{ case(matrix.os == '🐧', 'libkrb5-dev libipc-run-perl', 'krb5 cpanminus') }}
+          version: ${{ matrix.pg.version }}
+          packages: ${{ case(matrix.pg.os == 'linux', 'libkrb5-dev libipc-run-perl', 'krb5 cpanminus') }}
       - name: Install IPC::Run on macOS
-        if: matrix.os == '🍎'
+        if: matrix.pg.os == 'macos'
         run: cpanm --notest IPC::Run
       - name: Get chDB Version
         id: chdb
@@ -56,7 +66,7 @@ jobs:
         id: cache-helper
         uses: actions/cache@v6
         with:
-          key: helper-${{ runner.os }}-${{ matrix.arch }}-${{ steps.chdb.outputs.version }}-${{ hashFiles('src/helper/*.c', 'src/setup.h') }}
+          key: helper-${{ runner.os }}-${{ matrix.pg.arch }}-${{ steps.chdb.outputs.version }}-${{ hashFiles('src/helper/*.c', 'src/setup.h') }}
           path: |
             src/helper/chdb_helper
             src/helper/chdb_helper.o
@@ -64,7 +74,7 @@ jobs:
         if: steps.cache-helper.outputs.cache-hit == 'true'
         run: touch src/helper/chdb_helper*
       - name: Install libchdb.so
-        if: matrix.build == 'dynamic' && matrix.os == '🍎'
+        if: matrix.build == 'dynamic' && matrix.pg.os == 'macos'
         # macOS requires libchdb.so to be code signed in its home. For dynamic
         # builds on macOS, we use BUNDLE_LIBCHDB=1 only here to download,
         # install, and sign libchdb.so.
@@ -103,7 +113,7 @@ jobs:
         if: failure() && steps.test.outcome == 'failure'
         uses: actions/upload-artifact@v7
         with:
-          name: regression-${{ runner.os }}-${{ matrix.arch }}-pg${{ matrix.pg }}
+          name: regression-${{ matrix.pg.os }}-${{ matrix.pg.arch }}-pg${{ matrix.pg.version }}
           path: |
             test/pgxs/regression.diffs
             test/pgxs/results
