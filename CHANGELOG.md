@@ -9,19 +9,37 @@ All notable changes to this project will be documented in this file. It uses the
 
 ## [v0.1.2] — Unreleased
 
+### ⚡ Improvements
+
+*   Added mappings for additional chDB data types:
+    *   The [Interval] family maps to Postgres interval or bigint
+    *   A [Map] maps to a two-dimensional array of key/value pairs or a custom
+        two-field [composite type]
+    *   A [Tuple] maps to an array of its values or [composite type]
+    *   An unflattened [Nested] column maps to a two-dimensional array or
+        [composite type] array
+    *   All [LowCardinality] types now map to their Postgres equivalents, not
+        just `LowCardinality(String)`
+    *   Parameterized [JSON] (`JSON(...)`) now maps to jsonb or json
+
 ### 🐞 Bug Fixes
 
 *   Reject `COPY FROM` a URL with a `WHERE` clause, preventing imports from
     silently ignoring row filters ([#86]).
-*   The `install` target no longer installs `libchdb.a` when using
-    `LIBCHDB_BUILD=static`. Since we statically link it, we do not need to
-    install it.
 
 ### 🏗️ Build Setup
 
 *   Added the `NO_FILE_SCHEME` option to `make`. When set, chd_hook will be
     built without support for the `file://` scheme, which may be useful for
-    Postgres hosting providers.
+    Postgres hosting providers ([#85]).
+*   The `install` target no longer installs `libchdb.a` when using
+    `LIBCHDB_BUILD=static`. Since we statically link it, we do not need to
+    install it ([#87]).
+*   Added the `MAX_CONCURRENT_TESTS` variable to minimize the number of
+    concurrent tests in resource-constrained environments, such as CI runners
+    ([#91]).
+*   Added macOS testing to the CI workflow and adopted the PGXN actions for
+    the CI and release workflows.
 
 ### ⬆️ Dependencies
 
@@ -35,6 +53,16 @@ All notable changes to this project will be documented in this file. It uses the
 
   [v0.1.2]: https://github.com/clickhouse/pg_chdb/compare/v0.1.1...v0.1.2
   [#86]: https://github.com/ClickHouse/pg_chdb/pull/86
+  [Interval]: https://clickhouse.com/docs/reference/data-types/special-data-types/interval
+  [composite type]: https://www.postgresql.org/docs/current/rowtypes.html
+  [Map]: https://clickhouse.com/docs/reference/data-types/map
+  [Tuple]: https://clickhouse.com/docs/reference/data-types/tuple
+  [Nested]: https://clickhouse.com/docs/reference/data-types/nested-data-structures
+  [LowCardinality]: https://clickhouse.com/docs/reference/data-types/lowcardinality
+  [JSON]: https://clickhouse.com/docs/reference/formats/JSON/JSON
+  [#85]: https://github.com/ClickHouse/pg_chdb/pull/85
+  [#87]: https://github.com/ClickHouse/pg_chdb/pull/87
+  [#91]: https://github.com/ClickHouse/pg_chdb/pull/91
 
 ## [v0.1.1] — 2026-09-06
 
