@@ -175,6 +175,23 @@ CREATE TABLE oops () WITH (
 -- Reject options unknown to chDB and PostgreSQL
 CREATE TABLE oops () WITH (structure_from = :'requests_csv', nonesuch = 1);
 
+-- Reject invalid encoding.
+\set file_base file:///tmp/chdb-create/invalid-people.tsv
+CREATE TABLE peeps () WITH (
+    copy_from = :'file_base',
+    structure = 'id bigint, n1 String, n2 String, n3 String'
+);
+
+-- Remove invalid encoding.
+\set file_base file:///tmp/chdb-create/invalid-people.tsv
+CREATE TABLE peeps () WITH (
+    copy_from = :'file_base',
+    encoding_check = 'remove',
+    structure = 'id bigint, n1 String, n2 String, n3 String'
+);
+SELECT n1 FROM peeps ORDER BY id;
+
+
 \set ECHO errors
 \! rm -rf /tmp/create.tmp 2> /dev/null || true
 \! rm -rf /tmp/chdb-create 2> /dev/null || true

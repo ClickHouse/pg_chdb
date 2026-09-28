@@ -271,13 +271,14 @@ structure_on_one_line(const char* structure) {
 static void
 contextualize_options(chdbCopyContext* ctx, List* options, List** others) {
     ListCell* lc;
-    ctx->access_key    = "";
-    ctx->access_secret = "";
-    ctx->session_token = "";
-    ctx->format        = "";
-    ctx->structure     = "";
-    ctx->compression   = "";
-    ctx->timeout       = 30000; /* Same as ClickHouse. */
+    ctx->access_key     = "";
+    ctx->access_secret  = "";
+    ctx->session_token  = "";
+    ctx->format         = "";
+    ctx->structure      = "";
+    ctx->compression    = "";
+    ctx->timeout        = 30000; /* Same as ClickHouse. */
+    ctx->encoding_check = CHC_ENC_FAIL;
 
     foreach (lc, options) {
         DefElem* elem = (DefElem*)lfirst(lc);
@@ -303,6 +304,19 @@ contextualize_options(chdbCopyContext* ctx, List* options, List** others) {
                 );
             }
             ctx->timeout = (uint32_t)timeout;
+        } else if (strcmp(elem->defname, "encoding_check") == 0) {
+            const char* val = defGetString(elem);
+            pgch_encoding_check v;
+
+            if (!pgch_parse_encoding_check(val, &v)) {
+                ereport(
+                    ERROR,
+                    errcode(ERRCODE_FDW_INVALID_STRING_FORMAT),
+                    errmsg("invalid value for option \"encoding_check\": \"%s\"", val),
+                    errhint("Valid values are: fail, truncate, remove, replace")
+                );
+            }
+            ctx->encoding_check = v;
         } else if (others) {
             *others = lappend(*others, elem);
         } else {

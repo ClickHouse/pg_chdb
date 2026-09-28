@@ -9,6 +9,12 @@ All notable changes to this project will be documented in this file. It uses the
 
 ## [v0.1.2] — Unreleased
 
+### ⚡ Improvements
+
+*   Added the `encoding_check` option to `COPY`. Valid values are `fail`,
+    `replace`, `remove`, and `truncate`. See the [COPY docs] for details
+    ([#96]).
+
 ### 🐞 Bug Fixes
 
 *   Reject `COPY FROM` a URL with a `WHERE` clause, preventing imports from
@@ -40,7 +46,11 @@ All notable changes to this project will be documented in this file. It uses the
 
   [v0.1.2]: https://github.com/clickhouse/pg_chdb/compare/v0.1.1...v0.1.2
   [#86]: https://github.com/ClickHouse/pg_chdb/pull/86
+    "ClickHouse/pg_chdb#96 Reject COPY FROM WHERE"
   [#89]: https://github.com/ClickHouse/pg_chdb/pull/89
+    "ClickHouse/pg_chdb#89 Fix CREATE TABLE inference for Tuple, Map, and Nested"
+  [#96]: https://github.com/ClickHouse/pg_chdb/pull/96
+    "ClickHouse/pg_chdb#96 Update pg-clickhouse-c & add encoding_check option"
 
 ## [v0.1.1] — 2026-09-06
 

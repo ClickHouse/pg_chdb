@@ -53,6 +53,29 @@ COPY people TO :'people_out' (structure 'i Int32, f String, g String, n Nullable
 TRUNCATE people;
 COPY people FROM :'people_out';
 SELECT * FROM people ORDER BY id;
+
+-- Should fail to load record with invalid byte.
+TRUNCATE people;
+\set people_tsv :file_base /invalid-people.tsv
+COPY people FROM :'people_tsv';
+
+-- Have the COPY replace the characters.
+COPY people FROM :'people_tsv' (encoding_check 'replace');
+SELECT family_name FROM people ORDER BY id;
+
+-- Have the COPY remove the characters.
+TRUNCATE people;
+COPY people FROM :'people_tsv' (encoding_check 'remove');
+SELECT family_name FROM people ORDER BY id;
+
+-- Have the COPY truncate the characters.
+TRUNCATE people;
+COPY people FROM :'people_tsv' (encoding_check 'Truncate');
+SELECT family_name FROM people ORDER BY id;
+
+-- Back to fail.
+COPY people FROM :'people_tsv' (encoding_check 'FAIL');
+
 \set ECHO errors
 \! rm -rf /tmp/file.tmp 2> /dev/null || true
 \! rm -rf /tmp/chdb-corpus 2> /dev/null || true

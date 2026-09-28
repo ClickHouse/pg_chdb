@@ -112,4 +112,47 @@ SELECT * FROM people ORDER BY id;
   7 | Others      | Some       | go \ get \x07 your \x0B mouse @
 (7 rows)
 
+-- Should fail to load record with invalid byte.
+TRUNCATE people;
+TRUNCATE TABLE
+\set people_tsv :file_base /invalid-people.tsv
+COPY people FROM :'people_tsv';
+ERROR:  invalid byte sequence for encoding "UTF8": 0x00
+-- Have the COPY replace the characters.
+COPY people FROM :'people_tsv' (encoding_check 'replace');
+COPY 2
+SELECT family_name FROM people ORDER BY id;
+ family_name 
+-------------
+ theory
+ a�b
+(2 rows)
+
+-- Have the COPY remove the characters.
+TRUNCATE people;
+TRUNCATE TABLE
+COPY people FROM :'people_tsv' (encoding_check 'remove');
+COPY 2
+SELECT family_name FROM people ORDER BY id;
+ family_name 
+-------------
+ theory
+ ab
+(2 rows)
+
+-- Have the COPY truncate the characters.
+TRUNCATE people;
+TRUNCATE TABLE
+COPY people FROM :'people_tsv' (encoding_check 'Truncate');
+COPY 2
+SELECT family_name FROM people ORDER BY id;
+ family_name 
+-------------
+ theory
+ a
+(2 rows)
+
+-- Back to fail.
+COPY people FROM :'people_tsv' (encoding_check 'FAIL');
+ERROR:  invalid byte sequence for encoding "UTF8": 0x00
 \set ECHO errors

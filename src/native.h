@@ -42,6 +42,7 @@ chdb_copy_receive(
     List* attnums,
     List* rtable,
     List* rteperminfos,
+    uint16_t encoding_check,
     chdbHelper* helper
 );
 

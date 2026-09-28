@@ -612,6 +612,7 @@ chdb_copy_receive(
     List* attnums,
     List* rtable,
     List* rteperminfos,
+    uint16_t encoding_check,
     chdbHelper* helper
 ) {
     TupleDesc desc = RelationGetDescr(rel);
@@ -638,6 +639,7 @@ chdb_copy_receive(
     if (reader.error) {
         report_reader_error(reader.error);
     }
+    reader.encoding_check = encoding_check;
     if (pgch_reader_columns(&reader) == 0) {
         /* Nothing streamed at all, so there is no schema to check. */
         MemoryContextSwitchTo(oldcxt);

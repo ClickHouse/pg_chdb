@@ -307,4 +307,26 @@ ERROR:  chdb: unsupported column type "AggregateFunction(sum, Int64)" (column "a
 -- Reject options unknown to chDB and PostgreSQL
 CREATE TABLE oops () WITH (structure_from = :'requests_csv', nonesuch = 1);
 ERROR:  unrecognized parameter "nonesuch"
+-- Reject invalid encoding.
+\set file_base file:///tmp/chdb-create/invalid-people.tsv
+CREATE TABLE peeps () WITH (
+    copy_from = :'file_base',
+    structure = 'id bigint, n1 String, n2 String, n3 String'
+);
+ERROR:  invalid byte sequence for encoding "UTF8": 0x00
+-- Remove invalid encoding.
+\set file_base file:///tmp/chdb-create/invalid-people.tsv
+CREATE TABLE peeps () WITH (
+    copy_from = :'file_base',
+    encoding_check = 'remove',
+    structure = 'id bigint, n1 String, n2 String, n3 String'
+);
+CREATE TABLE
+SELECT n1 FROM peeps ORDER BY id;
+   n1   
+--------
+ theory
+ ab
+(2 rows)
+
 \set ECHO errors

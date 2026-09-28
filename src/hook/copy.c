@@ -171,7 +171,12 @@ chdb_copy(chdbCopyContext* ctx) {
     uint64_t num_rows =
         ctx->cmd_type == CHDB_CMD_SELECT
             ? chdb_copy_receive(
-                  ctx->rel, ctx->attnums, ctx->rtable, ctx->rteperminfos, helper
+                  ctx->rel,
+                  ctx->attnums,
+                  ctx->rtable,
+                  ctx->rteperminfos,
+                  ctx->encoding_check,
+                  helper
               )
             : chdb_copy_send(ctx->rel, ctx->structure, ctx->attnums, helper);
     chdb_helper_finish(helper);

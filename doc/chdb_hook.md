@@ -307,6 +307,17 @@ file name. Supported values:
 Request timeout in milliseconds. Applies to HTTP, S3, GCS, and Azure URLs.
 Defaults to `30000` (30s).
 
+#### `encoding_check`
+
+Defines how to to handle invalid characters under the [database encoding] when
+converting chDB String and JSON values. One of:
+*   `fail` (default): raise an error
+*   `remove` removes invalid bytes
+*   `replace`: under the UTF-8 encoding, replaces invalid bytes with the
+    Unicode replacement character (`�`); same as `remove` for other
+    encodings
+*   `truncate` truncates the text at the first invalid byte
+
 ### Debugging
 
 On error, the chdb_hook `COPY` command includes the [chDB] query it attempted
@@ -844,3 +855,5 @@ Copyright (c) 2026, ClickHouse
     "ClickHouse Docs: max_threads_* session settings"
   [`max_parsing_threads`]: https://clickhouse.com/docs/reference/settings/session-settings/max#max_parsing_threads
     "ClickHouse Docs: max_parsing_threads session setting"
+  [database encoding]: https://www.postgresql.org/docs/current/multibyte.html
+    "PostgreSQL Docs: Character Set Support"
