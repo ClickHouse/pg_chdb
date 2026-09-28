@@ -7,10 +7,24 @@ All notable changes to this project will be documented in this file. It uses the
   [Semantic Versioning]: https://semver.org/spec/v2.0.0.html
     "Semantic Versioning 2.0.0"
 
-## [v0.1.2] — Unreleased
+## [v0.1.2] — 2026-09-30
+
+This release makes binary-only changes. Once installed and loaded, any
+existing use of chdb and chdb_hook v0.1 will get the v0.1.2 benefits without
+needing to `ALTER EXTENSION UPDATE`.
 
 ### ⚡ Improvements
 
+*   Added mappings for additional chDB data types:
+    *   The [Interval] family maps to Postgres interval or bigint
+    *   A [Map] maps to a two-dimensional array of key/value pairs or a custom
+        two-field [composite type]
+    *   A [Tuple] maps to an array of its values or [composite type]
+    *   An unflattened [Nested] column maps to a two-dimensional array or
+        [composite type] array
+    *   All [LowCardinality] types now map to their Postgres equivalents, not
+        just `LowCardinality(String)`
+    *   Parameterized [JSON] (`JSON(...)`) now maps to jsonb or json
 *   Added the `encoding_check` option to `COPY`. Valid values are `fail`,
     `replace`, `remove`, and `truncate`. See the [COPY docs] for details
     ([#96]).
@@ -30,7 +44,15 @@ All notable changes to this project will be documented in this file. It uses the
 
 *   Added the `NO_FILE_SCHEME` option to `make`. When set, chd_hook will be
     built without support for the `file://` scheme, which may be useful for
-    Postgres hosting providers.
+    Postgres hosting providers ([#85]).
+*   The `install` target no longer installs `libchdb.a` when using
+    `LIBCHDB_BUILD=static`. Since we statically link it, we do not need to
+    install it ([#87]).
+*   Added the `MAX_CONCURRENT_TESTS` variable to minimize the number of
+    concurrent tests in resource-constrained environments, such as CI runners
+    ([#91]).
+*   Added macOS testing to the CI workflow and adopted the PGXN actions for
+    the CI and release workflows.
 
 ### ⬆️ Dependencies
 
@@ -45,12 +67,32 @@ All notable changes to this project will be documented in this file. It uses the
     for `Enum`, `Tuple`, `Map`, and `Nested` columns ([#89]).
 
   [v0.1.2]: https://github.com/clickhouse/pg_chdb/compare/v0.1.1...v0.1.2
+  [#85]: https://github.com/ClickHouse/pg_chdb/pull/85
+    "ClickHouse/pg_chdb#85 Add `NO_FILE_SCHEME` option to make"
   [#86]: https://github.com/ClickHouse/pg_chdb/pull/86
     "ClickHouse/pg_chdb#96 Reject COPY FROM WHERE"
+  [#87]: https://github.com/ClickHouse/pg_chdb/pull/87
+    "ClickHouse/pg_chdb#87 Don't install libchdb.a"
   [#89]: https://github.com/ClickHouse/pg_chdb/pull/89
     "ClickHouse/pg_chdb#89 Fix CREATE TABLE inference for Tuple, Map, and Nested"
+  [#91]: https://github.com/ClickHouse/pg_chdb/pull/91
+    "ClickHouse/pg_chdb#91 Restore `MAX_CONCURRENT_TESTS`, fix macOS"
   [#96]: https://github.com/ClickHouse/pg_chdb/pull/96
     "ClickHouse/pg_chdb#96 Update pg-clickhouse-c & add encoding_check option"
+  [Interval]: https://clickhouse.com/docs/reference/data-types/special-data-types/interval
+    "ClickHouse Docs: Interval"
+  [composite type]: https://www.postgresql.org/docs/current/rowtypes.html
+  [Map]: https://clickhouse.com/docs/reference/data-types/map
+    "ClickHouse Docs: Map"
+  [Tuple]: https://clickhouse.com/docs/reference/data-types/tuple
+    "ClickHouse Docs: Tuple"
+  [Nested]: https://clickhouse.com/docs/reference/data-types/nested-data-structures
+    "ClickHouse Docs: Nested"
+  [LowCardinality]: https://clickhouse.com/docs/reference/data-types/lowcardinality
+    "ClickHouse Docs: LowCardinality"
+  [JSON]: https://clickhouse.com/docs/reference/formats/JSON/JSON
+  [LowCardinality]: https://clickhouse.com/docs/reference/data-types/lowcardinality
+    "ClickHouse Docs: JSON"
 
 ## [v0.1.1] — 2026-09-06
 
