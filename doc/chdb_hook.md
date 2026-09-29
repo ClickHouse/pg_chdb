@@ -462,50 +462,42 @@ Postgres types to reasonable chDB equivalents. When they don't match your use
 case, specify the [structure](#structure) to override the generated types with
 those you need.
 
-| Postgres    | chDB                                     | Notes                                                                  |
-| ----------- | ---------------------------------------- | ---------------------------------------------------------------------- |
-| boolean     | Bool                                     |                                                                        |
-| name        | String                                   |                                                                        |
-| text        | String                                   |                                                                        |
-| inet        | String                                   | Override with `IPv4` or `IPv6` if data contains only one or the other. |
-| cidr        | String                                   |                                                                        |
-| macaddr     | String                                   |                                                                        |
-| macaddr8    | String                                   |                                                                        |
-| interval    | String                                   | Override with an `Interval` unit such as `IntervalDay`.                |
-| tsvector    | String                                   |                                                                        |
-| tsquery     | String                                   |                                                                        |
-| jsonpath    | String                                   |                                                                        |
-| money       | String                                   |                                                                        |
-| enum        | String                                   |                                                                        |
-| varchar     | String                                   |                                                                        |
-| varbit      | String                                   |                                                                        |
-| char        | FixedString                              |                                                                        |
-| bit         | FixedString                              |                                                                        |
-| bpchar      | String                                   |                                                                        |
-| int2        | Int16                                    |                                                                        |
-| int4        | Int32                                    |                                                                        |
-| int8        | Int64                                    |                                                                        |
-| oid         | UInt32                                   |                                                                        |
-| oid8        | UInt64                                   |                                                                        |
-| xid8        | UInt64                                   |                                                                        |
-| json        | String                                   | Override with `JSON` if data contains only objects.                    |
-| jsonb       | String                                   | Override with `JSON` if data contains only objects.                    |
-| float4      | Float32                                  |                                                                        |
-| float8      | Float64                                  |                                                                        |
-| date        | Date32                                   |                                                                        |
-| time        | Time64(6)                                | Override with `String` for formats that don't support times.           |
-| timetz      | String                                   |                                                                        |
-| timestamp   | DateTime64(6)                            | Declared with the `UTC` time zone, converted from session time zone.   |
-| timestamptz | DateTime64(6)                            | Declared with the `UTC` time zone.                                     |
-| numeric     | Decimal                                  |                                                                        |
-| uuid        | UUID                                     |                                                                        |
-| point       | `Point`                                  | Same two coordinates as Postgres.                                      |
-| lseg        | `LineString`                             | A line of exactly two points.                                          |
-| path        | `LineString`                             | A closed path repeats its first point.                                 |
-| polygon     | `Ring`                                   | A ring closes implicitly, as a polygon does.                           |
-| box         | `Tuple(high Point, low Point)`           | The two corners, sorted as Postgres sorts.                             |
-| circle      | `Tuple(center Point, radius Float64)`    |                                                                        |
-| line        | `Tuple(a Float64, b Float64, c Float64)` | The equation `Ax + By + C = 0`.                                        |
+<!-- ENCODE-TABLE-BEGIN generated by `make type-table` -->
+|    PostgreSQL    |                  chDB                  |                                 Notes                                  |
+|------------------|----------------------------------------|------------------------------------------------------------------------|
+| boolean          | Bool                                   |                                                                        |
+| smallint         | Int16                                  |                                                                        |
+| integer          | Int32                                  |                                                                        |
+| bigint           | Int64                                  |                                                                        |
+| oid              | UInt32                                 |                                                                        |
+| xid8             | UInt64                                 |                                                                        |
+| oid8             | UInt64                                 |                                                                        |
+| real             | Float32                                |                                                                        |
+| double precision | Float64                                |                                                                        |
+| numeric          | Decimal256(38)                         | Also when precision exceeds 76 digits.                                 |
+| numeric(12,6)    | Decimal(12,6)                          | Precision and scale carry over.                                        |
+| text             | String                                 |                                                                        |
+| bytea            | String                                 |                                                                        |
+| date             | Date32                                 |                                                                        |
+| time             | Time64(6)                              | Override with `String` for formats that don't support times.           |
+| timestamp        | DateTime64(6, 'UTC')                   | Converted from session time zone.                                      |
+| timestamptz      | DateTime64(6, 'UTC')                   |                                                                        |
+| interval         | String                                 | Override with an `Interval` unit such as `IntervalDay`.                |
+| uuid             | UUID                                   |                                                                        |
+| json             | String                                 | Override with `JSON` if data contains only objects.                    |
+| jsonb            | String                                 | Override with `JSON` if data contains only objects.                    |
+| inet             | String                                 | Override with `IPv4` or `IPv6` if data contains only one or the other. |
+| point            | Point                                  | Same two coordinates as Postgres.                                      |
+| lseg             | LineString                             | A line of exactly two points.                                          |
+| path             | LineString                             | A closed path repeats its first point.                                 |
+| polygon          | Ring                                   | A ring closes implicitly, as a polygon does.                           |
+| box              | Tuple(high Point, low Point)           | The two corners, sorted as Postgres sorts.                             |
+| circle           | Tuple(center Point, radius Float64)    |                                                                        |
+| line             | Tuple(a Float64, b Float64, c Float64) | The equation `Ax + By + C = 0`.                                        |
+<!-- ENCODE-TABLE-END -->
+
+Types absent from this table, such as `name`, `varchar`, `char`, `bit`,
+`timetz`, `money`, and enums, map to `String`.
 
 Array types map to `Array`s of the mapped element type. ClickHouse constrains
 nullability per column while Postgres constrains it per array, so elements are
@@ -572,7 +564,7 @@ casts. Empty cells still allow those casts. These targets describe reads;
 writes follow separate conversion rules.
 
 <!-- TYPE-TABLE-BEGIN generated by `make type-table` -->
-|          ClickHouse          |     Default PostgreSQL      |          Additional read targets          |                        Notes                         |
+|             chDB             |     Default PostgreSQL      |          Additional read targets          |                        Notes                         |
 |------------------------------|-----------------------------|-------------------------------------------|------------------------------------------------------|
 | Array(T)                     | T[]                         |                                           | One PG array type per depth                          |
 | BFloat16                     | real                        |                                           |                                                      |

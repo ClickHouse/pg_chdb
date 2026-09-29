@@ -11,8 +11,8 @@ development of the chdb extensions.
 
 ## Data Type Table
 
-`type_table.awk` rewrites the inferred data type table in
-[doc/chdb_hook.md](../doc/chdb_hook.md) from the table that pg-clickhouse-c
+`type_table.awk` rewrites both data type tables in
+[doc/chdb_hook.md](../doc/chdb_hook.md) from the tables that pg-clickhouse-c
 generates out of its own regression test:
 
 ```sh

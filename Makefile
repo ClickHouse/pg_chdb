@@ -156,9 +156,11 @@ uninstall-libchdb:
 format: $(wildcard src/*.c src/*.h src/helper/*.c)
 	@$(CLANG_FORMAT) --style=file:.clang-format -i $^
 
-.PHONY: type-table # Regenerate the chDB to Postgres table of doc/chdb_hook.md.
+.PHONY: type-table # Regenerate the data type tables of doc/chdb_hook.md.
 type-table:
 	@(cd $(PGCH_DIR) && ./gen_type_table.awk) | dev/type_table.awk doc/chdb_hook.md
+	@(cd $(PGCH_DIR) && ./gen_type_table.awk -v section=ENCODE) | \
+		dev/type_table.awk -v section=ENCODE doc/chdb_hook.md
 
 .PHONY: clang-tidy # Run clang-tidy static analysis (requires compile_commands.json)
 clang-tidy: compile_commands.json
