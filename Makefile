@@ -30,7 +30,7 @@ CLANG_FORMAT ?= clang-format
 # Binary dependency on specific version (for now) of libchdb. Optionally
 # download locally by setting BUNDLE_LIBCHDB and compile statically with
 # LIBCHDB_BUILD=static.
-LIBCHDB_VERSION ?= v26.7.3
+LIBCHDB_VERSION ?= v26.9.0
 LIBCHDB_BUILD   ?= dynamic
 
 # Header-only dependencies, vendored as submodules. clickhouse-c comes from

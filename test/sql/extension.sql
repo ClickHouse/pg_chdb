@@ -39,11 +39,11 @@ SELECT * FROM chdb_query('SELECT 1, 2') AS (a int);
 SELECT * FROM chdb_query('SELECT 1 WHERE 0') AS (x int, y text);
 
 -- Should fail with column type mismatch.
-SELECT * FROM chdb_query('SELECT version()') AS (version int);
+SELECT * FROM chdb_query('SELECT ''26.7.2.1''') AS (version int);
 
 -- Working examples.
-SELECT * FROM chdb_query('SELECT version()') AS (version text);
-SELECT * FROM chdb_query('SELECT 42, version()') AS (id int, version text);
+SELECT * FROM chdb_query('SELECT ''26.7.2.1''') AS (version text);
+SELECT * FROM chdb_query('SELECT 42, ''26.7.2.1''') AS (id int, version text);
 SELECT * FROM chdb_query(
     'SELECT number AS n, number * number FROM numbers(5) ORDER BY n'
 ) AS (n int2, p int);

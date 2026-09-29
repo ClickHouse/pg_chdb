@@ -222,13 +222,13 @@ t: Arrow
 t: ArrowStream
 t: ORC
 t: Avro
-psql:test/utils/round-trip-formats.sql:402: ERROR:  chdb: chDB was terminated by signal 6
-DETAIL:  libc++abi: terminating due to uncaught exception of type std::__1::system_error: mutex lock failed: Invalid argument
+psql:test/utils/round-trip-formats.sql:402: ERROR:  chdb: error finishing chDB query
+DETAIL:  Code: 407. DB::Exception: Convert overflow. (DECIMAL_OVERFLOW)
 CONTEXT:  query: INSERT INTO FUNCTION file({path:String}, {format:String}, {structure:String}) SETTINGS engine_file_truncate_on_insert=1
 psql:test/utils/round-trip-formats.sql:402: STATEMENT:  COPY "datetime_arrays" TO 'file:///tmp/datetimes.tmp' (format 'Protobuf');
 f: Protobuf
-psql:test/utils/round-trip-formats.sql:421: ERROR:  chdb: chDB was terminated by signal 6
-DETAIL:  libc++abi: terminating due to uncaught exception of type std::__1::system_error: mutex lock failed: Invalid argument
+psql:test/utils/round-trip-formats.sql:421: ERROR:  chdb: error finishing chDB query
+DETAIL:  Code: 407. DB::Exception: Convert overflow. (DECIMAL_OVERFLOW)
 CONTEXT:  query: INSERT INTO FUNCTION file({path:String}, {format:String}, {structure:String}) SETTINGS engine_file_truncate_on_insert=1
 psql:test/utils/round-trip-formats.sql:421: STATEMENT:  COPY "datetime_arrays" TO 'file:///tmp/datetimes.tmp' (format 'ProtobufList');
 f: ProtobufList

@@ -28,6 +28,7 @@ needing to `ALTER EXTENSION UPDATE`.
 *   Added the `encoding_check` option to `COPY`. Valid values are `fail`,
     `replace`, `remove`, and `truncate`. See the [COPY docs] for details
     ([#96]).
+*   Linking to libchdb v26.9.0 fixes the CVS format with NULL geometric types.
 
 ### 🐞 Bug Fixes
 
@@ -56,7 +57,7 @@ needing to `ALTER EXTENSION UPDATE`.
 
 ### ⬆️ Dependencies
 
-*   Added testing for chDB v26.7.3.
+*   Added testing for chDB v26.7.3 and v26.9.0.
 *   Updated to support PostgreSQL 19 beta 4.
 
 ### 📚 Documentation

@@ -416,11 +416,10 @@ between Postgres and chDB, chdb_hook has the following limitations:
     the copying role. Postgres applies such policies by rewriting `COPY TO`
     into a query, which chdb_hook does not support.
 *   Cannot `COPY FROM` a URL with a `WHERE` clause.
-*   ClickHouse has no NULL array, so `COPY TO` stores an empty array (`[]`)
-    for a `NULL`.
-*   ClickHouse represents the equivalents of `lseg`, `path`, or `polygon` as
-    arrays; thus NULL values of these types also `COPY TO` an empty array
-    (`[]`).
+*   chDB has no NULL array, so `COPY TO` stores an empty array (`[]`) for a
+    NULL.
+*   chDB represents the equivalents of `lseg`, `path`, or `polygon` as arrays;
+    thus NULL values of these types also `COPY TO` an empty array (`[]`).
 *   NULL values output for a specified [structure](#structure) that doesn't
     define the column as Nullable will be output as their default values.
     Always explicitly define nullable columns in the [structure](#structure)
@@ -449,8 +448,6 @@ between Postgres and chDB, chdb_hook has the following limitations:
 *   Protobuf output does not support dates prior to 1970-01-01. Configure
     `time` columns as `String`s in an explicit [structure](#structure) to
     preserve their values. (ClickHouse/ClickHouse#111860)
-*   The CSVWithNames and CSVWithNamesAndTypes formats cannot currently import
-    `NULL` box or circle values. (ClickHouse/ClickHouse#115523)
 
 ## Data Types
 

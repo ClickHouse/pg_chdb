@@ -1,0 +1,268 @@
+LOAD 'chdb_hook';
+/****************************************************************************/
+-- Geometric types.
+CREATE TABLE geos (
+    p   point    NOT NULL,
+    line line    NOT NULL,
+    lseg lseg    NOT NULL,
+    box  box     NOT NULL,
+    path path    NOT NULL,
+    poly polygon NOT NULL,
+    cir  circle  NOT NULL
+);
+INSERT INTO geos
+VALUES ('0,0', '(1,1),(2,2)', '((11,11),(12,12))', '((11,11),(13,13))', '((11,12),(13,13),(14,14))', '((11,12),(13,13),(14,14))', '1,1,1')
+     , ('(11,nan)', '{nan, 1, nan}', '((11,nan),(nan,12))', '((nan,11),(13,13))', '((11,nan),(13,13),(14,14))', '((11,12),(13,13),(14,nan))', '<(500,500),500>')
+     , ('(11,nan)', '{nan, 1, nan}', '((11,nan),(nan,12))', '((nan,11),(13,13))', '[(11,12),(13,13),(14,14)]', '((11,12),(13,13),(14,nan))', '(0,0),1')
+;
+-- Execute round-trip to all supported formats.
+CREATE TABLE geos2 (LIKE geos INCLUDING ALL);
+\set from_table geos
+\set to_table geos2
+\set output_file geos.tmp
+\set columns 'p::text, line::text, lseg::text, box::text, path::text, poly::text, cir::text'
+\i test/utils/round-trip-formats.sql
+\set ECHO errors
+t: TabSeparated
+t: TabSeparatedRaw
+t: TabSeparatedWithNames
+t: TabSeparatedWithNamesAndTypes
+t: TabSeparatedRawWithNames
+t: TabSeparatedRawWithNamesAndTypes
+t: CSV
+f: CSVWithNames
+f: CSVWithNamesAndTypes
+t: CustomSeparated
+t: CustomSeparatedWithNames
+t: CustomSeparatedWithNamesAndTypes
+t: Values
+t: JSON
+t: JSONColumns
+t: JSONColumnsWithMetadata
+t: JSONCompact
+t: JSONCompactColumns
+t: JSONEachRow
+t: JSONStringsEachRow
+t: JSONCompactEachRow
+t: JSONCompactStringsEachRow
+t: JSONCompactEachRowWithNames
+t: JSONCompactEachRowWithNamesAndTypes
+t: JSONCompactStringsEachRowWithNames
+t: JSONCompactStringsEachRowWithNamesAndTypes
+t: JSONObjectEachRow
+t: TSKV
+t: Native
+t: RowBinary
+t: RowBinaryWithNames
+t: RowBinaryWithNamesAndTypes
+t: Parquet
+t: Arrow
+t: ArrowStream
+t: ORC
+t: Avro
+t: Protobuf
+t: ProtobufList
+t: MsgPack
+t: BSONEachRow
+/****************************************************************************/
+-- Nullable geometric types. NULL polygon, path or lseg crosses as empty
+-- ring or line, ClickHouse rejecting Nullable on implicit Array.
+CREATE TABLE geo_nulls (
+    p   point,
+    line line,
+    lseg lseg,
+    box  box,
+    path path,
+    poly polygon,
+    cir  circle
+);
+INSERT INTO geo_nulls
+VALUES ('0,0', '(1,1),(2,2)', '((11,11),(12,12))', '((11,11),(13,13))', '((11,12),(13,13),(14,14))', '((11,12),(13,13),(14,14))', '1,1,1')
+     , (NULL, NULL, NULL, NULL, NULL, NULL, NULL)
+;
+-- Execute round-trip to all supported formats.
+-- Protobuf reads a Nullable field holding its default back as NULL, so the
+-- point at the origin does not survive:
+-- https://github.com/chdb-io/chdb-core/issues/152
+CREATE TABLE geo_nulls2 (LIKE geo_nulls INCLUDING ALL);
+\set from_table geo_nulls
+\set to_table geo_nulls2
+\set columns 'p::text, line::text, lseg::text, box::text, path::text, poly::text, cir::text'
+\i test/utils/round-trip-formats.sql
+\set ECHO errors
+t: TabSeparated
+t: TabSeparatedRaw
+t: TabSeparatedWithNames
+t: TabSeparatedWithNamesAndTypes
+t: TabSeparatedRawWithNames
+t: TabSeparatedRawWithNamesAndTypes
+t: CSV
+psql:test/utils/round-trip-formats.sql:82: ERROR:  chdb: error executing chDB query
+DETAIL:  Code: 27. DB::Exception: Cannot parse input: expected ',' before: '\n': (at row 2)
+: 
+Row 1:
+Column 0,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "0"
+Column 1,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "0"
+Column 2,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "1"
+Column 3,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "-1"
+Column 4,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "0"
+Column 5,   name: lseg, type: LineString,                                       parsed text: "<DOUBLE QUOTE>[(11,11),(12,12)]<DOUBLE QUOTE>"
+Column 6,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "13"
+Column 7,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "13"
+Column 8,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "11"
+Column 9,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "11"
+Column 10,  name: path, type: LineString,                                       parsed text: "<DOUBLE QUOTE>[(11,12),(13,13),(14,14),(11,12)]<DOUBLE QUOTE>"
+Column 11,  name: poly, type: Ring,                                             parsed text: "<DOUBLE QUOTE>[(11,12),(13,13),(14,14)]<DOUBLE QUOTE>"
+Column 12,  name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "1"
+Column 13,  name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "1"
+Column 14,  name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "1"
+
+Row 2:
+Column 0,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "<BACKSLASH>N"
+Column 1,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "<BACKSLASH>N"
+Column 2,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "<DOUBLE QUOTE>[]<DOUBLE QUOTE>"
+Column 3,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "<BACKSLASH>N"
+Column 4,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "<DOUBLE QUOTE>[]<DOUBLE QUOTE>"
+Column 5,   name: lseg, type: LineString,                                       parsed text: "<DOUBLE QUOTE>[]<DOUBLE QUOTE>"
+Column 6,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "<BACKSLASH>N"
+ERROR: Line feed found where delimiter (,) is expected. It's like your file has less columns than expected.
+And if your file has the right number of columns, maybe it has unescaped quotes in values.
+
+: (in file/uri /tmp/geos.tmp): While executing ParallelParsingBlockInputFormat: While executing File. (CANNOT_PARSE_INPUT_ASSERTION_FAILED)
+CONTEXT:  query: SELECT * FROM file({path:String}, {format:String}, {structure:String})
+psql:test/utils/round-trip-formats.sql:82: STATEMENT:  COPY "geo_nulls2" FROM 'file:///tmp/geos.tmp' (format 'CSVWithNames');
+f: CSVWithNames
+psql:test/utils/round-trip-formats.sql:90: ERROR:  chdb: error executing chDB query
+DETAIL:  Code: 27. DB::Exception: Cannot parse input: expected ',' before: '\n': (at row 2)
+: 
+Row 1:
+Column 0,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "0"
+Column 1,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "0"
+Column 2,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "1"
+Column 3,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "-1"
+Column 4,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "0"
+Column 5,   name: lseg, type: LineString,                                       parsed text: "<DOUBLE QUOTE>[(11,11),(12,12)]<DOUBLE QUOTE>"
+Column 6,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "13"
+Column 7,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "13"
+Column 8,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "11"
+Column 9,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "11"
+Column 10,  name: path, type: LineString,                                       parsed text: "<DOUBLE QUOTE>[(11,12),(13,13),(14,14),(11,12)]<DOUBLE QUOTE>"
+Column 11,  name: poly, type: Ring,                                             parsed text: "<DOUBLE QUOTE>[(11,12),(13,13),(14,14)]<DOUBLE QUOTE>"
+Column 12,  name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "1"
+Column 13,  name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "1"
+Column 14,  name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "1"
+
+Row 2:
+Column 0,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "<BACKSLASH>N"
+Column 1,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "<BACKSLASH>N"
+Column 2,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "<DOUBLE QUOTE>[]<DOUBLE QUOTE>"
+Column 3,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "<BACKSLASH>N"
+Column 4,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "<DOUBLE QUOTE>[]<DOUBLE QUOTE>"
+Column 5,   name: lseg, type: LineString,                                       parsed text: "<DOUBLE QUOTE>[]<DOUBLE QUOTE>"
+Column 6,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "<BACKSLASH>N"
+ERROR: Line feed found where delimiter (,) is expected. It's like your file has less columns than expected.
+And if your file has the right number of columns, maybe it has unescaped quotes in values.
+
+: (in file/uri /tmp/geos.tmp): While executing ParallelParsingBlockInputFormat: While executing File. (CANNOT_PARSE_INPUT_ASSERTION_FAILED)
+CONTEXT:  query: SELECT * FROM file({path:String}, {format:String}, {structure:String})
+psql:test/utils/round-trip-formats.sql:90: STATEMENT:  COPY "geo_nulls2" FROM 'file:///tmp/geos.tmp' (format 'CSVWithNamesAndTypes');
+f: CSVWithNamesAndTypes
+t: CustomSeparated
+t: CustomSeparatedWithNames
+t: CustomSeparatedWithNamesAndTypes
+t: Values
+t: JSON
+t: JSONColumns
+t: JSONColumnsWithMetadata
+t: JSONCompact
+t: JSONCompactColumns
+t: JSONEachRow
+t: JSONStringsEachRow
+t: JSONCompactEachRow
+t: JSONCompactStringsEachRow
+t: JSONCompactEachRowWithNames
+t: JSONCompactEachRowWithNamesAndTypes
+t: JSONCompactStringsEachRowWithNames
+t: JSONCompactStringsEachRowWithNamesAndTypes
+t: JSONObjectEachRow
+t: TSKV
+t: Native
+t: RowBinary
+t: RowBinaryWithNames
+t: RowBinaryWithNamesAndTypes
+t: Parquet
+t: Arrow
+t: ArrowStream
+t: ORC
+t: Avro
+f: Protobuf
+f: ProtobufList
+t: MsgPack
+t: BSONEachRow
+/****************************************************************************/
+-- Geometric type arrays.
+CREATE TABLE geo_arrays (
+    p   point[]    NOT NULL,
+    line line[]    NOT NULL,
+    lseg lseg[]    NOT NULL,
+    box  box[]     NOT NULL,
+    path path[]    NOT NULL,
+    poly polygon[] NOT NULL,
+    cir  circle[]  NOT NULL
+);
+-- Postgres box arrays use ; as a delimiter.
+INSERT INTO geo_arrays
+VALUES ('{"0,0"}', '{"(1,1),(2,2)"}', '{"((11,11),(12,12))"}', '{"((11,11),(13,13))"}', '{"((11,12),(13,13),(14,14))"}', '{"((11,12),(13,13),(14,14))"}', '{"1,1,1"}')
+     , ('{"(11,nan)", NULL}', '{NULL, "{nan, 1, nan}"}', '{NULL}', '{"((nan,11),(13,13))"; NULL}', '{NULL, "((11,nan),(13,13),(14,14))"}', '{"((11,12),(13,13),(14,nan))", NULL}', '{NULL}')
+;
+-- Execute round-trip to all supported formats. Parquet loses the null map of
+-- the Nullable Point the array holds, as above, and Protobuf has no null in a
+-- repeated field, so the arrays carrying one come back short.
+CREATE TABLE geo_arrays2 (LIKE geo_arrays INCLUDING ALL);
+\set from_table geo_arrays
+\set to_table geo_arrays2
+\set columns 'p::text[], line::text[], lseg::text[], box::text[], path::text[], poly::text[], cir::text[]'
+\i test/utils/round-trip-formats.sql
+\set ECHO errors
+t: TabSeparated
+t: TabSeparatedRaw
+t: TabSeparatedWithNames
+t: TabSeparatedWithNamesAndTypes
+t: TabSeparatedRawWithNames
+t: TabSeparatedRawWithNamesAndTypes
+t: CSV
+t: CSVWithNames
+t: CSVWithNamesAndTypes
+t: CustomSeparated
+t: CustomSeparatedWithNames
+t: CustomSeparatedWithNamesAndTypes
+t: Values
+t: JSON
+t: JSONColumns
+t: JSONColumnsWithMetadata
+t: JSONCompact
+t: JSONCompactColumns
+t: JSONEachRow
+t: JSONStringsEachRow
+t: JSONCompactEachRow
+t: JSONCompactStringsEachRow
+t: JSONCompactEachRowWithNames
+t: JSONCompactEachRowWithNamesAndTypes
+t: JSONCompactStringsEachRowWithNames
+t: JSONCompactStringsEachRowWithNamesAndTypes
+t: JSONObjectEachRow
+t: TSKV
+t: Native
+t: RowBinary
+t: RowBinaryWithNames
+t: RowBinaryWithNamesAndTypes
+t: Parquet
+t: Arrow
+t: ArrowStream
+t: ORC
+t: Avro
+f: Protobuf
+f: ProtobufList
+t: MsgPack
+t: BSONEachRow
+\set ECHO errors

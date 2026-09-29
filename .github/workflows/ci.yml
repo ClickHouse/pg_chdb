@@ -32,7 +32,7 @@ jobs:
       matrix:
         pg: ${{ fromJson(needs.matrix.outputs.matrix) }}
         build: [dynamic, static]
-        libchdb: [v26.7.0, v26.7.3]
+        libchdb: [v26.9.0, v26.7.0, v26.7.3]
     env:
       BUNDLE_LIBCHDB: ${{ case(matrix.pg.os == 'linux' || matrix.build == 'static', '1', '') }}
       LIBCHDB_BUILD: ${{ matrix.build }}
@@ -115,8 +115,8 @@ jobs:
         with:
           name: regression-${{ matrix.pg.os }}-${{ matrix.pg.arch }}-pg${{ matrix.pg.version }}
           path: |
-            test/pgxs/regression.diffs
-            test/pgxs/results
+            regression.diffs
+            results
       - name: Test No File
         # NO_FILE_SCHEME disables file://; when set, file test should fail
         # with output that includes "could not open file". This step fails if

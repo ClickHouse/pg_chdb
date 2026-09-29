@@ -97,76 +97,8 @@ t: TabSeparatedWithNamesAndTypes
 t: TabSeparatedRawWithNames
 t: TabSeparatedRawWithNamesAndTypes
 t: CSV
-psql:test/utils/round-trip-formats.sql:82: ERROR:  chdb: error executing chDB query
-DETAIL:  Code: 27. DB::Exception: Cannot parse input: expected ',' before: '\n': (at row 2)
-: 
-Row 1:
-Column 0,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "0"
-Column 1,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "0"
-Column 2,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "1"
-Column 3,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "-1"
-Column 4,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "0"
-Column 5,   name: lseg, type: LineString,                                       parsed text: "<DOUBLE QUOTE>[(11,11),(12,12)]<DOUBLE QUOTE>"
-Column 6,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "13"
-Column 7,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "13"
-Column 8,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "11"
-Column 9,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "11"
-Column 10,  name: path, type: LineString,                                       parsed text: "<DOUBLE QUOTE>[(11,12),(13,13),(14,14),(11,12)]<DOUBLE QUOTE>"
-Column 11,  name: poly, type: Ring,                                             parsed text: "<DOUBLE QUOTE>[(11,12),(13,13),(14,14)]<DOUBLE QUOTE>"
-Column 12,  name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "1"
-Column 13,  name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "1"
-Column 14,  name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "1"
-
-Row 2:
-Column 0,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "<BACKSLASH>N"
-Column 1,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "<BACKSLASH>N"
-Column 2,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "<DOUBLE QUOTE>[]<DOUBLE QUOTE>"
-Column 3,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "<BACKSLASH>N"
-Column 4,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "<DOUBLE QUOTE>[]<DOUBLE QUOTE>"
-Column 5,   name: lseg, type: LineString,                                       parsed text: "<DOUBLE QUOTE>[]<DOUBLE QUOTE>"
-Column 6,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "<BACKSLASH>N"
-ERROR: Line feed found where delimiter (,) is expected. It's like your file has less columns than expected.
-And if your file has the right number of columns, maybe it has unescaped quotes in values.
-
-: (in file/uri /tmp/geos.tmp): While executing ParallelParsingBlockInputFormat: While executing File. (CANNOT_PARSE_INPUT_ASSERTION_FAILED)
-CONTEXT:  query: SELECT * FROM file({path:String}, {format:String}, {structure:String})
-psql:test/utils/round-trip-formats.sql:82: STATEMENT:  COPY "geo_nulls2" FROM 'file:///tmp/geos.tmp' (format 'CSVWithNames');
-f: CSVWithNames
-psql:test/utils/round-trip-formats.sql:90: ERROR:  chdb: error executing chDB query
-DETAIL:  Code: 27. DB::Exception: Cannot parse input: expected ',' before: '\n': (at row 2)
-: 
-Row 1:
-Column 0,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "0"
-Column 1,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "0"
-Column 2,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "1"
-Column 3,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "-1"
-Column 4,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "0"
-Column 5,   name: lseg, type: LineString,                                       parsed text: "<DOUBLE QUOTE>[(11,11),(12,12)]<DOUBLE QUOTE>"
-Column 6,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "13"
-Column 7,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "13"
-Column 8,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "11"
-Column 9,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "11"
-Column 10,  name: path, type: LineString,                                       parsed text: "<DOUBLE QUOTE>[(11,12),(13,13),(14,14),(11,12)]<DOUBLE QUOTE>"
-Column 11,  name: poly, type: Ring,                                             parsed text: "<DOUBLE QUOTE>[(11,12),(13,13),(14,14)]<DOUBLE QUOTE>"
-Column 12,  name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "1"
-Column 13,  name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "1"
-Column 14,  name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "1"
-
-Row 2:
-Column 0,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "<BACKSLASH>N"
-Column 1,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "<BACKSLASH>N"
-Column 2,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "<DOUBLE QUOTE>[]<DOUBLE QUOTE>"
-Column 3,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "<BACKSLASH>N"
-Column 4,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "<DOUBLE QUOTE>[]<DOUBLE QUOTE>"
-Column 5,   name: lseg, type: LineString,                                       parsed text: "<DOUBLE QUOTE>[]<DOUBLE QUOTE>"
-Column 6,   name: <SKIPPED COLUMN>, type: Nothing,                                          parsed text: "<BACKSLASH>N"
-ERROR: Line feed found where delimiter (,) is expected. It's like your file has less columns than expected.
-And if your file has the right number of columns, maybe it has unescaped quotes in values.
-
-: (in file/uri /tmp/geos.tmp): While executing ParallelParsingBlockInputFormat: While executing File. (CANNOT_PARSE_INPUT_ASSERTION_FAILED)
-CONTEXT:  query: SELECT * FROM file({path:String}, {format:String}, {structure:String})
-psql:test/utils/round-trip-formats.sql:90: STATEMENT:  COPY "geo_nulls2" FROM 'file:///tmp/geos.tmp' (format 'CSVWithNamesAndTypes');
-f: CSVWithNamesAndTypes
+t: CSVWithNames
+t: CSVWithNamesAndTypes
 t: CustomSeparated
 t: CustomSeparatedWithNames
 t: CustomSeparatedWithNamesAndTypes

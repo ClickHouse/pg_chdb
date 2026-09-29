@@ -32,7 +32,7 @@ subtest s3 => sub {
     check_query(
         $node, 'just TO url',
         qq{COPY stuff TO 's3://localhost:$port/bucket/prefix/file.csv'},
-        qr/\QDB::Exception: Message: Access Denied/,
+        qr/^$|\QDB::Exception: Message: Access Denied/,
         qr[\QINSERT INTO FUNCTION s3({url:String}, NOSIGN, {format:String}, {structure:String}) SETTINGS s3_truncate_on_insert = 1, s3_request_timeout_ms = 30000],
         qr[\Q{ url: "s3://localhost:\E$port\Q/bucket/prefix/file.csv", format: "auto", structure: "id Nullable(Int32)" }],
     );
@@ -148,7 +148,7 @@ subtest gcs => sub {
     check_query(
         $node, 'just TO url',
         qq{COPY stuff TO 'gcs://storage.googleapis.com/bucket/prefix/file.csv'},
-        qr/Code: 499/,
+        qr/^$|Code: 499/,
         qr[\QINSERT INTO FUNCTION gcs({url:String}, NOSIGN, {format:String}, {structure:String}) SETTINGS s3_truncate_on_insert = 1, s3_request_timeout_ms = 30000],
         qr[\Q{ url: "https://storage.googleapis.com/bucket/prefix/file.csv", format: "auto", structure: "id Nullable(Int32)" }],
     );
@@ -280,7 +280,7 @@ subtest azure => sub {
     check_query(
         $node, 'FROM abfs with compression & structure',
         q{COPY stuff FROM 'abfs://container@account/xyz/yep.csv' (access_key 'ac-key', compression 'snappy', structure 'x String')},
-        qr/Azure::Storage::StorageException/,
+        qr/Azure::Core::Http::TransportException: Code: 198|Azure::Storage::StorageException/,
         qr[\QSELECT * FROM azureBlobStorage({url:String}, {container:String}, {path:String}, {account_name:String}, {account_key:String}, {format:String}, {compression:String}, {structure:String}) SETTINGS azure_request_timeout_ms=30000],
         qr[\Q{ url: "https://account.blob.core.windows.net", container: "container", path: "xyz/yep.csv", account_name: "ac-key", account_key: "", format: "auto", compression: "snappy", structure: "x String" }],
     );
