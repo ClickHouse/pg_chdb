@@ -79,10 +79,11 @@ After which the `times` table contains the records from each file it loaded:
 ```
 
 A [CREATE TABLE] may also derive its columns, and load its rows, from such a
-URL:
+URL (beware: this public data file holds 41m rows):
 
 ```sql
 CREATE TABLE reviews () WITH (
+    encoding_check = 'replace',
     copy_from = 'https://datasets-documentation.s3.eu-west-3.amazonaws.com/amazon_reviews/amazon_reviews_2015.snappy.parquet'
 );
 ```

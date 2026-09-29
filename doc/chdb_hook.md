@@ -1,4 +1,4 @@
-chdb_hook 0.1.1
+chdb_hook 0.1.2
 ===============
 
 ## Synopsis
@@ -358,10 +358,12 @@ chdb_hook also hooks into [CREATE TABLE], so that a table can derive its
 columns, and load its rows, from a URL.
 
 To create a table with the structure derived from a URL, pass the URL in the
-`structure_from` option and leave the column list empty:
+`structure_from` option and leave the column list empty (beware: this public
+data file holds 41m rows):
 
 ```sql
 CREATE TABLE reviews () WITH (
+    encoding_check = 'replace',
     structure_from = 's3://datasets-documentation/amazon_reviews/amazon_reviews_2015.snappy.parquet'
 );
 ```
@@ -370,6 +372,7 @@ Use `copy_from` to load the rows as well as the columns:
 
 ```sql
 CREATE TABLE reviews () WITH (
+    encoding_check = 'replace',
     copy_from = 's3://datasets-documentation/amazon_reviews/amazon_reviews_2015.snappy.parquet'
 );
 ```
@@ -631,6 +634,7 @@ Input-compatible types can read strings using their PostgreSQL input function.
 Composite types must have matching fields in matching order. To read a tuple
 as an array, each field must convert to the array's element type, and no field
 can itself be an array.
+
 When read as an array, `Map` uses one row per key-value pair and `Nested` uses
 one row per nested row. To read a tuple as `box`, provide two points; for
 `circle`, provide a point and radius; for `line`, provide three coefficients.

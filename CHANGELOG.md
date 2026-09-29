@@ -80,6 +80,7 @@ needing to `ALTER EXTENSION UPDATE`.
     "ClickHouse/pg_chdb#91 Restore `MAX_CONCURRENT_TESTS`, fix macOS"
   [#96]: https://github.com/ClickHouse/pg_chdb/pull/96
     "ClickHouse/pg_chdb#96 Update pg-clickhouse-c & add encoding_check option"
+  [COPY docs](doc/chdb_hook.md#copy-overloading) "chdb_hook docs: COPY Overloading"
   [Interval]: https://clickhouse.com/docs/reference/data-types/special-data-types/interval
     "ClickHouse Docs: Interval"
   [composite type]: https://www.postgresql.org/docs/current/rowtypes.html
