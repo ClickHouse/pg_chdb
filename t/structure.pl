@@ -302,7 +302,7 @@ DATETIME: {
         qq{COPY datetime FROM 'file://$dir/nonesuch.csv'},
         qr/nonesuch.csv doesn't exist/,
         qr[\QSELECT * FROM file],
-        qr[\Q structure: "ts Nullable(DateTime64(6, 'UTC')), tsn Nullable(DateTime64(6, 'UTC')), tstz DateTime64(6, 'UTC'), tstzn DateTime64(6, 'UTC'), date Date32, time Time64(6), timen Time64(6), ttz String, ttzn String, ival String" }],
+        qr[\Q structure: "ts Nullable(DateTime64(6)), tsn Nullable(DateTime64(3)), tstz DateTime64(6, 'UTC'), tstzn DateTime64(4, 'UTC'), date Date32, time Time64(6), timen Time64(3), ttz String, ttzn String, ival String" }],
     );
 
     $node->psql(postgres => q{
@@ -324,7 +324,7 @@ DATETIME: {
         qq{COPY datetime_arrays FROM 'file://$dir/nonesuch.csv'},
         qr/nonesuch.csv doesn't exist/,
         qr[\QSELECT * FROM file],
-        qr[\Q structure: "ts Array(Nullable(DateTime64(6, 'UTC'))), tsn Array(Nullable(DateTime64(6, 'UTC'))), tstz Array(Nullable(DateTime64(6, 'UTC'))), tstzn Array(Nullable(DateTime64(6, 'UTC'))), date Array(Nullable(Date32)), time Array(Nullable(Time64(6))), timen Array(Nullable(Time64(6))), ttz Array(Nullable(String)), ttzn Array(Nullable(String)), ival Array(Nullable(String))" }],
+        qr[\Q structure: "ts Array(Nullable(DateTime64(6))), tsn Array(Nullable(DateTime64(3))), tstz Array(Nullable(DateTime64(6, 'UTC'))), tstzn Array(Nullable(DateTime64(4, 'UTC'))), date Array(Nullable(Date32)), time Array(Nullable(Time64(6))), timen Array(Nullable(Time64(3))), ttz Array(Nullable(String)), ttzn Array(Nullable(String)), ival Array(Nullable(String))" }],
     );
 }
 

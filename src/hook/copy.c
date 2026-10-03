@@ -89,8 +89,8 @@ structure_for_attnums(TupleDesc desc, List* attnums) {
 }
 
 /*
- * Return a copy of `structure` with every bare `type` clause replaced with
- * `String`.
+ * Return a copy of `structure` with every bare `type` clause, along with any
+ * parameters it takes, replaced with `String`.
  */
 static char*
 structure_as_string(const char* structure, const char* type) {
@@ -104,20 +104,25 @@ structure_as_string(const char* structure, const char* type) {
             quoted = !quoted;
         }
         if (!quoted && strncmp(pos, type, len) == 0 && pos > structure &&
-            (pos[-1] == ' ' || pos[-1] == '(') &&
-            (pos[len] == '\0' || pos[len] == ',' || pos[len] == ')')) {
-            appendStringInfoString(&buf, "String");
-            pos += len;
-        } else {
-            appendStringInfoChar(&buf, *pos++);
+            (pos[-1] == ' ' || pos[-1] == '(')) {
+            const char* end = pos + len;
+            if (*end == '(' && strchr(end, ')')) {
+                end = strchr(end, ')') + 1;
+            }
+            if (*end == '\0' || *end == ',' || *end == ')') {
+                appendStringInfoString(&buf, "String");
+                pos = end;
+                continue;
+            }
         }
+        appendStringInfoChar(&buf, *pos++);
     }
     return buf.data;
 }
 
 /*
  * Returns true if `format` is one of the formats lacking Time64 support.
- * In such cases, `Time64(6)` should be replaced with `String`.
+ * In such cases, `Time64` should be replaced with `String`.
  */
 static bool
 format_lacks_time64(const char* format) {
@@ -152,7 +157,7 @@ chdb_copy(chdbCopyContext* ctx) {
             ctx->structure = structure_as_string(ctx->structure, "UUID");
         }
         if (format_lacks_time64(ctx->format)) {
-            ctx->structure = structure_as_string(ctx->structure, "Time64(6)");
+            ctx->structure = structure_as_string(ctx->structure, "Time64");
         }
     }
 

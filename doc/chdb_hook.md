@@ -483,7 +483,7 @@ those you need.
 | bytea            | String                                 |                                                                        |
 | date             | Date32                                 |                                                                        |
 | time             | Time64(6)                              | Override with `String` for formats that don't support times.           |
-| timestamp        | DateTime64(6, 'UTC')                   | Converted from session time zone.                                      |
+| timestamp        | DateTime64(6)                          | Converted from session time zone.                                      |
 | timestamptz      | DateTime64(6, 'UTC')                   |                                                                        |
 | interval         | String                                 | Override with an `Interval` unit such as `IntervalDay`.                |
 | uuid             | UUID                                   |                                                                        |

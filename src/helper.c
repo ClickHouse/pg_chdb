@@ -26,6 +26,8 @@
 #include "utils/palloc.h"
 #include "utils/wait_event.h"
 
+#include "pg-clickhouse.h"
+
 #include "helper.h"
 #include "setup.h"
 
@@ -367,6 +369,8 @@ build_setup(
     appendBinaryStringInfo(buf, (char*)&ctx->max_threads, sizeof(ctx->max_threads));
     appendBinaryStringInfo(buf, (char*)&ctx->max_parsers, sizeof(ctx->max_parsers));
 
+    /* timestamp maps to DateTime64 without time zone, read in this zone */
+    append_string(buf, pgch_session_timezone());
     append_string(buf, query);
 
     uint16_t count = (uint16_t)nparams;

@@ -146,6 +146,72 @@ SELECT pg_read_file(:'tsv_path');
  
 (1 row)
 
+/************************ No offset ************************/
+-- Text without offset reads as wall clock in Postgres timezone for timestamp,
+-- UTC for timestamptz. ts stays 12:00 under every timezone.
+\set naive_path :temp_dir /naive.tsv
+\set naive_url file:// :naive_path
+CREATE TABLE naive (id INT, ts TEXT, tstz TEXT);
+INSERT INTO naive VALUES (1, '2026-08-28 12:00:00', '2026-08-28 12:00:00');
+COPY naive TO :'naive_url';
+SET timezone TO 'America/Los_Angeles';
+TRUNCATE dt2;
+COPY dt2 FROM :'naive_url';
+SELECT * FROM dt2;
+ id |         ts          |          tstz          
+----+---------------------+------------------------
+  1 | 2026-08-28 12:00:00 | 2026-08-28 05:00:00-07
+(1 row)
+
+SET timezone TO 'Asia/Tokyo';
+TRUNCATE dt2;
+COPY dt2 FROM :'naive_url';
+SELECT * FROM dt2;
+ id |         ts          |          tstz          
+----+---------------------+------------------------
+  1 | 2026-08-28 12:00:00 | 2026-08-28 21:00:00+09
+(1 row)
+
+-- Fixed offset, which chDB spells Fixed/UTC-07:00:00
+SET TIME ZONE -7;
+TRUNCATE dt2;
+COPY dt2 FROM :'naive_url';
+SELECT * FROM dt2;
+ id |         ts          |          tstz          
+----+---------------------+------------------------
+  1 | 2026-08-28 12:00:00 | 2026-08-28 05:00:00-07
+(1 row)
+
+SET timezone TO 'UTC';
+/************************ Declared precision ************************/
+-- Inferred structure takes fractional digits from column typmod.
+CREATE TABLE precisions (
+    ts   TIMESTAMP(3)   NOT NULL,
+    tstz TIMESTAMPTZ(1) NOT NULL,
+    t    TIME(4)        NOT NULL,
+    tn   TIME(2)            NULL
+);
+INSERT INTO precisions
+VALUES ('2026-07-23 20:43:27.363', '2026-07-23 20:43:50.9Z', '13:45:24.2821', '13:45:24.28');
+COPY precisions TO :'tsv_url';
+SELECT pg_read_file(:'tsv_path');
+                                    pg_read_file                                     
+-------------------------------------------------------------------------------------
+ 2026-07-23T20:43:27.363Z        2026-07-23T20:43:50.9Z  13:45:24.2821   13:45:24.28+
+ 
+(1 row)
+
+-- Parquet replaces parameterized Time64 with String.
+\set parquet_url file:// :temp_dir /precisions.parquet
+COPY precisions TO :'parquet_url' (format 'Parquet');
+TRUNCATE precisions;
+COPY precisions FROM :'parquet_url' (format 'Parquet');
+SELECT * FROM precisions;
+           ts            |           tstz           |       t       |     tn      
+-------------------------+--------------------------+---------------+-------------
+ 2026-07-23 20:43:27.363 | 2026-07-23 20:43:50.9+00 | 13:45:24.2821 | 13:45:24.28
+(1 row)
+
 /************************ Default scales ************************/
 -- A DateTime64 or Time64 named without a scale takes chDB's default of
 -- milliseconds, truncating the microseconds Postgres holds.

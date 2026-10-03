@@ -309,7 +309,8 @@ setup_session(
     chdb_connection conn,
     uint16_t max_mem,
     uint16_t max_threads,
-    uint16_t max_parsers
+    uint16_t max_parsers,
+    str timezone
 ) {
     char settings[1024];
     snprintf(
@@ -321,10 +322,12 @@ setup_session(
         "output_format_native_encode_types_in_binary_format=0,"
         "date_time_output_format='iso',"
         "max_threads=%" PRIu16 ",max_parsing_threads=%" PRIu16
-        ",max_memory_usage=%" PRIu64,
+        ",max_memory_usage=%" PRIu64 ",session_timezone='%.*s'",
         max_threads,
         max_parsers,
-        (uint64_t)max_mem * 1024 * 1024
+        (uint64_t)max_mem * 1024 * 1024,
+        (int)timezone.len,
+        timezone.data
     );
     chdb_result* res = chdb_query(conn, settings, native_format);
     const char* err  = chdb_result_error(res);
@@ -346,6 +349,7 @@ main(void) {
     uint16_t max_mem     = take2(&cur);
     uint16_t max_threads = take2(&cur);
     uint16_t max_parsers = take2(&cur);
+    str timezone         = take_str(&cur);
     str query            = take_str(&cur);
     uint16_t npar        = take2(&cur);
 
@@ -380,7 +384,7 @@ main(void) {
      * Unfortunately, setting via argv doesn't work, so we have to set them a
      * an initial query. https://github.com/chdb-io/chdb-core/issues/191
      */
-    int status = setup_session(*conn, max_mem, max_threads, max_parsers);
+    int status = setup_session(*conn, max_mem, max_threads, max_parsers, timezone);
 
     if (!status) {
         switch (cmd_type) {

@@ -24,6 +24,7 @@ typedef struct chdbHelperContext {
  * Fields are native endian.
  *
  *   chdbHelperContext      command type, settings
+ *   string                 session_timezone
  *   string                 query
  *   uint16                 parameter count
  *   string                 parameter name and value, repeated

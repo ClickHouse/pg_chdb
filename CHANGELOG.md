@@ -9,12 +9,21 @@ All notable changes to this project will be documented in this file. It uses the
 
 ## Unreleased
 
+### ⚡ Improvements
+
+*   Preserve declared fractional-second precision when mapping `time`,
+    `timestamp`, and `timestamptz` columns to chDB types ([#101]).
+
 ### 🐞 Bug Fixes
 
+*   Use PostgreSQL session `TimeZone` in chDB so `COPY FROM` preserves
+    `timestamp` wall-clock values when input omits time zone ([#101]).
 *   Preserve Azure SAS tokens between schema inference and data loading in
     `CREATE TABLE ... COPY FROM` ([#103]).
 *   Fix GCC 15 build failures caused by discarded `const` qualifiers ([#103]).
 
+  [#101]: https://github.com/ClickHouse/pg_chdb/pull/101
+    "ClickHouse/pg_chdb#101 Have chDB use postgres session's TimeZone"
   [#103]: https://github.com/ClickHouse/pg_chdb/pull/103
     "ClickHouse/pg_chdb#103 Use const more"
 
