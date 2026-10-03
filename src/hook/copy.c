@@ -529,7 +529,7 @@ parse_azure_url(chdbCopyContext* ctx, azureURLParts* parts) {
     const char* host = path ? pnstrdup(uri, path - uri) : uri;
     path             = path ? path + 1 : "";
 
-    char* dot = strchr(host, '.');
+    const char* dot = strchr(host, '.');
     if (!dot) {
         ereport(
             ERROR,
@@ -563,7 +563,7 @@ parse_azure_url(chdbCopyContext* ctx, azureURLParts* parts) {
 static char*
 get_local_path_from_file_url(const char* url) {
     /* https://github.com/ClickHouse/ClickHouse/blob/0b235b0/src/Storages/StorageURL.cpp#L2000-L2014*/
-    char* path = strstr(url, "://");
+    char* path = (char*)strstr(url, "://"); /* borrowed from url */
     if (!path) {
         /* Should not happen, validated by the hook. */
         elog(ERROR, "chdb: malformed file URL %s", url);
