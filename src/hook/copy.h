@@ -39,13 +39,13 @@ typedef struct chdbCopyContext {
     uint16_t max_parsers;    /* max_parsing_threads, 0 for auto */
     uint16_t encoding_check; /* encoding error handling, 0 for fail */
     /* Table function options; keep in sync with CHDB_MAX_TABLEFUNC_ARGS. */
-    char* url;
-    char* access_key;
-    char* access_secret;
-    char* session_token;
-    char* format;
-    char* structure;
-    char* compression;
+    const char* url;
+    const char* access_key;
+    const char* access_secret;
+    const char* session_token;
+    const char* format;
+    const char* structure;
+    const char* compression;
     bool preserve_nested;
 } chdbCopyContext;
 

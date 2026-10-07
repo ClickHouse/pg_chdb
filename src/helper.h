@@ -27,8 +27,8 @@ extern chdbHelper*
 chdb_helper_start(
     chdbHelperContext* ctx,
     const char* query,
-    char* const* names,
-    char* const* values,
+    const char* const* names,
+    const char* const* values,
     size_t nparams
 );
 

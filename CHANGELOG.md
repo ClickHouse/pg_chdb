@@ -7,6 +7,17 @@ All notable changes to this project will be documented in this file. It uses the
   [Semantic Versioning]: https://semver.org/spec/v2.0.0.html
     "Semantic Versioning 2.0.0"
 
+## Unreleased
+
+### 🐞 Bug Fixes
+
+*   Preserve Azure SAS tokens between schema inference and data loading in
+    `CREATE TABLE ... COPY FROM` ([#103]).
+*   Fix GCC 15 build failures caused by discarded `const` qualifiers ([#103]).
+
+  [#103]: https://github.com/ClickHouse/pg_chdb/pull/103
+    "ClickHouse/pg_chdb#103 Use const more"
+
 ## [v0.1.2] — 2026-09-30
 
 This release makes binary-only changes. Once installed and loaded, any

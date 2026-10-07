@@ -358,8 +358,8 @@ build_setup(
     StringInfo buf,
     chdbHelperContext* ctx,
     const char* query,
-    char* const* names,
-    char* const* values,
+    const char* const* names,
+    const char* const* values,
     size_t nparams
 ) {
     appendBinaryStringInfo(buf, (char*)&ctx->cmd, sizeof(ctx->cmd));
@@ -405,8 +405,8 @@ chdbHelper*
 chdb_helper_start(
     chdbHelperContext* ctx,
     const char* query,
-    char* const* names,
-    char* const* values,
+    const char* const* names,
+    const char* const* values,
     size_t nparams
 ) {
     chdbHelper* h = palloc0(sizeof(*h));

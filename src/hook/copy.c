@@ -38,14 +38,19 @@ static char const* const table_function[] = {
  * expects.
  */
 typedef struct azureURLParts {
-    char* account_url;
-    char* container;
-    char* path;
+    const char* account_url;
+    const char* container;
+    const char* path;
 } azureURLParts;
 
 /* Creates the chDB query for a COPY. */
 static size_t
-make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** values);
+make_ch_query(
+    chdbCopyContext* ctx,
+    StringInfo query,
+    const char** names,
+    const char** values
+);
 
 /* Parses `url` into `parts`. */
 static void
@@ -155,8 +160,8 @@ chdb_copy(chdbCopyContext* ctx) {
     StringInfoData ch_query;
     initStringInfo(&ch_query);
 
-    char* names[CHDB_MAX_TABLEFUNC_ARGS];
-    char* values[CHDB_MAX_TABLEFUNC_ARGS];
+    const char* names[CHDB_MAX_TABLEFUNC_ARGS];
+    const char* values[CHDB_MAX_TABLEFUNC_ARGS];
     size_t param_count = make_ch_query(ctx, &ch_query, names, values);
 
     /* Hand off to the helper. */
@@ -191,8 +196,8 @@ chdb_describe(chdbCopyContext* ctx) {
     /* Build DESCRIBE with read settings without changing COPY context */
     chdbCopyContext describe = *ctx;
     StringInfoData ch_query;
-    char* names[CHDB_MAX_TABLEFUNC_ARGS];
-    char* values[CHDB_MAX_TABLEFUNC_ARGS];
+    const char* names[CHDB_MAX_TABLEFUNC_ARGS];
+    const char* values[CHDB_MAX_TABLEFUNC_ARGS];
 
     describe.cmd_type = CHDB_CMD_DESCRIBE;
     /* Ask chDB to infer structure when none was provided */
@@ -235,7 +240,12 @@ truncate_setting(chdbCopyContext* ctx, const char* setting) {
 }
 
 static size_t
-make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** values) {
+make_ch_query(
+    chdbCopyContext* ctx,
+    StringInfo query,
+    const char** names,
+    const char** values
+) {
     /* Start the query. */
     appendStringInfo(
         query,
@@ -255,7 +265,7 @@ make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** value
 
     size_t i = 0;
     /* chDB infers a format the copy did not name from the file extension. */
-    char* format = ctx->format[0] ? ctx->format : "auto";
+    const char* format = ctx->format[0] ? ctx->format : "auto";
 
     switch (ctx->scheme) {
     case s3_scheme:
@@ -266,7 +276,7 @@ make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** value
          */
 
         /* First parameter: the base URL. */
-        char* uri = strstr(ctx->url, "://");
+        const char* uri = strstr(ctx->url, "://");
         if (!uri) {
             /* Should not happen, validated by the hook. */
             elog(
@@ -277,7 +287,7 @@ make_ch_query(chdbCopyContext* ctx, StringInfo query, char** names, char** value
             );
         }
         uri += strlen("://");
-        char* slash = strchr(uri, '/');
+        const char* slash = strchr(uri, '/');
 
         if (ctx->scheme == s3_scheme) {
             if (slash && slash - uri >= strlen(AWS_HOST) &&
@@ -469,7 +479,7 @@ parse_azure_url(chdbCopyContext* ctx, azureURLParts* parts) {
      * Based on Azure URL parsing for the url() function in ClickHouse 26.7:
      * https://github.com/ClickHouse/ClickHouse/blob/0b235b0/src/Storages/StorageURL.cpp#L2016-L2087
      */
-    char* uri = strstr(ctx->url, "://");
+    const char* uri = strstr(ctx->url, "://");
     if (!uri) {
         /* Should not happen, validated by the hook. */
         elog(ERROR, "chdb: malformed Azure URL %s", ctx->url);
@@ -481,10 +491,9 @@ parse_azure_url(chdbCopyContext* ctx, azureURLParts* parts) {
      * Split off the query string (a SAS token such as `?sp=...&sig=...`)
      * before parsing the host and path.
      */
-    char* query = strchr(uri, '?');
+    const char* query = strchr(uri, '?');
     if (query) {
-        /* NUL terminate the URL and split off the query. */
-        *query = '\0';
+        uri = pnstrdup(uri, query - uri);
         query++;
     }
 
@@ -493,7 +502,7 @@ parse_azure_url(chdbCopyContext* ctx, azureURLParts* parts) {
      * `abfss://<container>@<account>.dfs.core.windows.net/<blob path>`.
      */
     if (ctx->scheme == abfs_scheme) {
-        char* at = strchr(uri, '@');
+        const char* at = strchr(uri, '@');
         if (!at) {
             ereport(
                 ERROR,
@@ -503,16 +512,16 @@ parse_azure_url(chdbCopyContext* ctx, azureURLParts* parts) {
             );
         }
 
-        parts->container    = pnstrdup(uri, at - uri);
-        char* host_and_path = at + 1;
-        char* slash         = strchr(host_and_path, '/');
-        char* host =
+        parts->container          = pnstrdup(uri, at - uri);
+        const char* host_and_path = at + 1;
+        const char* slash         = strchr(host_and_path, '/');
+        const char* host =
             slash ? pnstrdup(host_and_path, slash - host_and_path) : host_and_path;
-        parts->path        = slash ? slash + 1 : "";
-        char* dot          = strchr(host, '.');
-        char* account      = dot ? host : psprintf("%s.blob.core.windows.net", host);
-        parts->account_url = query ? psprintf("https://%s?%s", account, query)
-                                   : psprintf("https://%s", account);
+        parts->path         = slash ? slash + 1 : "";
+        const char* dot     = strchr(host, '.');
+        const char* account = dot ? host : psprintf("%s.blob.core.windows.net", host);
+        parts->account_url  = query ? psprintf("https://%s?%s", account, query)
+                                    : psprintf("https://%s", account);
         return;
     }
 
@@ -520,7 +529,7 @@ parse_azure_url(chdbCopyContext* ctx, azureURLParts* parts) {
      * `<account>.blob.core.windows.net/<container>/<blob>` or
      * `<host>/<container>/<blob>`.
      */
-    char* path = strstr(uri, "/");
+    const char* path = strstr(uri, "/");
 
     /*
      * `az://<account>.blob.core.windows.net/<container>/<blob>` or
@@ -529,7 +538,7 @@ parse_azure_url(chdbCopyContext* ctx, azureURLParts* parts) {
     const char* host = path ? pnstrdup(uri, path - uri) : uri;
     path             = path ? path + 1 : "";
 
-    char* dot = strchr(host, '.');
+    const char* dot = strchr(host, '.');
     if (!dot) {
         ereport(
             ERROR,
@@ -541,12 +550,11 @@ parse_azure_url(chdbCopyContext* ctx, azureURLParts* parts) {
 
     parts->account_url =
         query ? psprintf("https://%s?%s", host, query) : psprintf("https://%s", host);
-    char* slash = strchr(path, '/');
-    parts->container =
-        slash ? pnstrdup(path, slash - path) : pnstrdup(path, strlen(path));
-    parts->path = slash ? slash + 1 : "";
+    const char* slash = strchr(path, '/');
+    parts->container  = slash ? pnstrdup(path, slash - path) : path;
+    parts->path       = slash ? slash + 1 : "";
 
-    if (strlen(parts->container) == 0) {
+    if (parts->container[0] == '\0') {
         ereport(
             ERROR,
             errcode(ERRCODE_INVALID_PARAMETER_VALUE),

@@ -115,7 +115,7 @@ InitializeUtilityHook(void) {
 static scheme
 scheme_for(const char* str) {
     if (str) {
-        char* ptr = strstr(str, "://");
+        const char* ptr = strstr(str, "://");
         if (ptr) {
             size_t len = ptr - str;
 
