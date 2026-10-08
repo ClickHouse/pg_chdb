@@ -7,21 +7,28 @@ All notable changes to this project will be documented in this file. It uses the
   [Semantic Versioning]: https://semver.org/spec/v2.0.0.html
     "Semantic Versioning 2.0.0"
 
-## Unreleased
+## [v0.1.3] 2026-10-08
+
+This release makes binary-only changes. Once installed and loaded, any
+existing use of chdb and chdb_hook v0.1 will get the v0.1.3 benefits without
+needing to `ALTER EXTENSION UPDATE`.
 
 ### ⚡ Improvements
 
-*   Preserve declared fractional-second precision when mapping `time`,
-    `timestamp`, and `timestamptz` columns to chDB types ([#101]).
+*   Improved the mapping of `time`, `timestamp`, and `timestamptz` columns to
+    chDB types to preserve declared fractional-second precision. ([#101]).
 
 ### 🐞 Bug Fixes
 
-*   Use PostgreSQL session `TimeZone` in chDB so `COPY FROM` preserves
-    `timestamp` wall-clock values when input omits time zone ([#101]).
-*   Preserve Azure SAS tokens between schema inference and data loading in
-    `CREATE TABLE ... COPY FROM` ([#103]).
-*   Fix GCC 15 build failures caused by discarded `const` qualifiers ([#103]).
+*   Fixed `timestamp` wall-clock values when input omits time zone by using
+    the PostgreSQL session `TimeZone` in chDB during `COPY FROM` ([#101]).
+*   Fixed the parsing of Azure URLs to preserve SAS tokens SAS tokens between
+    schema inference and data loading in `CREATE TABLE ... COPY FROM`
+    ([#103]).
+*   Fixed GCC 15 build failures caused by discarded `const` qualifiers
+    ([#103]).
 
+  [v0.1.3]: https://github.com/clickhouse/pg_chdb/compare/v0.1.2...v0.1.3
   [#101]: https://github.com/ClickHouse/pg_chdb/pull/101
     "ClickHouse/pg_chdb#101 Have chDB use postgres session's TimeZone"
   [#103]: https://github.com/ClickHouse/pg_chdb/pull/103

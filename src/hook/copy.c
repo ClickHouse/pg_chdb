@@ -57,7 +57,7 @@ static void
 parse_azure_url(chdbCopyContext*, azureURLParts* parts);
 
 /* Extracts and returns the local file path from `url`. */
-static char*
+static const char*
 get_local_path_from_file_url(const char* url);
 
 /*
@@ -573,10 +573,10 @@ parse_azure_url(chdbCopyContext* ctx, azureURLParts* parts) {
  * Get the local path from a file:// URL. Must be an absolute path or else it
  * raises an error.
  */
-static char*
+static const char*
 get_local_path_from_file_url(const char* url) {
     /* https://github.com/ClickHouse/ClickHouse/blob/0b235b0/src/Storages/StorageURL.cpp#L2000-L2014*/
-    char* path = strstr(url, "://");
+    const char* path = strstr(url, "://");
     if (!path) {
         /* Should not happen, validated by the hook. */
         elog(ERROR, "chdb: malformed file URL %s", url);

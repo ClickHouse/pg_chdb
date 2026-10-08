@@ -1,4 +1,4 @@
-chdb_hook 0.1.2
+chdb_hook 0.1.3
 ===============
 
 ## Synopsis
