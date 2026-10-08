@@ -1,6 +1,7 @@
 SET DateStyle = 'ISO, MDY';
+CREATE EXTENSION IF NOT EXISTS chdb_hook;
 ----------------------------------------------------------------------------
--- pgchdb_version
+-- pgchdb_version and chdb_hook_version()
 ----------------------------------------------------------------------------
 SELECT pgchdb_version() ~ '^\d+\.\d+\.\d+$';
  ?column? 
@@ -8,15 +9,36 @@ SELECT pgchdb_version() ~ '^\d+\.\d+\.\d+$';
  t
 (1 row)
 
--- pgchdb_version should be the same as pg_get_loaded_modules() version.
-\set ECHO errors
-SELECT version = pgchdb_version() 
-  FROM pg_get_loaded_modules()
- WHERE module_name = 'chdb';
+SELECT chdb_hook_version() = pgchdb_version();
  ?column? 
 ----------
  t
 (1 row)
+
+-- version should be the same as pg_get_loaded_modules() version.
+\set ECHO errors
+SELECT version = pgchdb_version() AS chdb, version = chdb_hook_version() AS hook
+  FROM pg_get_loaded_modules()
+ WHERE module_name IN ('chdb', 'chdb_hook');
+ chdb | hook 
+------+------
+ t    | t
+ t    | t
+(2 rows)
+
+-- Both chdb and chdb_hook should be listed in pg_available_extensions with
+-- their x.y versions.
+SELECT name,
+       default_version = regexp_replace(pgchdb_version(), '\.\d+$', '')    AS chdb,
+       default_version = regexp_replace(chdb_hook_version(), '\.\d+$', '') AS chdb_hook
+  FROM pg_available_extensions
+ WHERE name IN ('chdb', 'chdb_hook')
+ ORDER BY name;
+   name    | chdb | chdb_hook 
+-----------+------+-----------
+ chdb      | t    | t
+ chdb_hook | t    | t
+(2 rows)
 
 ----------------------------------------------------------------------------
 -- chdb_query

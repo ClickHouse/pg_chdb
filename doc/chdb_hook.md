@@ -38,6 +38,26 @@ makes the most sense for your use case:
     LOAD 'chdb_hook';
     ```
 
+*   Explicitly via the [CREATE EXTENSION] command:
+
+    ```sql
+    CREATE EXTENSION chdb_hook;
+    ```
+
+    However, this command loads the module only in the session in which it
+    executes. In subsequent sessions, one must either use `LOAD` or
+    [chdb_hook_version](#chdb_hook_version) to load the module into memory.
+
+*   Implicitly via the [chdb_hook_version](#chdb_hook_version) function,
+    available once `CREATE EXTENSION` has created the extension:
+
+    ```sql
+    SELECT chdb_hook_version();
+    ```
+
+    This is effectively identical to `LOAD`, except that it returns the module
+    version.
+
 *   For all sessions, via the [session_preload_libraries] setting, via
     `postgresql.conf`:
 
@@ -63,8 +83,10 @@ makes the most sense for your use case:
     ALTER ROLE name SET session_preload_libraries = 'chdb_hook';
     ```
 
+    We recommend using this pattern with a user dedicated to using chdb_hook.
+
 *   At server start via the [shared_preload_libraries] setting, so it's always
-    available to all sessions and databases:
+    available to all sessions, users, and databases:
 
     ```ini
     shared_preload_libraries = chdb_hook
@@ -74,6 +96,26 @@ makes the most sense for your use case:
 > Be aware that loading chdb_hook allows users in the `pg_read_server_files`
 > or `pg_write_server_files` roles to `COPY` data to and from files on the
 > Postgres server, as well as cloud storage.
+
+## Functions
+
+### `chdb_hook_version`
+
+```sql
+SELECT chdb_hook_version();
+```
+
+Returns the current [semantic version][semver] of the chdb_hook module. While
+the chdb_hook extension version uses only the `x.y` part of the version, the
+library provides the full `x.y.z` [semantic version][semver]. This value will
+be the same as that returned by the Postgres 18 and later
+[`pg_get_loaded_modules()`] function:
+
+```sql
+SELECT version
+  FROM pg_get_loaded_modules()
+ WHERE module_name = 'chdb_hook';
+```
 
 ## COPY Overloading
 
@@ -808,6 +850,7 @@ Copyright (c) 2026, ClickHouse
     "Postgres Docs: Row Security Policies"
   [JSON type]: https://clickhouse.com/docs/reference/data-types/newjson "ClickHouse Docs: JSON Data Type"
   [LOAD]: https://www.postgresql.org/docs/current/sql-load.html "Postgres Docs: LOAD"
+  [CREATE EXTENSION]: https://www.postgresql.org/docs/current/sql-createextension.html "Postgres Docs: CREATE EXTENSION"
   [session_preload_libraries]:https://www.postgresql.org/docs/18/runtime-config-client.html#GUC-SESSION-PRELOAD-LIBRARIES
     "Postgres Docs: `session_preload_libraries`"
   [shared_preload_libraries]:https://www.postgresql.org/docs/18/runtime-config-client.html#GUC-SESSION-PRELOAD-LIBRARIES
@@ -850,3 +893,4 @@ Copyright (c) 2026, ClickHouse
     "ClickHouse Docs: max_parsing_threads session setting"
   [database encoding]: https://www.postgresql.org/docs/current/multibyte.html
     "PostgreSQL Docs: Character Set Support"
+  [semver]: https://semver.org/spec/v2.0.0.html "Semantic Versioning 2.0.0"

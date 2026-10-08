@@ -18,6 +18,7 @@
 #include "parser/parse_relation.h"
 #include "tcop/utility.h"
 #include "utils/acl.h"
+#include "utils/builtins.h"
 #include "utils/rel.h"
 #include "utils/rls.h"
 
@@ -43,6 +44,15 @@ PG_MODULE_MAGIC;
 #else
 #define CHDB_NO_SCHEME no_scheme
 #endif
+
+/*
+ * Function returns the full chdb_hook library version.
+ */
+PG_FUNCTION_INFO_V1(chdb_hook_version);
+Datum
+chdb_hook_version(PG_FUNCTION_ARGS) {
+    PG_RETURN_TEXT_P(cstring_to_text(PGCHCB_VERSION));
+}
 
 void
 InitializeUtilityHook(void);

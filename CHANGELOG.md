@@ -7,6 +7,20 @@ All notable changes to this project will be documented in this file. It uses the
   [Semantic Versioning]: https://semver.org/spec/v2.0.0.html
     "Semantic Versioning 2.0.0"
 
+## [v0.1.4] Unreleased
+
+### ⚡ Improvements
+
+*   Add a control file and installation script to support
+    `CREATE EXTENSION chdb_hook`. This allows chd_hook to be listed in
+    `pg_available_extensions` alongside `chdb`. Add `chdb_hook_version()`
+    as the sole function created by the extension. It's output is identical to
+    that of `pgchdb_version()` ([#106])
+
+  [v0.1.4]: https://github.com/clickhouse/pg_chdb/compare/v0.1.3...v0.1.4
+  [#105]: https://github.com/ClickHouse/pg_chdb/pull/105
+    "ClickHouse/pg_chdb#105 Add `chdb_hook.control` and `chdb_hook_version()`"
+
 ## [v0.1.3] 2026-10-08
 
 This release makes binary-only changes. Once installed and loaded, any

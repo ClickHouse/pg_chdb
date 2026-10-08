@@ -1,17 +1,19 @@
+EXT_NAME     = chdb
 EXTENSION    = $(patsubst %.control,%,$(wildcard *.control))
-EXTVERSION   = $(shell grep -m 1 'default_version' chdb.control | \
+EXTVERSION   = $(shell grep -m 1 'default_version' $(EXT_NAME).control | \
                sed -e "s/[[:space:]]*default_version[[:space:]]*=[[:space:]]*'\([^']*\)',\{0,1\}/\1/")
 DISTVERSION  = $(shell grep -m 1 '^[[:space:]]\{2\}"version":' META.json | \
                sed -e 's/[[:space:]]*"version":[[:space:]]*"\([^"]*\)",\{0,1\}/\1/')
 
 MAX_CONCURRENT_TESTS ?=
 
-DATA         = $(sort $(wildcard sql/$(EXTENSION)--*.sql) sql/$(EXTENSION)--$(EXTVERSION).sql)
+SQL_FILES    = $(patsubst %,sql/%--$(EXTVERSION).sql,$(EXTENSION))
+DATA         = $(sort $(SQL_FILES) $(wildcard $(patsubst %,sql/%--*.sql,$(EXTENSION))))
 DOCS         = $(wildcard doc/*.md)
 TESTS        ?= $(wildcard test/sql/*.sql)
 REGRESS      = --schedule test/schedule$(MAX_CONCURRENT_TESTS)
-REGRESS_OPTS = --inputdir=test --load-extension=$(EXTENSION) $(if $(MAX_CONCURRENT_TESTS),--max-concurrent-tests $(MAX_CONCURRENT_TESTS))
-MODULE_big   = $(EXTENSION)
+REGRESS_OPTS = --inputdir=test --load-extension=$(EXT_NAME) $(if $(MAX_CONCURRENT_TESTS),--max-concurrent-tests $(MAX_CONCURRENT_TESTS))
+MODULE_big   = $(EXT_NAME)
 PG_CONFIG   ?= pg_config
 TAP_TESTS   ?= 1
 OBJS         = $(subst .c,.o, $(wildcard src/*.c))
@@ -46,11 +48,11 @@ PG_CFLAGS    = -Wno-declaration-after-statement -Wall -Werror
 # PGCH_MSG_PREFIX prefixes messages pg-clickhouse-c raises like our own.
 # clickhouse-c copies what it raises through chc_err.msg, 256 bytes by default,
 # which clips the longer type names out of a decoding error.
-PG_CPPFLAGS  = -isystem $(CH_C_DIR) -isystem $(PGCH_DIR) -DPGCH_MSG_PREFIX='"chdb: "' \
+PG_CPPFLAGS  = -isystem $(CH_C_DIR) -isystem $(PGCH_DIR) -DPGCH_MSG_PREFIX='"$(EXT_NAME): "' \
                -DCHC_ERR_MSG_LEN=4096
 
 # Clean up generated files.
-EXTRA_CLEAN  = src/version.h sql/$(EXTENSION)--$(EXTVERSION).sql src/hook/chdb_hook$(DLSUFFIX) src/hook/*.o src/hook/*.bc src/helper/chdb_helper src/helper/*.o test/schedule*
+EXTRA_CLEAN  = src/version.h $(SQL_FILES) src/hook/chdb_hook$(DLSUFFIX) src/hook/*.o src/hook/*.bc src/helper/chdb_helper src/helper/*.o test/schedule*
 
 PGXS := $(shell $(PG_CONFIG) --pgxs)
 include $(PGXS)
@@ -71,15 +73,15 @@ endif
 endif
 
 # Require the versioned SQL script.
-all: sql/$(EXTENSION)--$(EXTVERSION).sql src/helper/chdb_helper src/hook/chdb_hook$(DLSUFFIX)
+all: $(SQL_FILES) src/helper/chdb_helper src/hook/chdb_hook$(DLSUFFIX)
 
 # PGXS tracks no header dependencies, and the vendored libraries are all header.
 # *.bc compiles same sources, so needs same headers.
 $(OBJS) $(OBJS:.o=.bc): $(CH_C_DIR)/clickhouse.h src/version.h \
                         $(wildcard src/*.h $(PGCH_DIR)/*.h $(CH_C_DIR)/*.h)
 
-# Versioned SQL script.
-sql/$(EXTENSION)--$(EXTVERSION).sql: sql/$(EXTENSION).sql
+# Versioned SQL scripts.
+sql/%--$(EXTVERSION).sql: sql/%.sql
 	cp $< $@
 
 # Versioned source file.
@@ -186,19 +188,19 @@ debian-install-lint:
 	@chmod +x /usr/local/bin/pre-commit
 
 # Test the PGXN distribution.
-dist-test: $(EXTENSION)-$(DISTVERSION).zip
-	unzip $(EXTENSION)-$(DISTVERSION).zip
-	cd $(EXTENSION)-$(DISTVERSION)
+dist-test: $(EXT_NAME)-$(DISTVERSION).zip
+	unzip $(EXT_NAME)-$(DISTVERSION).zip
+	cd $(EXT_NAME)-$(DISTVERSION)
 	$(MAKE) && $(DIST_TEST_SUDO) $(MAKE) install && $(MAKE) installcheck
 
 .PHONY: release-notes # Show release notes for current version (must have `mknotes` in PATH).
 release-notes: CHANGELOG.md
 	mknotes -v v$(DISTVERSION) -f $< -r https://github.com/$(or $(GITHUB_REPOSITORY),ClickHouse/pg_chdb)
 
-$(EXTENSION)-$(DISTVERSION).zip:
-	git archive-all -v --prefix "$(EXTENSION)-$(DISTVERSION)/" --force-submodules $(EXTENSION)-$(DISTVERSION).zip
+$(EXT_NAME)-$(DISTVERSION).zip:
+	git archive-all -v --prefix "$(EXT_NAME)-$(DISTVERSION)/" --force-submodules $(EXT_NAME)-$(DISTVERSION).zip
 
-zip: $(EXTENSION)-$(DISTVERSION).zip
+zip: $(EXT_NAME)-$(DISTVERSION).zip
 
 kv-rest:
 	curl -Ls https://github.com/theory/kv-rest/releases/download/v0.1.1/kv-rest-v0.1.1-$(OS)-$(ARCH).tar.gz | tar zxf - --strip-components=1 $(if $(filter $(OS),linux),--wildcards) '*/kv-rest'

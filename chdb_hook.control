@@ -1,0 +1,7 @@
+# chdb extension
+comment = 'Hook into Postgres commands to have chDB and copy data to and from cloud storage.'
+default_version = '0.1'
+module_pathname = 'chdb_hook'
+relocatable = true
+superuser = true
+trusted = false
