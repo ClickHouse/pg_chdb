@@ -39,6 +39,14 @@ SELECT * FROM requests ORDER BY req_id;
       4 | add_to_cart | /products/shoes
 (4 rows)
 
+-- PostgreSQL COPY aliases become per-query ClickHouse format settings.
+\set delimited_out :temp_base /delimited.csv
+COPY requests TO :'delimited_out' (format 'CSV', delimiter '|');
+COPY 4
+TRUNCATE requests;
+TRUNCATE TABLE
+COPY requests FROM :'delimited_out' (format 'CSV', delimiter '|');
+COPY 4
 -- Test importing from ClickHouse with all possible backslash escapes.
 -- https://clickhouse.com/docs/interfaces/formats/TabSeparated
 CREATE TABLE people (

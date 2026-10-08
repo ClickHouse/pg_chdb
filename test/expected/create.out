@@ -186,6 +186,19 @@ SELECT * FROM loaded_csv ORDER BY c1;
   4 | add_to_cart | /products/shoes
 (4 rows)
 
+-- Apply format settings while inferring columns and copying rows
+\set delimited_csv :temp_base /requests.csv
+COPY loaded_csv TO :'delimited_csv' (format 'CSV', delimiter '|');
+COPY 4
+CREATE TABLE loaded_delimited () WITH (
+    copy_from = :'delimited_csv', format = 'CSV', delimiter = '|'
+);
+CREATE TABLE
+COPY loaded_delimited TO STDOUT WITH (FORMAT CSV);
+1,page_view,/users/profile
+2,Page_View,/users/settings
+3,PAGE_VIEW,/admin/dashboard
+4,add_to_cart,/products/shoes
 -- Copy only rows when statement defines columns
 CREATE TABLE given_csv (
     req_id BIGINT PRIMARY KEY,

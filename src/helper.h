@@ -20,8 +20,9 @@
 typedef struct chdbHelper chdbHelper;
 
 /*
- * Starts the helper on `query`, bound to `nparams` named parameters. The helper
- * dies with the backend.
+ * Starts the helper on `query`, bound to `nparams` named parameters, after
+ * applying `nsettings` named settings for this operation. The helper dies with
+ * the backend.
  */
 extern chdbHelper*
 chdb_helper_start(
@@ -29,7 +30,10 @@ chdb_helper_start(
     const char* query,
     const char* const* names,
     const char* const* values,
-    size_t nparams
+    size_t nparams,
+    const char* const* setting_names,
+    const char* const* setting_values,
+    size_t nsettings
 );
 
 /*

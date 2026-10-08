@@ -28,6 +28,8 @@ typedef struct chdbHelperContext {
  *   string                 query
  *   uint16                 parameter count
  *   string                 parameter name and value, repeated
+ *   uint16                 format setting count
+ *   string                 setting name and value, repeated
  *
  * A string is a uint32 byte count followed by that many bytes, unterminated.
  */

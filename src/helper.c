@@ -362,8 +362,19 @@ build_setup(
     const char* query,
     const char* const* names,
     const char* const* values,
-    size_t nparams
+    size_t nparams,
+    const char* const* setting_names,
+    const char* const* setting_values,
+    size_t nsettings
 ) {
+    if (nparams > UINT16_MAX || nsettings > UINT16_MAX) {
+        ereport(
+            ERROR,
+            errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
+            errmsg("chdb: too many query parameters or format settings")
+        );
+    }
+
     appendBinaryStringInfo(buf, (char*)&ctx->cmd, sizeof(ctx->cmd));
     appendBinaryStringInfo(buf, (char*)&ctx->max_memory, sizeof(ctx->max_memory));
     appendBinaryStringInfo(buf, (char*)&ctx->max_threads, sizeof(ctx->max_threads));
@@ -378,6 +389,13 @@ build_setup(
     for (size_t i = 0; i < nparams; i++) {
         append_string(buf, names[i]);
         append_string(buf, values[i]);
+    }
+
+    count = (uint16_t)nsettings;
+    appendBinaryStringInfo(buf, (char*)&count, sizeof(count));
+    for (size_t i = 0; i < nsettings; i++) {
+        append_string(buf, setting_names[i]);
+        append_string(buf, setting_values[i]);
     }
 
     if (buf->len > CHDB_SETUP_MAX) {
@@ -411,7 +429,10 @@ chdb_helper_start(
     const char* query,
     const char* const* names,
     const char* const* values,
-    size_t nparams
+    size_t nparams,
+    const char* const* setting_names,
+    const char* const* setting_values,
+    size_t nsettings
 ) {
     chdbHelper* h = palloc0(sizeof(*h));
 
@@ -444,7 +465,17 @@ chdb_helper_start(
 
     StringInfoData setup;
     initStringInfo(&setup);
-    build_setup(&setup, ctx, query, names, values, nparams);
+    build_setup(
+        &setup,
+        ctx,
+        query,
+        names,
+        values,
+        nparams,
+        setting_names,
+        setting_values,
+        nsettings
+    );
 
     open_channel(&h->data, &h->data_peer, true);
     open_channel(&h->err, &h->err_peer, false);
