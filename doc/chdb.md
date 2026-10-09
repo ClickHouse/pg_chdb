@@ -106,7 +106,8 @@ for the number of megabytes or one of the following memory units:
 *   `GB` (gigabytes)
 *   `TB` (terabytes)
 
-Defaults to `0`, which does not limit the memory.
+Defaults to `4 GB`. Set to `0` to allow unlimited memory usage (up to the
+available RAM.
 
 ### `chdb.max_threads`
 
@@ -115,8 +116,8 @@ SET chdb.max_threads = 4;
 ```
 
 The maximum number of query processing threads for a chDB query, used to set
-the chDB [`max_threads`] setting. Requires superuser privileges. Defaults to
-`0`, which allows chDB to determine the value.
+the chDB [`max_threads`] setting. Requires superuser privileges. Use `0` to
+allow chDB to use the vCPU size of your service. Defaults to `0`.
 
 We strongly encourage setting `chdb.max_threads` before executing a major
 query in order to prevent chDB from maxing out CPU usage at the expense of

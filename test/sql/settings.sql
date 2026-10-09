@@ -61,10 +61,10 @@ EXECUTE show_all;
 EXECUTE show_chdb(false);
 
 -- Set max values.
-SET chdb.max_memory = 65535;
+SET chdb.max_memory = 2147483647;
 SET chdb.max_threads = 65535;
 SET chdb.max_parsing_threads = 65535;
-SET chdb_hook.max_memory = 65535;
+SET chdb_hook.max_memory = 2147483647;
 SET chdb_hook.max_threads = 65535;
 SET chdb_hook.max_parsing_threads = 65535;
 EXECUTE show_all;
@@ -77,9 +77,9 @@ SET chdb.max_parsing_threads = -1;
 SET chdb_hook.max_memory = -1;
 SET chdb_hook.max_threads = -1;
 SET chdb_hook.max_parsing_threads = -1;
-SET chdb.max_memory = 65536;
+SET chdb.max_memory = 2147483648;
 SET chdb.max_threads = 65536;
 SET chdb.max_parsing_threads = 65536;
-SET chdb_hook.max_memory = 65536;
+SET chdb_hook.max_memory = 2147483648;
 SET chdb_hook.max_threads = 65536;
 SET chdb_hook.max_parsing_threads = 65536;

@@ -37,16 +37,16 @@ PREPARE show_chdb(bool) AS
 EXECUTE show_all;
  extension | memory | threads | parsers 
 -----------+--------+---------+---------
- chdb      | 0      | 0       | 0
- chdb_hook | 0      | 0       | 0
+ chdb      | 4GB    | 0       | 0
+ chdb_hook | 4GB    | 0       | 0
 (2 rows)
 
 EXECUTE show_chdb(false);
-                        name                        | value 
-----------------------------------------------------+-------
+                        name                        |   value    
+----------------------------------------------------+------------
  allow_experimental_nullable_tuple_type             | 1
  date_time_output_format                            | iso
- max_memory_usage                                   | 0
+ max_memory_usage                                   | 4294967296
  max_parsing_threads                                | auto
  max_threads                                        | auto
  output_format_native_encode_types_in_binary_format | 0
@@ -106,17 +106,17 @@ EXECUTE show_chdb(false);
 (7 rows)
 
 -- Set max values.
-SET chdb.max_memory = 65535;
+SET chdb.max_memory = 2147483647;
 SET chdb.max_threads = 65535;
 SET chdb.max_parsing_threads = 65535;
-SET chdb_hook.max_memory = 65535;
+SET chdb_hook.max_memory = 2147483647;
 SET chdb_hook.max_threads = 65535;
 SET chdb_hook.max_parsing_threads = 65535;
 EXECUTE show_all;
- extension | memory  | threads | parsers 
------------+---------+---------+---------
- chdb      | 65535MB | 65535   | 65535
- chdb_hook | 65535MB | 65535   | 65535
+ extension |    memory    | threads | parsers 
+-----------+--------------+---------+---------
+ chdb      | 2147483647MB | 65535   | 65535
+ chdb_hook | 2147483647MB | 65535   | 65535
 (2 rows)
 
 EXECUTE show_chdb(true);
@@ -133,25 +133,27 @@ EXECUTE show_chdb(true);
 
 -- Set invalid values.
 SET chdb.max_memory = -1;
-ERROR:  -1 MB is outside the valid range for parameter "chdb.max_memory" (0 MB .. 65535 MB)
+ERROR:  -1 MB is outside the valid range for parameter "chdb.max_memory" (0 MB .. 2147483647 MB)
 SET chdb.max_threads = -1;
 ERROR:  -1 is outside the valid range for parameter "chdb.max_threads" (0 .. 65535)
 SET chdb.max_parsing_threads = -1;
 ERROR:  -1 is outside the valid range for parameter "chdb.max_parsing_threads" (0 .. 65535)
 SET chdb_hook.max_memory = -1;
-ERROR:  -1 MB is outside the valid range for parameter "chdb_hook.max_memory" (0 MB .. 65535 MB)
+ERROR:  -1 MB is outside the valid range for parameter "chdb_hook.max_memory" (0 MB .. 2147483647 MB)
 SET chdb_hook.max_threads = -1;
 ERROR:  -1 is outside the valid range for parameter "chdb_hook.max_threads" (0 .. 65535)
 SET chdb_hook.max_parsing_threads = -1;
 ERROR:  -1 is outside the valid range for parameter "chdb_hook.max_parsing_threads" (0 .. 65535)
-SET chdb.max_memory = 65536;
-ERROR:  65536 MB is outside the valid range for parameter "chdb.max_memory" (0 MB .. 65535 MB)
+SET chdb.max_memory = 2147483648;
+ERROR:  invalid value for parameter "chdb.max_memory": "2147483648"
+HINT:  Value exceeds integer range.
 SET chdb.max_threads = 65536;
 ERROR:  65536 is outside the valid range for parameter "chdb.max_threads" (0 .. 65535)
 SET chdb.max_parsing_threads = 65536;
 ERROR:  65536 is outside the valid range for parameter "chdb.max_parsing_threads" (0 .. 65535)
-SET chdb_hook.max_memory = 65536;
-ERROR:  65536 MB is outside the valid range for parameter "chdb_hook.max_memory" (0 MB .. 65535 MB)
+SET chdb_hook.max_memory = 2147483648;
+ERROR:  invalid value for parameter "chdb_hook.max_memory": "2147483648"
+HINT:  Value exceeds integer range.
 SET chdb_hook.max_threads = 65536;
 ERROR:  65536 is outside the valid range for parameter "chdb_hook.max_threads" (0 .. 65535)
 SET chdb_hook.max_parsing_threads = 65536;

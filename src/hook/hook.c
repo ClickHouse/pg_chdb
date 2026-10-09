@@ -92,7 +92,7 @@ static char const* const scheme_name[no_scheme][4] = {
 /*
  * GUCs for settings to be passed to chDB, referenced by CHDB_GUCS().
  */
-static int chdb_max_memory  = 0;
+static int chdb_max_memory  = 4096; /* MB */
 static int chdb_max_threads = 0;
 static int chdb_max_parsers = 0;
 

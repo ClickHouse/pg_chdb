@@ -8,9 +8,9 @@
         "Memory budget for a chDB query.",                                             \
         "Zero leaves chDB to decide. Applied as max_memory_usage.",                    \
         &chdb_max_memory,                                                              \
+        4096,                                                                          \
         0,                                                                             \
-        0,                                                                             \
-        UINT16_MAX,                                                                    \
+        INT32_MAX,                                                                     \
         PGC_SUSET,                                                                     \
         GUC_UNIT_MB,                                                                   \
         NULL,                                                                          \
