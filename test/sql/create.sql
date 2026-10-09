@@ -99,6 +99,14 @@ SELECT * FROM json_params ORDER BY id;
 CREATE TABLE loaded_csv () WITH (copy_from = :'requests_csv');
 SELECT * FROM loaded_csv ORDER BY c1;
 
+-- Apply format settings while inferring columns and copying rows
+\set delimited_csv :temp_base /requests.csv
+COPY loaded_csv TO :'delimited_csv' (format 'CSV', delimiter '|');
+CREATE TABLE loaded_delimited () WITH (
+    copy_from = :'delimited_csv', format = 'CSV', delimiter = '|'
+);
+COPY loaded_delimited TO STDOUT WITH (FORMAT CSV);
+
 -- Copy only rows when statement defines columns
 CREATE TABLE given_csv (
     req_id BIGINT PRIMARY KEY,

@@ -22,6 +22,13 @@ typedef enum scheme {
     no_scheme, /* Must be last.*/
 } scheme;
 
+/* User-supplied ClickHouse setting, normalized from a PostgreSQL option. */
+typedef struct chdbSetting {
+    const char* option;
+    const char* name;
+    const char* value;
+} chdbSetting;
+
 /*
  * Contextual data from a COPY command assembled by hook.c and read into copy.c.
  */
@@ -46,6 +53,7 @@ typedef struct chdbCopyContext {
     const char* format;
     const char* structure;
     const char* compression;
+    List* settings;
     bool preserve_nested;
 } chdbCopyContext;
 

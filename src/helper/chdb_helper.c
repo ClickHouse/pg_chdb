@@ -133,6 +133,29 @@ typedef struct params {
     size_t count;
 } params;
 
+static params
+take_params(cursor* cur) {
+    uint16_t count      = take2(cur);
+    size_t nalloc       = count ? count : 1;
+    const char** names  = not_null(calloc(nalloc, sizeof(*names)));
+    size_t* name_lens   = not_null(calloc(nalloc, sizeof(*name_lens)));
+    const char** values = not_null(calloc(nalloc, sizeof(*values)));
+    size_t* value_lens  = not_null(calloc(nalloc, sizeof(*value_lens)));
+
+    for (uint16_t i = 0; i < count; i++) {
+        str name  = take_str(cur);
+        str value = take_str(cur);
+
+        names[i]      = name.data;
+        name_lens[i]  = name.len;
+        values[i]     = value.data;
+        value_lens[i] = value.len;
+    }
+
+    params result = { names, name_lens, values, value_lens, count };
+    return result;
+}
+
 /* False once the backend has gone, which is not ours to report. */
 static bool
 write_all(const char* at, size_t len) {
@@ -340,6 +363,66 @@ setup_session(
     return EXIT_SUCCESS;
 }
 
+/*
+ * Apply user format settings to this one-operation helper connection. chDB's
+ * streaming API clears query parameters before SETTINGS expressions are
+ * evaluated, so a parameterized SET keeps values out of SQL while preserving
+ * per-operation scope.
+ */
+static int
+setup_format_settings(chdb_connection conn, const params* settings) {
+    if (!settings->count) {
+        return EXIT_SUCCESS;
+    }
+
+    size_t capacity = strlen("SET ") + 1;
+    for (size_t i = 0; i < settings->count; i++) {
+        capacity += settings->name_lens[i] * 2 + strlen("={:String},");
+    }
+
+    char* query = not_null(malloc(capacity));
+    char* at    = query;
+    memcpy(at, "SET ", strlen("SET "));
+    at += strlen("SET ");
+    for (size_t i = 0; i < settings->count; i++) {
+        if (i) {
+            *at++ = ',';
+        }
+        memcpy(at, settings->names[i], settings->name_lens[i]);
+        at += settings->name_lens[i];
+        *at++ = '=';
+        *at++ = '{';
+        memcpy(at, settings->names[i], settings->name_lens[i]);
+        at += settings->name_lens[i];
+        memcpy(at, ":String}", strlen(":String}"));
+        at += strlen(":String}");
+    }
+    *at = '\0';
+
+    chdb_result* result = chdb_query_with_params_n(
+        conn,
+        query,
+        (size_t)(at - query),
+        native_format,
+        sizeof(native_format) - 1,
+        settings->names,
+        settings->name_lens,
+        settings->values,
+        settings->value_lens,
+        settings->count
+    );
+    const char* error = chdb_result_error(result);
+    int status        = error ? EXIT_FAILURE : EXIT_SUCCESS;
+
+    if (error) {
+        fprintf(stderr, "%s\n", error);
+    }
+    chdb_destroy_query_result(result);
+    free(query);
+
+    return status;
+}
+
 int
 main(void) {
     size_t len;
@@ -351,23 +434,8 @@ main(void) {
     uint16_t max_parsers = take2(&cur);
     str timezone         = take_str(&cur);
     str query            = take_str(&cur);
-    uint16_t npar        = take2(&cur);
-
-    size_t nalloc       = npar ? npar : 1;
-    const char** names  = not_null(calloc(nalloc, sizeof(*names)));
-    size_t* name_lens   = not_null(calloc(nalloc, sizeof(*name_lens)));
-    const char** values = not_null(calloc(nalloc, sizeof(*values)));
-    size_t* value_lens  = not_null(calloc(nalloc, sizeof(*value_lens)));
-    for (uint16_t i = 0; i < npar; i++) {
-        str name  = take_str(&cur);
-        str value = take_str(&cur);
-
-        names[i]      = name.data;
-        name_lens[i]  = name.len;
-        values[i]     = value.data;
-        value_lens[i] = value.len;
-    }
-    params par = { names, name_lens, values, value_lens, npar };
+    params par             = take_params(&cur);
+    params format_settings = take_params(&cur);
 
     /*
      * chDB's own handlers would unwind on a fatal signal, and the unwinder is
@@ -385,6 +453,10 @@ main(void) {
      * an initial query. https://github.com/chdb-io/chdb-core/issues/191
      */
     int status = setup_session(*conn, max_mem, max_threads, max_parsers, timezone);
+
+    if (!status) {
+        status = setup_format_settings(*conn, &format_settings);
+    }
 
     if (!status) {
         switch (cmd_type) {

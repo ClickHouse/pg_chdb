@@ -52,6 +52,17 @@ make_ch_query(
     const char** values
 );
 
+/* Start a helper with the query parameters and this COPY's format settings. */
+static chdbHelper*
+start_copy_helper(
+    chdbCopyContext* ctx,
+    chdbHelperContext* hcx,
+    const char* query,
+    const char* const* names,
+    const char* const* values,
+    size_t nparams
+);
+
 /* Parses `url` into `parts`. */
 static void
 parse_azure_url(chdbCopyContext*, azureURLParts* parts);
@@ -139,6 +150,43 @@ format_lacks_time64(const char* format) {
     return false;
 }
 
+static chdbHelper*
+start_copy_helper(
+    chdbCopyContext* ctx,
+    chdbHelperContext* hcx,
+    const char* query,
+    const char* const* names,
+    const char* const* values,
+    size_t nparams
+) {
+    size_t nsettings = list_length(ctx->settings);
+    const char** setting_names = nsettings ? palloc(sizeof(*setting_names) * nsettings)
+                                           : NULL;
+    const char** setting_values =
+        nsettings ? palloc(sizeof(*setting_values) * nsettings) : NULL;
+    size_t i = 0;
+    ListCell* lc;
+
+    foreach (lc, ctx->settings) {
+        chdbSetting* setting = lfirst(lc);
+
+        setting_names[i]  = setting->name;
+        setting_values[i] = setting->value;
+        i++;
+    }
+
+    return chdb_helper_start(
+        hcx,
+        query,
+        names,
+        values,
+        nparams,
+        setting_names,
+        setting_values,
+        nsettings
+    );
+}
+
 uint64_t
 chdb_copy(chdbCopyContext* ctx) {
     /*
@@ -177,7 +225,7 @@ chdb_copy(chdbCopyContext* ctx) {
         .max_parsers = ctx->max_parsers,
     };
     chdbHelper* helper =
-        chdb_helper_start(&hcx, ch_query.data, names, values, param_count);
+        start_copy_helper(ctx, &hcx, ch_query.data, names, values, param_count);
     uint64_t num_rows =
         ctx->cmd_type == CHDB_CMD_SELECT
             ? chdb_copy_receive(
@@ -211,15 +259,16 @@ chdb_describe(chdbCopyContext* ctx) {
     }
     initStringInfo(&ch_query);
 
-    size_t param_count    = make_ch_query(&describe, &ch_query, names, values);
+    size_t param_count = make_ch_query(&describe, &ch_query, names, values);
     chdbHelperContext hcx = {
         .cmd         = describe.cmd_type,
         .max_memory  = describe.max_memory,
         .max_threads = describe.max_threads,
         .max_parsers = describe.max_parsers,
     };
-    chdbHelper* helper =
-        chdb_helper_start(&hcx, ch_query.data, names, values, param_count);
+    chdbHelper* helper = start_copy_helper(
+        &describe, &hcx, ch_query.data, names, values, param_count
+    );
     List* columns = chdb_native_describe(helper);
 
     chdb_helper_finish(helper);
@@ -459,6 +508,18 @@ make_ch_query(
                 appendStringInfoString(&params, ", ");
             }
             appendStringInfo(&params, "%s: \"%s\"", names[j], values[j]);
+            first = false;
+        }
+        ListCell* lc;
+        foreach (lc, ctx->settings) {
+            chdbSetting* setting = lfirst(lc);
+
+            if (!first) {
+                appendStringInfoString(&params, ", ");
+            }
+            appendStringInfo(
+                &params, "%s: \"%s\"", setting->name, setting->value
+            );
             first = false;
         }
 
