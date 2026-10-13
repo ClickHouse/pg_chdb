@@ -18,10 +18,14 @@ All notable changes to this project will be documented in this file. It uses the
     that of `pgchdb_version()` ([#106])
 *   Changed the default `max_memory` GUCs values to 4 GB. Previously chDB had
     no default memory limit.
+*   Add ClickHouse format settings as `COPY` options, including PostgreSQL
+    mappings and shorter aliases that omit the `format_` prefix ([#105]).
 
   [v0.1.4]: https://github.com/clickhouse/pg_chdb/compare/v0.1.3...v0.1.4
   [#105]: https://github.com/ClickHouse/pg_chdb/pull/105
-    "ClickHouse/pg_chdb#105 Add `chdb_hook.control` and `chdb_hook_version()`"
+    "ClickHouse/pg_chdb#105 Add support for ClickHouse format settings"
+  [#106]: https://github.com/ClickHouse/pg_chdb/pull/106
+    "ClickHouse/pg_chdb#106 Add `chdb_hook.control` and `chdb_hook_version()`"
 
 ## [v0.1.3] 2026-10-08
 

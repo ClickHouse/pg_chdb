@@ -26,6 +26,29 @@ TRUNCATE requests;
 COPY requests FROM :'requests_out';
 SELECT * FROM requests ORDER BY req_id;
 
+-- PostgreSQL COPY aliases become per-query ClickHouse format settings.
+\set delimited_out :temp_base /delimited.csv
+COPY requests TO :'delimited_out' (format 'CSV', delimiter '|');
+TRUNCATE requests;
+COPY requests FROM :'delimited_out' (format 'CSV', delimiter '|');
+SELECT * FROM requests ORDER BY req_id \g (format=csv)
+
+-- Format settings apply only to the operation that specifies them.
+\set isolated_delimited_out :temp_base /isolated-delimited.csv
+\set isolated_default_out :temp_base /isolated-default.csv
+COPY requests TO :'isolated_delimited_out' (format 'CSV', delimiter '|');
+COPY requests TO :'isolated_default_out' (format 'CSV');
+COPY (
+    SELECT split_part(
+        pg_read_file('/tmp/file.tmp/isolated-delimited.csv'), E'\n', 1
+    )
+) TO STDOUT;
+COPY (
+    SELECT split_part(
+        pg_read_file('/tmp/file.tmp/isolated-default.csv'), E'\n', 1
+    )
+) TO STDOUT;
+
 -- Test importing from ClickHouse with all possible backslash escapes.
 -- https://clickhouse.com/docs/interfaces/formats/TabSeparated
 CREATE TABLE people (

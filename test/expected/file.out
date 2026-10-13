@@ -39,6 +39,39 @@ SELECT * FROM requests ORDER BY req_id;
       4 | add_to_cart | /products/shoes
 (4 rows)
 
+-- PostgreSQL COPY aliases become per-query ClickHouse format settings.
+\set delimited_out :temp_base /delimited.csv
+COPY requests TO :'delimited_out' (format 'CSV', delimiter '|');
+COPY 4
+TRUNCATE requests;
+TRUNCATE TABLE
+COPY requests FROM :'delimited_out' (format 'CSV', delimiter '|');
+COPY 4
+SELECT * FROM requests ORDER BY req_id \g (format=csv)
+req_id,name,path
+1,page_view,/users/profile
+2,Page_View,/users/settings
+3,PAGE_VIEW,/admin/dashboard
+4,add_to_cart,/products/shoes
+-- Format settings apply only to the operation that specifies them.
+\set isolated_delimited_out :temp_base /isolated-delimited.csv
+\set isolated_default_out :temp_base /isolated-default.csv
+COPY requests TO :'isolated_delimited_out' (format 'CSV', delimiter '|');
+COPY 4
+COPY requests TO :'isolated_default_out' (format 'CSV');
+COPY 4
+COPY (
+    SELECT split_part(
+        pg_read_file('/tmp/file.tmp/isolated-delimited.csv'), E'\n', 1
+    )
+) TO STDOUT;
+1|"page_view"|"/users/profile"
+COPY (
+    SELECT split_part(
+        pg_read_file('/tmp/file.tmp/isolated-default.csv'), E'\n', 1
+    )
+) TO STDOUT;
+1,"page_view","/users/profile"
 -- Test importing from ClickHouse with all possible backslash escapes.
 -- https://clickhouse.com/docs/interfaces/formats/TabSeparated
 CREATE TABLE people (

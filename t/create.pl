@@ -26,10 +26,14 @@ my $file_query = q{DESCRIBE TABLE file({path:String}, {format:String}, {structur
 FILE: {
     check_query(
         $node, 'structure_from file',
-        qq{CREATE TABLE inferred () WITH (structure_from = 'file://$dir/nonesuch.csv')},
+        qq{
+            CREATE TABLE inferred () WITH (
+                structure_from = 'file://$dir/nonesuch.csv', delimiter = '|'
+            )
+        },
         qr[Cannot stat file .*nonesuch\.csv],
         qr[\Q$file_query],
-        qr[\Q{ path: "$dir/nonesuch.csv", format: "auto", structure: "auto" }],
+        qr[\Q{ path: "$dir/nonesuch.csv", format: "auto", structure: "auto", format_csv_delimiter: "|" }],
     );
 
     # Infer columns before copying rows

@@ -28,7 +28,7 @@ Fetch server log lines since the last fetch.
 
 Compare the log lines immediately following an "executing chDB query" log line.
 The first should contain the chDB query with placeholders. The second should map
-the placeholders to values.
+the placeholders and per-operation settings to values.
 
 =cut
 

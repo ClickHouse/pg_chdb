@@ -360,6 +360,49 @@ converting chDB String and JSON values. One of:
     encodings
 *   `truncate` truncates the text at the first invalid byte
 
+### ClickHouse format settings
+
+`COPY` accepts ClickHouse [format settings] as options. Where PostgreSQL
+already names the same behavior, use the PostgreSQL option; for example,
+`delimiter` maps to `format_csv_delimiter`. These PostgreSQL-compatible
+mappings are maintained in
+[`setting_aliases`](../src/hook/format_settings.c#L20-L25).
+
+Otherwise, use the canonical ClickHouse setting name. Settings whose names
+start with `format_` also have a shorter alias without that prefix. For
+example, these two options are equivalent:
+
+```sql
+COPY users TO 'file:///tmp/users.csv' (
+    format 'CSV',
+    csv_allow_single_quotes false
+);
+
+COPY users TO 'file:///tmp/users.csv' (
+    format 'CSV',
+    format_csv_allow_single_quotes false
+);
+```
+
+Aliases are normalized to the canonical ClickHouse name before execution.
+A setting may be specified only once, whether by its canonical name or an
+alias. chDB validates setting names and values. Each setting applies only to
+the isolated chDB operation for that `COPY` or `CREATE TABLE`; it does not
+change later operations.
+
+chdb_hook maintains the `format_` setting list to recognize aliases after that
+prefix is removed, and the unprefixed setting list because those names cannot
+otherwise be distinguished from PostgreSQL options or storage parameters.
+
+Settings controlled by chdb_hook for Native transport, session representation,
+or security cannot be changed. Their canonical names and setting-family
+prefixes are maintained in
+[`protected_settings`](../src/hook/format_settings.c#L118-L124). When pg_chdb
+starts controlling another setting, add it to that array.
+
+PostgreSQL limits option names to 63 bytes. `setting_aliases` also provides
+shorter names for ClickHouse settings that exceed this limit.
+
 ### Debugging
 
 On error, the chdb_hook `COPY` command includes the [chDB] query it attempted
@@ -437,7 +480,8 @@ which do not identify their original ClickHouse types.
 
 Both options support the same [URL schemes](#url-schemes) and
 [options](#options) as `COPY`; credentials, format, compression, timeout, and
-even an explicit [structure](#structure) all apply. Postgres keeps whatever
+even an explicit [structure](#structure) and [ClickHouse format
+settings](#clickhouse-format-settings) all apply. Postgres keeps whatever
 storage parameters remain:
 
 ```sql
@@ -841,6 +885,8 @@ Copyright (c) 2026, ClickHouse
     "ClickHouse Docs: DESCRIBE TABLE"
   [formats]: https://github.com/chdb-io/chdb/blob/main/refs/clickhouse-formats-settings.md#complete-format-names-table
     "chDB Docs: Complete Format Names Table"
+  [format settings]: https://clickhouse.com/docs/reference/settings/formats
+    "ClickHouse Docs: Format Settings"
   [access key ID and access secret]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
     "AWS Identity and Access Management: Manage access keys for IAM users"
   [HMAC key and secret]: https://docs.cloud.google.com/storage/docs/authentication/hmackeys

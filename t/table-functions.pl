@@ -327,11 +327,157 @@ subtest file => sub {
     );
 
     check_query(
+        $node, 'FROM with format setting aliases',
+        qq{
+            COPY stuff FROM 'file://$dir/nonesuch.csv' (
+                format 'CSV', delimiter '|', csv_allow_single_quotes false
+            )
+        },
+        qr/nonesuch.csv doesn't exist/,
+        qr[\QSELECT * FROM file({path:String}, {format:String}, {structure:String})],
+        qr[\Q{ path: "$dir/nonesuch.csv", format: "CSV", structure: "id Nullable(Int32)", format_csv_delimiter: "|", format_csv_allow_single_quotes: "false" }],
+    );
+
+    local $@;
+    eval {
+        $node->safe_psql(
+            postgres => qq{
+                COPY stuff FROM 'file://$dir/nonesuch.csv' (
+                    delimiter '|', csv_delimiter ','
+                )
+            }
+        )
+    };
+    like $@,
+        qr/Options "delimiter" and "csv_delimiter" both set ClickHouse setting "format_csv_delimiter"/,
+        'Reject aliases for the same setting';
+
+    $@ = undef;
+    eval {
+        $node->safe_psql(
+            postgres => qq{
+                COPY stuff FROM 'file://$dir/nonesuch.csv' (
+                    csv_allow_single_quotes false,
+                    format_csv_allow_single_quotes true
+                )
+            }
+        )
+    };
+    like $@,
+        qr/chdb: conflicting or redundant format settings.*Options "csv_allow_single_quotes" and "format_csv_allow_single_quotes" both set ClickHouse setting "format_csv_allow_single_quotes"/s,
+        'Reject an alias combined with its canonical setting name';
+
+    check_query(
+        $node, 'unprefixed format setting',
+        qq{
+            COPY stuff FROM 'file://$dir/nonesuch.csv' (
+                precise_float_parsing true
+            )
+        },
+        qr/nonesuch.csv doesn't exist/,
+        qr[\QSELECT * FROM file({path:String}, {format:String}, {structure:String})],
+        qr[\Q{ path: "$dir/nonesuch.csv", format: "auto", structure: "id Nullable(Int32)", precise_float_parsing: "true" }],
+    );
+
+    $@ = undef;
+    eval {
+        $node->safe_psql(
+            postgres => qq{
+                COPY stuff FROM 'file://$dir/nonesuch.csv' (
+                    "input_format_foo;bar" true
+                )
+            }
+        )
+    };
+    like $@, qr/chdb: option "input_format_foo;bar" not supported/,
+        'Reject an unsafe generic format setting name';
+    unlike join("\n", server_log($node)), qr/executing chDB query/,
+        'Should not send an unsafe format setting name to the helper';
+
+    check_query(
+        $node, 'invalid format setting name',
+        qq{
+            COPY stuff FROM 'file://$dir/nonesuch.csv' (
+                input_format_pg_chdb_unknown true
+            )
+        },
+        qr/Unknown setting 'input_format_pg_chdb_unknown'/,
+        qr[\QSELECT * FROM file({path:String}, {format:String}, {structure:String})],
+        qr[\Q{ path: "$dir/nonesuch.csv", format: "auto", structure: "id Nullable(Int32)", input_format_pg_chdb_unknown: "true" }],
+    );
+
+    check_query(
+        $node, 'invalid format setting value',
+        qq{
+            COPY stuff FROM 'file://$dir/nonesuch.csv' (
+                csv_allow_single_quotes 'not-bool'
+            )
+        },
+        qr/Cannot parse bool from string 'not-bool'/,
+        qr[\QSELECT * FROM file({path:String}, {format:String}, {structure:String})],
+        qr[\Q{ path: "$dir/nonesuch.csv", format: "auto", structure: "id Nullable(Int32)", format_csv_allow_single_quotes: "not-bool" }],
+    );
+
+    check_query(
+        $node, 'quote in format setting value',
+        qq{
+            COPY stuff FROM 'file://$dir/nonesuch.csv' (
+                csv_null_representation 'not''null'
+            )
+        },
+        qr/nonesuch.csv doesn't exist/,
+        qr[\QSELECT * FROM file({path:String}, {format:String}, {structure:String})],
+        qr[\Q{ path: "$dir/nonesuch.csv", format: "auto", structure: "id Nullable(Int32)", format_csv_null_representation: "not'null" }],
+    );
+
+    $@ = undef;
+    eval {
+        $node->safe_psql(
+            postgres => qq{
+                COPY stuff FROM 'file://$dir/nonesuch.csv' (
+                    output_format_native_write_json_as_string false
+                )
+            }
+        )
+    };
+    like $@,
+        qr/ClickHouse setting "output_format_native_write_json_as_string" is managed internally/,
+        'Reject a setting in a family owned by pg_chdb';
+
+    $@ = undef;
+    eval {
+        $node->safe_psql(
+            postgres => qq{
+                COPY stuff FROM 'file://$dir/nonesuch.csv' (
+                    date_time_output_format 'iso'
+                )
+            }
+        )
+    };
+    like $@,
+        qr/ClickHouse setting "date_time_output_format" is managed internally/,
+        'Reject an individual setting owned by pg_chdb';
+
+    check_query(
         $node, 'just TO file',
         qq{COPY stuff TO 'file://$dir/nonesuch.csv'},
         qr/^$/,
         qr[\QINSERT INTO FUNCTION file({path:String}, {format:String}, {structure:String}) SETTINGS engine_file_truncate_on_insert=1],
         qr[\Q{ path: "$dir/nonesuch.csv", format: "auto", structure: "id Nullable(Int32)" }],
+    );
+
+    check_query(
+        $node, 'COPY TO with canonical and long-alias format settings',
+        qq{
+            COPY stuff TO 'file://$dir/canonical.csv' (
+                format 'CSV',
+                format_csv_allow_double_quotes false,
+                date_time_64_cut_trailing_zeros_align_to_groups_of_thousands true
+            )
+        },
+        qr/^$/,
+        qr[\QINSERT INTO FUNCTION file({path:String}, {format:String}, {structure:String}) SETTINGS engine_file_truncate_on_insert=1],
+        qr[\Q{ path: "$dir/canonical.csv", format: "CSV", structure: "id Nullable(Int32)", format_csv_allow_double_quotes: "false", date_time_64_output_format_cut_trailing_zeros_align_to_groups_of_thousands: "true" }],
     );
 
     is slurp_file("$dir/nonesuch.csv"), '', 'File should exist but be empty';
