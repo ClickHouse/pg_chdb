@@ -19,6 +19,11 @@ All notable changes to this project will be documented in this file. It uses the
 *   Changed the default `max_memory` GUCs values to 4 GB. Previously chDB had
     no default memory limit.
 
+### 📚 Documentation
+
+*   Documented the maximum allowed values for the `max_memory`, `max_threads,
+    and `max_parsing_threads` GUCs.
+
   [v0.1.4]: https://github.com/clickhouse/pg_chdb/compare/v0.1.3...v0.1.4
   [#105]: https://github.com/ClickHouse/pg_chdb/pull/105
     "ClickHouse/pg_chdb#105 Add `chdb_hook.control` and `chdb_hook_version()`"
