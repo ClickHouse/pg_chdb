@@ -43,6 +43,7 @@ typedef struct chdbCopyContext {
     const char* access_key;
     const char* access_secret;
     const char* session_token;
+    const char* role_arn; /* AWS role to assume with the host's credentials */
     const char* format;
     const char* structure;
     const char* compression;
@@ -50,10 +51,11 @@ typedef struct chdbCopyContext {
 } chdbCopyContext;
 
 /*
- * GUC that lets members of a role use the cloud credentials of the host.
+ * GUCs that let members of a role use the cloud credentials of the host.
  * Defined in hook.c.
  */
 extern char* chdb_host_credentials_roles;
+extern char* chdb_s3_role_arn;
 
 /*
  * Number of table function options in chdbCopyContext +2 for Azure URL

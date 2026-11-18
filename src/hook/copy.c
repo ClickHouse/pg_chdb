@@ -241,6 +241,44 @@ chdb_describe(chdbCopyContext* ctx) {
 #define AWS_HOST ".amazonaws.com"
 
 /*
+ * True for an AWS IAM role ARN: arn:{partition}:iam::{12 digits}:role/{path}.
+ * The characters allowed need no quoting in a ClickHouse string literal.
+ */
+static bool
+is_role_arn(const char* arn) {
+    const char* p = arn;
+
+    if (strncmp(p, "arn:aws", 7) != 0) {
+        return false;
+    }
+    for (p += 7; *p != ':'; p++) {
+        if (!((*p >= 'a' && *p <= 'z') || *p == '-')) {
+            return false;
+        }
+    }
+    if (strncmp(p, ":iam::", 6) != 0) {
+        return false;
+    }
+    p += 6;
+    for (int n = 0; n < 12; n++, p++) {
+        if (*p < '0' || *p > '9') {
+            return false;
+        }
+    }
+    if (strncmp(p, ":role/", 6) != 0 || p[6] == '\0') {
+        return false;
+    }
+    for (p += 6; *p; p++) {
+        if (!((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') ||
+              (*p >= '0' && *p <= '9') || strchr("+=,.@_/-", *p))) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+/*
  * True when the current user has the privileges of a role named by
  * chdb_hook.host_credentials_roles, and so may use the cloud credentials of
  * the host. Names of roles that do not exist allow no one.
@@ -262,6 +300,47 @@ may_use_host_credentials(void) {
     }
 
     return false;
+}
+
+/*
+ * Decides how an S3 request without keys is signed. Returns false for an
+ * anonymous request. Returns true when the current user may use the
+ * credentials of the host, and sets `*role_arn` to the AWS role to assume with
+ * them, or to NULL for none. Raises when a role is named but may not be used.
+ */
+static bool
+s3_host_credentials(chdbCopyContext* ctx, const char** role_arn) {
+    bool named = ctx->role_arn[0] != '\0';
+
+    if (!may_use_host_credentials()) {
+        if (named) {
+            ereport(
+                ERROR,
+                errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
+                errmsg("chdb: permission denied to use option \"role_arn\""),
+                errdetail(
+                    "Only roles with privileges of a role named by "
+                    "\"chdb_hook.host_credentials_roles\" may use the cloud "
+                    "credentials of the server."
+                )
+            );
+        }
+        return false;
+    }
+
+    *role_arn = named                                     ? ctx->role_arn
+                : chdb_s3_role_arn && chdb_s3_role_arn[0] ? chdb_s3_role_arn
+                                                          : NULL;
+    if (*role_arn && !is_role_arn(*role_arn)) {
+        ereport(
+            ERROR,
+            errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+            errmsg("chdb: \"%s\" is not an AWS IAM role ARN", *role_arn),
+            errhint("Expected the form arn:aws:iam::123456789012:role/name.")
+        );
+    }
+
+    return true;
 }
 
 /* Truncate on insert changes nothing outside INSERT INTO FUNCTION */
@@ -294,7 +373,18 @@ make_ch_query(
      * Use `SETTINGS max_block_size = N` to set it per-query.
      */
 
-    size_t i = 0;
+    size_t i             = 0;
+    const char* role_arn = NULL;
+
+    if (ctx->role_arn[0] != '\0' &&
+        (ctx->scheme != s3_scheme || ctx->access_key[0] != '\0')) {
+        ereport(
+            ERROR,
+            errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+            errmsg("chdb: option \"role_arn\" requires an S3 URL and no \"access_key\"")
+        );
+    }
+
     /* chDB infers a format the copy did not name from the file extension. */
     const char* format = ctx->format[0] ? ctx->format : "auto";
 
@@ -348,12 +438,18 @@ make_ch_query(
             if (ctx->session_token[0] != '\0' && ctx->scheme == s3_scheme) {
                 PARAM(", {session_token:String}", "session_token", ctx->session_token);
             }
-        } else if (ctx->scheme == s3_scheme && may_use_host_credentials()) {
+        } else if (ctx->scheme == s3_scheme && s3_host_credentials(ctx, &role_arn)) {
             /*
              * Without NOSIGN chDB signs with the credentials it finds on the
-             * host. gcs() and azureBlobStorage() can take the same gate once
-             * chDB resolves host credentials for them.
+             * host, and assumes the role with them if there is one. gcs() and
+             * azureBlobStorage() can take the same gate once chDB resolves
+             * host credentials for them.
              */
+            if (role_arn) {
+                appendStringInfo(
+                    query, ", extra_credentials(role_arn = '%s')", role_arn
+                );
+            }
         } else {
             appendStringInfoString(query, ", NOSIGN");
         }

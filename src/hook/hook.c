@@ -101,9 +101,11 @@ static int chdb_max_parsers = 0;
  * cloud credentials of the host (instance or workload identity, environment,
  * config files) instead of passing keys. Empty, the default, means no one may,
  * and requests without keys are anonymous. The gate is not specific to a
- * cloud; so far only S3 URLs act on it.
+ * cloud; so far only S3 URLs act on it, where chdb_hook.s3_role_arn or the
+ * role_arn option names a role to assume with those credentials.
  */
 char* chdb_host_credentials_roles = NULL;
+char* chdb_s3_role_arn            = NULL;
 
 /*
  * _PG_init is the entry-point for the library.
@@ -124,6 +126,18 @@ _PG_init(void) {
         "",
         PGC_SUSET,
         GUC_LIST_INPUT,
+        NULL,
+        NULL,
+        NULL
+    );
+    DefineCustomStringVariable(
+        "chdb_hook.s3_role_arn",
+        "AWS role to assume with the host credentials when a command names none.",
+        "Used only by members of chdb_hook.host_credentials_roles, for S3 URLs.",
+        &chdb_s3_role_arn,
+        "",
+        PGC_USERSET,
+        0,
         NULL,
         NULL,
         NULL
@@ -305,6 +319,7 @@ contextualize_options(chdbCopyContext* ctx, List* options, List** others) {
     ctx->access_key     = "";
     ctx->access_secret  = "";
     ctx->session_token  = "";
+    ctx->role_arn       = "";
     ctx->format         = "";
     ctx->structure      = "";
     ctx->compression    = "";
@@ -319,6 +334,8 @@ contextualize_options(chdbCopyContext* ctx, List* options, List** others) {
             ctx->access_secret = defGetString(elem);
         } else if (strcmp(elem->defname, "session_token") == 0) {
             ctx->session_token = defGetString(elem);
+        } else if (strcmp(elem->defname, "role_arn") == 0) {
+            ctx->role_arn = defGetString(elem);
         } else if (strcmp(elem->defname, "format") == 0) {
             ctx->format = defGetString(elem);
         } else if (strcmp(elem->defname, "structure") == 0) {
