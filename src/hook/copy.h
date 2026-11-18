@@ -38,6 +38,7 @@ typedef struct chdbCopyContext {
     uint16_t max_threads;    /* max_threads, 0 for auto */
     uint16_t max_parsers;    /* max_parsing_threads, 0 for auto */
     uint16_t encoding_check; /* encoding error handling, 0 for fail */
+    bool host_credentials;   /* user may use the host's cloud credentials */
     /* Table function options; keep in sync with CHDB_MAX_TABLEFUNC_ARGS. */
     const char* url;
     const char* access_key;

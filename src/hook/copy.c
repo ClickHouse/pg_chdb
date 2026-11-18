@@ -171,10 +171,11 @@ chdb_copy(chdbCopyContext* ctx) {
 
     /* Hand off to the helper. */
     chdbHelperContext hcx = {
-        .cmd         = ctx->cmd_type,
-        .max_memory  = ctx->max_memory,
-        .max_threads = ctx->max_threads,
-        .max_parsers = ctx->max_parsers,
+        .cmd              = ctx->cmd_type,
+        .max_memory       = ctx->max_memory,
+        .max_threads      = ctx->max_threads,
+        .max_parsers      = ctx->max_parsers,
+        .host_credentials = ctx->host_credentials,
     };
     chdbHelper* helper =
         chdb_helper_start(&hcx, ch_query.data, names, values, param_count);
@@ -213,10 +214,11 @@ chdb_describe(chdbCopyContext* ctx) {
 
     size_t param_count    = make_ch_query(&describe, &ch_query, names, values);
     chdbHelperContext hcx = {
-        .cmd         = describe.cmd_type,
-        .max_memory  = describe.max_memory,
-        .max_threads = describe.max_threads,
-        .max_parsers = describe.max_parsers,
+        .cmd              = describe.cmd_type,
+        .max_memory       = describe.max_memory,
+        .max_threads      = describe.max_threads,
+        .max_parsers      = describe.max_parsers,
+        .host_credentials = describe.host_credentials,
     };
     chdbHelper* helper =
         chdb_helper_start(&hcx, ch_query.data, names, values, param_count);
@@ -322,12 +324,10 @@ make_ch_query(
             if (ctx->session_token[0] != '\0' && ctx->scheme == s3_scheme) {
                 PARAM(", {session_token:String}", "session_token", ctx->session_token);
             }
-        } else {
+        } else if (ctx->scheme != s3_scheme || !ctx->host_credentials) {
             /*
-             * Consider adding a superuser-only GUC to allow using environment
-             * or file credentials. If enabled we'd simply omit this parameter
-             * and append the `s3_allow_server_credentials_in_user_queries=1`
-             * setting.
+             * Without NOSIGN chDB signs an S3 request with the credentials it
+             * finds on the host, which it resolves for AWS alone.
              */
             appendStringInfoString(query, ", NOSIGN");
         }

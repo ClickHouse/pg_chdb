@@ -23,6 +23,7 @@
 #include "utils/rls.h"
 
 #include "../gucs.h"
+#include "../helper.h"
 #include "copy.h"
 #include "create.h"
 
@@ -95,6 +96,13 @@ static char const* const scheme_name[no_scheme][4] = {
 static int chdb_max_memory  = 4096; /* MB */
 static int chdb_max_threads = 0;
 static int chdb_max_parsers = 0;
+
+/*
+ * Members of the roles named by chdb_hook.host_credentials_roles may use the
+ * cloud credentials of the host instead of passing keys. Empty, the default,
+ * means none may, and requests without keys are anonymous.
+ */
+static char* chdb_host_credentials_roles = NULL;
 
 /*
  * _PG_init is the entry-point for the library.
@@ -456,6 +464,8 @@ chDBProcessUtilityHook(
                 .max_memory  = (uint16_t)chdb_max_memory,
                 .max_threads = (uint16_t)chdb_max_threads,
                 .max_parsers = (uint16_t)chdb_max_parsers,
+                .host_credentials =
+                    chdb_may_use_host_credentials(chdb_host_credentials_roles),
             };
 
             open_copy_relation(copy, &ctx);
@@ -484,6 +494,8 @@ chDBProcessUtilityHook(
             .max_memory  = (uint16_t)chdb_max_memory,
             .max_threads = (uint16_t)chdb_max_threads,
             .max_parsers = (uint16_t)chdb_max_parsers,
+            .host_credentials =
+                chdb_may_use_host_credentials(chdb_host_credentials_roles),
         };
 
         /* Reject read-only transaction before requesting remote schema */

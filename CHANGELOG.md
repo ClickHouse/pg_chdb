@@ -18,11 +18,17 @@ All notable changes to this project will be documented in this file. It uses the
     that of `pgchdb_version()` ([#106])
 *   Changed the default `max_memory` GUCs values to 4 GB. Previously chDB had
     no default memory limit.
+*   Added the `chdb.host_credentials_roles` and
+    `chdb_hook.host_credentials_roles` settings. Members of the roles they
+    name may use the cloud credentials of the PostgreSQL host, currently AWS
+    credentials for S3, rather than pass keys. Empty by default, so requests
+    without keys stay anonymous.
 
-### 📚 Documentation
+### ⚠️ Breaking Changes
 
-*   Documented the maximum allowed values for the `max_memory`, `max_threads,
-    and `max_parsing_threads` GUCs.
+*   `chdb_query()` no longer lets every caller use the AWS credentials of the
+    PostgreSQL host. chDB now starts with them hidden unless the caller is a
+    member of a role named by `chdb.host_credentials_roles`.
 
   [v0.1.4]: https://github.com/clickhouse/pg_chdb/compare/v0.1.3...v0.1.4
   [#105]: https://github.com/ClickHouse/pg_chdb/pull/105

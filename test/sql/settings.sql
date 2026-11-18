@@ -83,3 +83,60 @@ SET chdb.max_parsing_threads = 65536;
 SET chdb_hook.max_memory = 2147483648;
 SET chdb_hook.max_threads = 65536;
 SET chdb_hook.max_parsing_threads = 65536;
+
+-- Clean up after any previous failed run.
+SET client_min_messages = error;
+DROP ROLE IF EXISTS chdb_cloud;
+DROP ROLE IF EXISTS "chDB Cloud";
+DROP ROLE IF EXISTS chdb_nobody;
+RESET client_min_messages;
+CREATE ROLE chdb_cloud;
+CREATE ROLE "chDB Cloud";
+CREATE ROLE chdb_nobody;
+
+PREPARE show_roles AS
+    SELECT 'chdb' AS extension,
+        current_setting('chdb.host_credentials_roles') AS roles
+    UNION SELECT 'chdb_hook',
+        current_setting('chdb_hook.host_credentials_roles')
+    ORDER BY extension;
+
+-- No role may use host credentials by default.
+EXECUTE show_roles;
+
+-- Name roles, quoted where they need it.
+SET chdb.host_credentials_roles = 'chdb_cloud, "chDB Cloud"';
+SET chdb_hook.host_credentials_roles = '"chDB Cloud"';
+EXECUTE show_roles;
+
+-- Reject lists that do not parse.
+SET chdb.host_credentials_roles = '"chDB Cloud';
+SET chdb_hook.host_credentials_roles = 'chdb_cloud,,chdb_nobody';
+
+-- Reject roles that do not exist.
+SET chdb.host_credentials_roles = 'no_such_role';
+SET chdb_hook.host_credentials_roles = 'chdb_cloud, no_such_role';
+SET chdb.host_credentials_roles = 'chdb cloud';
+EXECUTE show_roles;
+
+-- A setting stored for a later session only notes a role that does not exist.
+ALTER ROLE chdb_nobody SET chdb.host_credentials_roles = 'no_such_role';
+ALTER ROLE chdb_nobody RESET chdb.host_credentials_roles;
+
+-- Only a superuser may name the roles.
+SET ROLE chdb_nobody;
+SET chdb.host_credentials_roles = 'chdb_nobody';
+SET chdb_hook.host_credentials_roles = 'chdb_nobody';
+RESET chdb.host_credentials_roles;
+RESET chdb_hook.host_credentials_roles;
+RESET ROLE;
+EXECUTE show_roles;
+
+-- Empty the lists.
+SET chdb.host_credentials_roles = '';
+RESET chdb_hook.host_credentials_roles;
+EXECUTE show_roles;
+
+DROP ROLE chdb_cloud;
+DROP ROLE "chDB Cloud";
+DROP ROLE chdb_nobody;

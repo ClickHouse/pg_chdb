@@ -90,6 +90,31 @@ chDB byte strings map to Postgres `text`, `bytea`, and other types.
 
 ## Settings
 
+### `chdb.host_credentials_roles`
+
+```sql
+SET chdb.host_credentials_roles = 'loaders, "S3 Users"';
+```
+
+A comma-separated list of roles whose members may use the cloud credentials
+of the PostgreSQL host in `chdb_query()`. Quote names as SQL identifiers where
+they need it. Requires superuser privileges, and every role named must exist.
+Defaults to an empty list.
+
+chDB currently uses only AWS credentials on the host. For a list member, a
+function such as `s3()` called without keys and without `NOSIGN` uses the
+credentials chDB finds as the AWS SDK does: environment variables such as
+`AWS_ACCESS_KEY_ID`, the files named by `AWS_SHARED_CREDENTIALS_FILE` and
+`AWS_CONFIG_FILE`, a web identity token, or the instance or container metadata
+service. If it finds none, the request is anonymous.
+
+For every other role chDB starts with those credentials hidden, rending such a
+request anonymous. A role dropped since it was included in the list will be
+considered anonymous in subsequent queries.
+
+Grant the listed roles with care: their members act with whatever the host's
+credentials allow.
+
 ### `chdb.max_memory`
 
 ```sql

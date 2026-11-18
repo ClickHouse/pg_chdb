@@ -16,6 +16,11 @@ typedef struct chdbHelperContext {
     uint16_t max_memory;  /* max_memory_usage setting in MB, 0 for none */
     uint16_t max_threads; /* max_threads setting, 0 for none */
     uint16_t max_parsers; /* max_parsing_threads setting, 0 for none */
+    /*
+     * Whether the helper may see the cloud credentials of the host. Decided by
+     * the backend and applied to the helper's environment; not in the payload.
+     */
+    bool host_credentials;
 } chdbHelperContext;
 
 /*

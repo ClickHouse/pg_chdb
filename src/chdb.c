@@ -32,6 +32,12 @@ static int chdb_max_threads = 0;
 static int chdb_max_parsers = 0;
 
 /*
+ * Members of the roles named by chdb.host_credentials_roles may use the cloud
+ * credentials of the host in chdb_query(). Empty, the default, means none may.
+ */
+static char* chdb_host_credentials_roles = NULL;
+
+/*
  * _PG_init is the entry-point for the library.
  */
 void
@@ -97,10 +103,11 @@ chdb_query(PG_FUNCTION_ARGS) {
 
     /* Hand off to the helper. */
     chdbHelperContext ctx = {
-        .cmd         = CHDB_CMD_SELECT,
-        .max_memory  = (uint16_t)chdb_max_memory,
-        .max_threads = (uint16_t)chdb_max_threads,
-        .max_parsers = (uint16_t)chdb_max_parsers,
+        .cmd              = CHDB_CMD_SELECT,
+        .max_memory       = (uint16_t)chdb_max_memory,
+        .max_threads      = (uint16_t)chdb_max_threads,
+        .max_parsers      = (uint16_t)chdb_max_parsers,
+        .host_credentials = chdb_may_use_host_credentials(chdb_host_credentials_roles),
     };
     chdbHelper* helper = chdb_helper_start(&ctx, sql, NULL, NULL, 0);
     return chdb_select_receive(sql, rsinfo, tupdesc, helper);

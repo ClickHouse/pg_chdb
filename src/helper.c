@@ -18,12 +18,15 @@
 #include <sys/prctl.h>
 #endif
 
+#include "access/xact.h"
 #include "lib/stringinfo.h"
 #include "mb/pg_wchar.h"
 #include "miscadmin.h"
 #include "storage/latch.h"
+#include "utils/acl.h"
 #include "utils/memutils.h"
 #include "utils/palloc.h"
+#include "utils/varlena.h"
 #include "utils/wait_event.h"
 
 #include "pg-clickhouse.h"
@@ -268,6 +271,112 @@ place_fd(int fd, int target) {
 }
 
 /*
+ * Returns true if the curnet user has the privedges of one or more roles.
+ * These are formatted as a comma-delimited list of identifiers.
+ */
+bool
+chdb_may_use_host_credentials(const char* roles) {
+    List* names = NIL;
+    ListCell* lc;
+
+    if (roles && SplitIdentifierString(pstrdup(roles), ',', &names)) {
+        foreach (lc, names) {
+            Oid role = get_role_oid((char*)lfirst(lc), true);
+
+            if (OidIsValid(role) && has_privs_of_role(GetUserId(), role)) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+/*
+ * Validate that `newval` contains a valid comma-delimited list of
+ * identifiers. In a transaction state (that is, not during startup), also
+ * validate that each of the identifiers corresponds to a role.
+ */
+bool
+chdb_check_host_credentials_roles(char** newval, void** extra, GucSource source) {
+    List* names = NIL;
+    ListCell* lc;
+
+    if (!SplitIdentifierString(pstrdup(*newval), ',', &names)) {
+        GUC_check_errdetail("List syntax is invalid.");
+        return false;
+    }
+
+    /*
+     * Roles can be looked up only inside a transaction of a connected backend.
+     * Otherwise, as when the postmaster reads postgresql.conf, take the names
+     * as given; one that names no role allows none.
+     */
+    if (!IsTransactionState() || !OidIsValid(MyDatabaseId)) {
+        return true;
+    }
+
+    foreach (lc, names) {
+        char* name = (char*)lfirst(lc);
+
+        if (OidIsValid(get_role_oid(name, true))) {
+            continue;
+        }
+        /* ALTER DATABASE/ROLE ... SET tests a value for some later session. */
+        /*
+         * When source == PGC_S_TEST, don't throw a hard error for a
+         * nonexistent table access method, only a NOTICE, to allow ALTER
+         * DATABASE/ROLE ... SET to tests a value for some later session. See
+         * comments in guc.h.
+         */
+        if (source == PGC_S_TEST) {
+            ereport(
+                NOTICE,
+                errcode(ERRCODE_UNDEFINED_OBJECT),
+                errmsg("role \"%s\" does not exist", name)
+            );
+            continue;
+        }
+        GUC_check_errdetail("Role \"%s\" does not exist.", name);
+        return false;
+    }
+
+    return true;
+}
+
+/*
+ * Prevent the AWS SDK in the helper from finding credentials on the host: in
+ * the environment, in the files it names or defaults to, or from the instance
+ * and container metadata services. chDB resolves no other cloud's credentials
+ * from the host.
+ */
+static void
+hide_host_credentials(void) {
+    static const char* const unset[] = {
+        "AWS_ACCESS_KEY_ID",
+        "AWS_SECRET_ACCESS_KEY",
+        "AWS_SESSION_TOKEN",
+        "AWS_PROFILE",
+        "AWS_DEFAULT_PROFILE",
+        "AWS_ROLE_ARN",
+        "AWS_WEB_IDENTITY_TOKEN_FILE",
+        "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI",
+        "AWS_CONTAINER_CREDENTIALS_FULL_URI",
+        "AWS_CONTAINER_AUTHORIZATION_TOKEN",
+        "AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE",
+    };
+
+    for (size_t i = 0; i < lengthof(unset); i++) {
+        unsetenv(unset[i]);
+    }
+    if (setenv("AWS_CONFIG_FILE", "/dev/null", 1) != 0 ||
+        setenv("AWS_SHARED_CREDENTIALS_FILE", "/dev/null", 1) != 0 ||
+        setenv("AWS_EC2_METADATA_DISABLED", "true", 1) != 0) {
+        _exit(126);
+    }
+}
+
+/*
  * Everything between the fork and the exec runs in a process that still holds
  * the backend's Postgres state, so it may only _exit.
  */
@@ -287,6 +396,10 @@ exec_helper(chdbHelper* h, const char* program, chdbHelperContext* ctx) {
         !place_fd(h->err_peer, STDERR_FILENO) ||
         !place_fd(h->setup_peer, CHDB_SETUP_FD)) {
         _exit(126);
+    }
+
+    if (!ctx->host_credentials) {
+        hide_host_credentials();
     }
 
     /* Postgres ignores SIGPIPE; ClickHouse wants the default disposition. */

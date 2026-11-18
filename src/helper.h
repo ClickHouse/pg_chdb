@@ -2,6 +2,9 @@
 #define CHDB_HELPER_H
 
 #include "postgres.h"
+
+#include "utils/guc.h"
+
 #include "setup.h"
 
 /*
@@ -31,6 +34,18 @@ chdb_helper_start(
     const char* const* values,
     size_t nparams
 );
+
+/*
+ * True when the current user has the privileges of a role named in `roles`, the
+ * value of a host_credentials_roles GUC, and so may use the cloud credentials
+ * of the host. A role that has since been dropped allows none.
+ */
+extern bool
+chdb_may_use_host_credentials(const char* roles);
+
+/* GUC check hook for host_credentials_roles: a list of existing roles. */
+extern bool
+chdb_check_host_credentials_roles(char** newval, void** extra, GucSource source);
 
 /*
  * Reads up to `len` bytes of Native output into `buf`. Returns number of bytes

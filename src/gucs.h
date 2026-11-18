@@ -45,6 +45,18 @@
         NULL,                                                                          \
         NULL                                                                           \
     );                                                                                 \
+    DefineCustomStringVariable(                                                        \
+        ns ".host_credentials_roles",                                                  \
+        "Roles whose members may use the cloud credentials of the host.",              \
+        "A comma-separated list. Empty disables the use of host credentials.",         \
+        &chdb_host_credentials_roles,                                                  \
+        "",                                                                            \
+        PGC_SUSET,                                                                     \
+        0,                                                                             \
+        chdb_check_host_credentials_roles,                                             \
+        NULL,                                                                          \
+        NULL                                                                           \
+    );                                                                                 \
     MarkGUCPrefixReserved(ns);
 
 #endif /* CHDB_GUCS_H */
