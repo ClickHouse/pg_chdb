@@ -8,9 +8,11 @@
 #include "postgres.h"
 
 #include "miscadmin.h"
+#include "utils/acl.h"
 #include "utils/builtins.h"
 #include "utils/guc.h"
 #include "utils/rel.h"
+#include "utils/varlena.h"
 
 /* PGCH_NATIVE_SETTINGS; native.c is the TU carrying the implementation. */
 #include "pg-clickhouse.h"
@@ -238,6 +240,30 @@ chdb_describe(chdbCopyContext* ctx) {
 #define GCS_HOST "storage.googleapis.com"
 #define AWS_HOST ".amazonaws.com"
 
+/*
+ * True when the current user has the privileges of a role named by
+ * chdb_hook.host_credentials_roles, and so may use the cloud credentials of
+ * the host. Names of roles that do not exist allow no one.
+ */
+static bool
+may_use_host_credentials(void) {
+    List* roles = NIL;
+    ListCell* lc;
+
+    if (chdb_host_credentials_roles &&
+        SplitIdentifierString(pstrdup(chdb_host_credentials_roles), ',', &roles)) {
+        foreach (lc, roles) {
+            Oid role = get_role_oid((char*)lfirst(lc), true);
+
+            if (OidIsValid(role) && has_privs_of_role(GetUserId(), role)) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
 /* Truncate on insert changes nothing outside INSERT INTO FUNCTION */
 static const char*
 truncate_setting(chdbCopyContext* ctx, const char* setting) {
@@ -322,13 +348,13 @@ make_ch_query(
             if (ctx->session_token[0] != '\0' && ctx->scheme == s3_scheme) {
                 PARAM(", {session_token:String}", "session_token", ctx->session_token);
             }
-        } else {
+        } else if (ctx->scheme == s3_scheme && may_use_host_credentials()) {
             /*
-             * Consider adding a superuser-only GUC to allow using environment
-             * or file credentials. If enabled we'd simply omit this parameter
-             * and append the `s3_allow_server_credentials_in_user_queries=1`
-             * setting.
+             * Without NOSIGN chDB signs with the credentials it finds on the
+             * host. gcs() and azureBlobStorage() can take the same gate once
+             * chDB resolves host credentials for them.
              */
+        } else {
             appendStringInfoString(query, ", NOSIGN");
         }
 

@@ -759,6 +759,31 @@ trailing NULs, while `bytea` keeps all N bytes.
 
 ## Settings
 
+### `chdb_hook.host_credentials_roles`
+
+```sql
+SET chdb_hook.host_credentials_roles = 'loaders, analysts';
+```
+
+A comma-separated list of roles whose members may use the cloud credentials
+of the PostgreSQL host, rather than pass `access_key` and `access_secret`.
+Requires superuser privileges. Defaults to an empty list, in which case
+requests without keys are anonymous for every role.
+
+For a member, a `COPY` or `CREATE TABLE` from an S3 URL without `access_key`
+leaves chDB to find credentials as the AWS SDK does: environment variables
+such as `AWS_ACCESS_KEY_ID`, the files named by `AWS_SHARED_CREDENTIALS_FILE`
+and `AWS_CONFIG_FILE`, a web identity token, or the instance or container
+metadata service. chDB runs with the environment of the PostgreSQL server, so
+set any variables where the server starts.
+
+The request is then signed, so the credentials found must be allowed to read
+or write the URL, even where anonymous access would have been. A name that
+matches no role allows no one. Other URL schemes ignore this setting.
+
+Grant the listed roles with care: their members act with whatever the host's
+credentials allow.
+
 ### `chdb_hook.max_memory`
 
 ```sql

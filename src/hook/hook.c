@@ -97,6 +97,15 @@ static int chdb_max_threads = 0;
 static int chdb_max_parsers = 0;
 
 /*
+ * Members of the roles named by chdb_hook.host_credentials_roles may use the
+ * cloud credentials of the host (instance or workload identity, environment,
+ * config files) instead of passing keys. Empty, the default, means no one may,
+ * and requests without keys are anonymous. The gate is not specific to a
+ * cloud; so far only S3 URLs act on it.
+ */
+char* chdb_host_credentials_roles = NULL;
+
+/*
  * _PG_init is the entry-point for the library.
  */
 void
@@ -107,6 +116,18 @@ _PG_init(void) {
         return;
     }
 
+    DefineCustomStringVariable(
+        "chdb_hook.host_credentials_roles",
+        "Roles whose members may use the cloud credentials of the host.",
+        "A comma-separated list. Empty disables the use of host credentials.",
+        &chdb_host_credentials_roles,
+        "",
+        PGC_SUSET,
+        GUC_LIST_INPUT,
+        NULL,
+        NULL,
+        NULL
+    );
     CHDB_GUCS("chdb_hook");
     InitializeUtilityHook();
 }

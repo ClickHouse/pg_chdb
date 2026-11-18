@@ -50,6 +50,12 @@ typedef struct chdbCopyContext {
 } chdbCopyContext;
 
 /*
+ * GUC that lets members of a role use the cloud credentials of the host.
+ * Defined in hook.c.
+ */
+extern char* chdb_host_credentials_roles;
+
+/*
  * Number of table function options in chdbCopyContext +2 for Azure URL
  * parsing.
  */

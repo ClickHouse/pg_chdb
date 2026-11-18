@@ -18,6 +18,10 @@ All notable changes to this project will be documented in this file. It uses the
     that of `pgchdb_version()` ([#106])
 *   Changed the default `max_memory` GUCs values to 4 GB. Previously chDB had
     no default memory limit.
+*   Added the `chdb_hook.host_credentials_roles` setting. Members of the
+    roles it names may use the cloud credentials of the PostgreSQL host for S3
+    URLs, rather than pass keys. Empty by default, so requests without keys
+    stay anonymous.
 
 ### 📚 Documentation
 
