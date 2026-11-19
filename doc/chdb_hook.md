@@ -329,6 +329,23 @@ AWS session token to use with the `access_key` and `access_secret`, often
 defined by the environment variable `AWS_SESSION_TOKEN`. Used only for S3
 URLs.
 
+#### `role_arn`
+
+The ARN of an AWS IAM role for chDB to assume with the cloud credentials of
+the PostgreSQL host. Typically a role in another AWS account that grants
+access to its bucket and trusts the host to assume it:
+
+```sql
+COPY events FROM 's3://acme-data/events/*.parquet' (
+    role_arn 'arn:aws:iam::111122223333:role/pg-load'
+);
+```
+
+Requires the privileges of a role named by
+[`chdb_hook.host_credentials_roles`](#chdb_hookhost_credentials_roles). Used
+only for S3 URLs, and not together with `access_key`. Defaults to the value of
+[`chdb_hook.s3_role_arn`](#chdb_hooks3_role_arn).
+
 #### `compression`
 
 File compression format. Use if the compression cannot be inferred from the
@@ -789,6 +806,26 @@ considered anonymous in subsequent queries.
 
 Grant the listed roles with care: their members act with whatever the host's
 credentials allow.
+
+### `chdb_hook.s3_role_arn`
+
+```sql
+ALTER DATABASE app SET chdb_hook.s3_role_arn = 'arn:aws:iam::111122223333:role/pg-load';
+```
+
+The ARN of the AWS IAM role for chDB to assume with the cloud credentials of
+the PostgreSQL host when a `COPY` or `CREATE TABLE` command to or from an S3
+URL names no [`role_arn`](#role_arn). Must be an IAM role ARN or empty.
+Defaults to empty, for no role.
+
+Any role may set it, but it takes effect only for members of the roles named
+by [`chdb_hook.host_credentials_roles`](#chdb_hookhost_credentials_roles), and
+only where they would use the host credentials: not for commands that pass
+`access_key`, and not for URLs other than S3.
+
+chdb has no such setting. A member of `chdb.host_credentials_roles` names the
+role in the query passed to `chdb_query()`, as
+`extra_credentials(role_arn = '...')`.
 
 ### `chdb_hook.max_memory`
 

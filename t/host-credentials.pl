@@ -85,6 +85,11 @@ my $nosign = qr[\QSELECT * FROM s3({url:String}, NOSIGN, {format:String}, {struc
 my $signed = qr[\QSELECT * FROM s3({url:String}, {format:String}, {structure:String}) SETTINGS s3_request_timeout_ms = 30000];
 my $params = qr[\Q{ url: "\E$url\Q", format: "auto", structure: "id Nullable(Int32)" }];
 
+# The role a member asks chDB to assume with the host credentials, and the
+# query the hook then writes.
+my $role_arn = 'arn:aws:iam::123456789012:role/path/loader';
+my $assumed  = qr[\QSELECT * FROM s3({url:String}, extra_credentials(role_arn = '\E$role_arn\Q'), {format:String}, {structure:String}) SETTINGS s3_request_timeout_ms = 30000];
+
 # No request can succeed (see above), so every COPY fails with this error.
 my $failed = qr/chdb: error executing chDB query/;
 
@@ -104,6 +109,13 @@ sub allow {
     my ($guc, $roles) = @_;
     $node->safe_psql(postgres => "ALTER SYSTEM SET $guc.host_credentials_roles = $roles");
     $node->reload;
+}
+
+# Run a statement as a role and return the error it raised, if any.
+sub error_as {
+    my ($role, $sql) = @_;
+    my ($ret, $out, $err) = $node->psql(postgres => "SET ROLE $role; $sql");
+    return $err;
 }
 
 # Run chdb_query() against the listener as a role, without NOSIGN. It fails,
@@ -209,6 +221,96 @@ subtest 'a role dropped after it was named allows none' => sub {
         qq{SET ROLE outsider; COPY stuff FROM '$url'},
         $failed, $nosign, $params,
     );
+};
+
+subtest 'role_arn names a role to assume' => sub {
+    allow chdb_hook => q{'cloud_users'};
+
+    # A member names the role with the option or the setting. The requests
+    # still fail (see above); the tests check the query in the log.
+    check_query(
+        $node, 'option',
+        qq{SET ROLE member; COPY stuff FROM '$url' (role_arn '$role_arn')},
+        $failed, $assumed, $params,
+    );
+    check_query(
+        $node, 'setting',
+        qq{SET ROLE member; SET chdb_hook.s3_role_arn = '$role_arn'; COPY stuff FROM '$url'},
+        $failed, $assumed, $params,
+    );
+    check_query(
+        $node, 'option over setting',
+        qq{SET ROLE member; SET chdb_hook.s3_role_arn = 'arn:aws:iam::123456789012:role/other';
+           COPY stuff FROM '$url' (role_arn '$role_arn')},
+        $failed, $assumed, $params,
+    );
+    check_query(
+        $node, 'COPY TO',
+        qq{SET ROLE member; COPY stuff TO '$url' (role_arn '$role_arn')},
+        qr/^$|chdb: error executing chDB query/,
+        qr[\QINSERT INTO FUNCTION s3({url:String}, extra_credentials(role_arn = '\E$role_arn\Q'), {format:String}, {structure:String}) SETTINGS s3_truncate_on_insert = 1, s3_request_timeout_ms = 30000],
+        $params,
+    );
+    for my $partition (qw(aws-cn aws-us-gov)) {
+        my $arn = "arn:$partition:iam::123456789012:role/loader";
+        check_query(
+            $node, "partition $partition",
+            qq{SET ROLE member; COPY stuff FROM '$url' (role_arn '$arn')},
+            $failed, qr[\Qextra_credentials(role_arn = '\E$arn\Q')], $params,
+        );
+    }
+
+    # The setting changes nothing where host credentials are not used: for an
+    # outsider, with keys, and for a URL that is not S3.
+    check_query(
+        $node, 'setting of an outsider',
+        qq{SET ROLE outsider; SET chdb_hook.s3_role_arn = '$role_arn'; COPY stuff FROM '$url'},
+        $failed, $nosign, $params,
+    );
+    check_query(
+        $node, 'setting with keys',
+        qq{SET ROLE member; SET chdb_hook.s3_role_arn = '$role_arn';
+           COPY stuff FROM '$url' (access_key 'key', access_secret 'secret')},
+        $failed,
+        qr[\QSELECT * FROM s3({url:String}, {access_key:String}, {access_secret:String}, {format:String}, {structure:String})],
+        qr[\Qaccess_key: "key", access_secret: "secret"],
+    );
+    check_query(
+        $node, 'setting with a GCS URL',
+        qq{SET ROLE member; SET chdb_hook.s3_role_arn = '$role_arn';
+           COPY stuff FROM 'gs://localhost:$port/bucket/file.csv'},
+        $failed,
+        qr[\QSELECT * FROM gcs({url:String}, NOSIGN, {format:String}, {structure:String})],
+        qr[\Qformat: "auto"],
+    );
+
+    # The hook raises these errors itself, before any request.
+    like error_as(outsider => qq{COPY stuff FROM '$url' (role_arn '$role_arn')}),
+        qr/permission denied to use option "role_arn"/,
+        'Should refuse the option from an outsider';
+    for my $bad (
+        q{x') SETTINGS s3_request_timeout_ms = 1 --},
+        q{arn:aws:iam::123456789012:role/it's},
+        'arn:aws:iam::123456789012:user/loader',
+        'arn:aws:iam::12345:role/loader',
+        'arn:aws:iam::123456789012:role/',
+        'arn:aws:s3:::bucket',
+        '',
+    ) {
+        (my $quoted = $bad) =~ s/'/''/g;
+        like error_as(member => qq{COPY stuff FROM '$url' (role_arn '$quoted')}),
+            qr/argument to option "role_arn" must be an AWS IAM role ARN/,
+            "Should refuse the option value '$bad'";
+    }
+    like error_as(
+        member => qq{COPY stuff FROM '$url' (role_arn '$role_arn', access_key 'k', access_secret 's')}
+    ), qr/option "role_arn" requires an S3 URL and no "access_key"/,
+        'Should refuse the option with keys';
+    for my $other ("http://localhost:$port/file.csv", "gs://localhost:$port/bucket/file.csv") {
+        like error_as(member => qq{COPY stuff FROM '$other' (role_arn '$role_arn')}),
+            qr/option "role_arn" requires an S3 URL and no "access_key"/,
+            "Should refuse the option for $other";
+    }
 };
 
 done_testing;

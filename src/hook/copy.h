@@ -44,6 +44,8 @@ typedef struct chdbCopyContext {
     const char* access_key;
     const char* access_secret;
     const char* session_token;
+    const char* role_arn;    /* AWS role the command names, empty for none */
+    const char* s3_role_arn; /* chdb_hook.s3_role_arn, the role to default to */
     const char* format;
     const char* structure;
     const char* compression;

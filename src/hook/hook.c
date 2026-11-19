@@ -105,6 +105,62 @@ static int chdb_max_parsers = 0;
 static char* chdb_host_credentials_roles = NULL;
 
 /*
+ * The AWS role that members of those roles assume with the host's credentials
+ * when a command names none. Empty, the default, means none.
+ */
+static char* chdb_s3_role_arn = NULL;
+
+/*
+ * True for an AWS IAM role ARN: arn:{partition}:iam::{12 digits}:role/{path}.
+ * The characters allowed need no quoting in a ClickHouse string literal, which
+ * is where the ARN ends up.
+ */
+static bool
+is_role_arn(const char* arn) {
+    const char* p = arn;
+
+    if (strncmp(p, "arn:aws", 7) != 0) {
+        return false;
+    }
+    for (p += 7; *p != ':'; p++) {
+        if (!((*p >= 'a' && *p <= 'z') || *p == '-')) {
+            return false;
+        }
+    }
+    if (strncmp(p, ":iam::", 6) != 0) {
+        return false;
+    }
+    p += 6;
+    for (int n = 0; n < 12; n++, p++) {
+        if (*p < '0' || *p > '9') {
+            return false;
+        }
+    }
+    if (strncmp(p, ":role/", 6) != 0 || p[6] == '\0') {
+        return false;
+    }
+    for (p += 6; *p; p++) {
+        if (!((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') ||
+              (*p >= '0' && *p <= '9') || strchr("+=,.@_/-", *p))) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+/* GUC check hook for chdb_hook.s3_role_arn: empty or an IAM role ARN. */
+static bool
+check_s3_role_arn(char** newval, void** extra, GucSource source) {
+    if ((*newval)[0] != '\0' && !is_role_arn(*newval)) {
+        GUC_check_errdetail("Expected the form arn:aws:iam::123456789012:role/name.");
+        return false;
+    }
+
+    return true;
+}
+
+/*
  * _PG_init is the entry-point for the library.
  */
 void
@@ -115,6 +171,18 @@ _PG_init(void) {
         return;
     }
 
+    DefineCustomStringVariable(
+        "chdb_hook.s3_role_arn",
+        "AWS role to assume with the host credentials when a command names none.",
+        "Used only by members of chdb_hook.host_credentials_roles, for S3 URLs.",
+        &chdb_s3_role_arn,
+        "",
+        PGC_USERSET,
+        0,
+        check_s3_role_arn,
+        NULL,
+        NULL
+    );
     CHDB_GUCS("chdb_hook");
     InitializeUtilityHook();
 }
@@ -292,6 +360,7 @@ contextualize_options(chdbCopyContext* ctx, List* options, List** others) {
     ctx->access_key     = "";
     ctx->access_secret  = "";
     ctx->session_token  = "";
+    ctx->role_arn       = "";
     ctx->format         = "";
     ctx->structure      = "";
     ctx->compression    = "";
@@ -306,6 +375,31 @@ contextualize_options(chdbCopyContext* ctx, List* options, List** others) {
             ctx->access_secret = defGetString(elem);
         } else if (strcmp(elem->defname, "session_token") == 0) {
             ctx->session_token = defGetString(elem);
+        } else if (strcmp(elem->defname, "role_arn") == 0) {
+            ctx->role_arn = defGetString(elem);
+            if (!ctx->host_credentials) {
+                ereport(
+                    ERROR,
+                    errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
+                    errmsg("chdb: permission denied to use option \"role_arn\""),
+                    errdetail(
+                        "Only roles with privileges of a role named by "
+                        "\"chdb_hook.host_credentials_roles\" may use the cloud "
+                        "credentials of the server."
+                    )
+                );
+            }
+            if (!is_role_arn(ctx->role_arn)) {
+                ereport(
+                    ERROR,
+                    errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+                    errmsg(
+                        "chdb: argument to option \"role_arn\" must be an AWS IAM "
+                        "role ARN"
+                    ),
+                    errhint("Expected the form arn:aws:iam::123456789012:role/name.")
+                );
+            }
         } else if (strcmp(elem->defname, "format") == 0) {
             ctx->format = defGetString(elem);
         } else if (strcmp(elem->defname, "structure") == 0) {
@@ -466,6 +560,7 @@ chDBProcessUtilityHook(
                 .max_parsers = (uint16_t)chdb_max_parsers,
                 .host_credentials =
                     chdb_may_use_host_credentials(chdb_host_credentials_roles),
+                .s3_role_arn = chdb_s3_role_arn,
             };
 
             open_copy_relation(copy, &ctx);
@@ -496,6 +591,7 @@ chDBProcessUtilityHook(
             .max_parsers = (uint16_t)chdb_max_parsers,
             .host_credentials =
                 chdb_may_use_host_credentials(chdb_host_credentials_roles),
+            .s3_role_arn = chdb_s3_role_arn,
         };
 
         /* Reject read-only transaction before requesting remote schema */

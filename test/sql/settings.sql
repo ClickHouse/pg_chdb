@@ -140,3 +140,36 @@ EXECUTE show_roles;
 DROP ROLE chdb_cloud;
 DROP ROLE "chDB Cloud";
 DROP ROLE chdb_nobody;
+
+-- No AWS role to assume by default.
+SHOW chdb_hook.s3_role_arn;
+
+-- Name a role, in any AWS partition.
+SET chdb_hook.s3_role_arn = 'arn:aws:iam::123456789012:role/loader';
+SHOW chdb_hook.s3_role_arn;
+SET chdb_hook.s3_role_arn = 'arn:aws-us-gov:iam::123456789012:role/path/to/Loader+=,.@_-';
+SHOW chdb_hook.s3_role_arn;
+
+-- Reject values that are not an IAM role ARN.
+SET chdb_hook.s3_role_arn = 'loader';
+SET chdb_hook.s3_role_arn = 'arn:aws:iam::123456789012:user/loader';
+SET chdb_hook.s3_role_arn = 'arn:aws:iam::1234:role/loader';
+SET chdb_hook.s3_role_arn = 'arn:aws:iam::123456789012:role/';
+SET chdb_hook.s3_role_arn = 'arn:aws:iam::123456789012:role/it''s';
+SET chdb_hook.s3_role_arn = 'arn:aws:s3:::bucket';
+SHOW chdb_hook.s3_role_arn;
+
+-- Any role may set it, and it can be stored for a role or database.
+CREATE ROLE chdb_nobody;
+SET ROLE chdb_nobody;
+SET chdb_hook.s3_role_arn = 'arn:aws:iam::123456789012:role/other';
+SHOW chdb_hook.s3_role_arn;
+RESET ROLE;
+ALTER ROLE chdb_nobody SET chdb_hook.s3_role_arn = 'arn:aws:iam::123456789012:role/loader';
+ALTER ROLE chdb_nobody SET chdb_hook.s3_role_arn = 'loader';
+DROP ROLE chdb_nobody;
+
+-- Empty it. chdb has no such setting, as chdb_query() takes the role in SQL.
+SET chdb_hook.s3_role_arn = '';
+SHOW chdb_hook.s3_role_arn;
+SHOW chdb.s3_role_arn;

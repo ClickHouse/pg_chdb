@@ -250,3 +250,76 @@ EXECUTE show_roles;
 DROP ROLE chdb_cloud;
 DROP ROLE "chDB Cloud";
 DROP ROLE chdb_nobody;
+-- No AWS role to assume by default.
+SHOW chdb_hook.s3_role_arn;
+ chdb_hook.s3_role_arn 
+-----------------------
+ 
+(1 row)
+
+-- Name a role, in any AWS partition.
+SET chdb_hook.s3_role_arn = 'arn:aws:iam::123456789012:role/loader';
+SHOW chdb_hook.s3_role_arn;
+         chdb_hook.s3_role_arn         
+---------------------------------------
+ arn:aws:iam::123456789012:role/loader
+(1 row)
+
+SET chdb_hook.s3_role_arn = 'arn:aws-us-gov:iam::123456789012:role/path/to/Loader+=,.@_-';
+SHOW chdb_hook.s3_role_arn;
+                    chdb_hook.s3_role_arn                    
+-------------------------------------------------------------
+ arn:aws-us-gov:iam::123456789012:role/path/to/Loader+=,.@_-
+(1 row)
+
+-- Reject values that are not an IAM role ARN.
+SET chdb_hook.s3_role_arn = 'loader';
+ERROR:  invalid value for parameter "chdb_hook.s3_role_arn": "loader"
+DETAIL:  Expected the form arn:aws:iam::123456789012:role/name.
+SET chdb_hook.s3_role_arn = 'arn:aws:iam::123456789012:user/loader';
+ERROR:  invalid value for parameter "chdb_hook.s3_role_arn": "arn:aws:iam::123456789012:user/loader"
+DETAIL:  Expected the form arn:aws:iam::123456789012:role/name.
+SET chdb_hook.s3_role_arn = 'arn:aws:iam::1234:role/loader';
+ERROR:  invalid value for parameter "chdb_hook.s3_role_arn": "arn:aws:iam::1234:role/loader"
+DETAIL:  Expected the form arn:aws:iam::123456789012:role/name.
+SET chdb_hook.s3_role_arn = 'arn:aws:iam::123456789012:role/';
+ERROR:  invalid value for parameter "chdb_hook.s3_role_arn": "arn:aws:iam::123456789012:role/"
+DETAIL:  Expected the form arn:aws:iam::123456789012:role/name.
+SET chdb_hook.s3_role_arn = 'arn:aws:iam::123456789012:role/it''s';
+ERROR:  invalid value for parameter "chdb_hook.s3_role_arn": "arn:aws:iam::123456789012:role/it's"
+DETAIL:  Expected the form arn:aws:iam::123456789012:role/name.
+SET chdb_hook.s3_role_arn = 'arn:aws:s3:::bucket';
+ERROR:  invalid value for parameter "chdb_hook.s3_role_arn": "arn:aws:s3:::bucket"
+DETAIL:  Expected the form arn:aws:iam::123456789012:role/name.
+SHOW chdb_hook.s3_role_arn;
+                    chdb_hook.s3_role_arn                    
+-------------------------------------------------------------
+ arn:aws-us-gov:iam::123456789012:role/path/to/Loader+=,.@_-
+(1 row)
+
+-- Any role may set it, and it can be stored for a role or database.
+CREATE ROLE chdb_nobody;
+SET ROLE chdb_nobody;
+SET chdb_hook.s3_role_arn = 'arn:aws:iam::123456789012:role/other';
+SHOW chdb_hook.s3_role_arn;
+        chdb_hook.s3_role_arn         
+--------------------------------------
+ arn:aws:iam::123456789012:role/other
+(1 row)
+
+RESET ROLE;
+ALTER ROLE chdb_nobody SET chdb_hook.s3_role_arn = 'arn:aws:iam::123456789012:role/loader';
+ALTER ROLE chdb_nobody SET chdb_hook.s3_role_arn = 'loader';
+ERROR:  invalid value for parameter "chdb_hook.s3_role_arn": "loader"
+DETAIL:  Expected the form arn:aws:iam::123456789012:role/name.
+DROP ROLE chdb_nobody;
+-- Empty it. chdb has no such setting, as chdb_query() takes the role in SQL.
+SET chdb_hook.s3_role_arn = '';
+SHOW chdb_hook.s3_role_arn;
+ chdb_hook.s3_role_arn 
+-----------------------
+ 
+(1 row)
+
+SHOW chdb.s3_role_arn;
+ERROR:  unrecognized configuration parameter "chdb.s3_role_arn"
