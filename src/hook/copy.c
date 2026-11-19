@@ -271,6 +271,15 @@ make_ch_query(
      */
 
     size_t i = 0;
+
+    if (ctx->role_arn[0] != '\0' &&
+        (ctx->scheme != s3_scheme || ctx->access_key[0] != '\0')) {
+        ereport(
+            ERROR,
+            errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+            errmsg("chdb: option \"role_arn\" requires an S3 URL and no \"access_key\"")
+        );
+    }
     /* chDB infers a format the copy did not name from the file extension. */
     const char* format = ctx->format[0] ? ctx->format : "auto";
 
@@ -330,6 +339,17 @@ make_ch_query(
              * finds on the host, which it resolves for AWS alone.
              */
             appendStringInfoString(query, ", NOSIGN");
+        } else if (ctx->role_arn[0] != '\0' || ctx->s3_role_arn[0] != '\0') {
+            /*
+             * chDB assumes the role with the credentials it finds on the host.
+             * extra_credentials() takes no query parameter, so the ARN is a
+             * literal; the hook has checked that it needs no quoting.
+             */
+            appendStringInfo(
+                query,
+                ", extra_credentials(role_arn = '%s')",
+                ctx->role_arn[0] != '\0' ? ctx->role_arn : ctx->s3_role_arn
+            );
         }
 
         /* Append remaining arguments and settings. */

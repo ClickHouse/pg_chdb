@@ -23,6 +23,10 @@ All notable changes to this project will be documented in this file. It uses the
     name may use the cloud credentials of the PostgreSQL host, currently AWS
     credentials for S3, rather than pass keys. Empty by default, so requests
     without keys stay anonymous.
+*   Added the `role_arn` option to chdb_hook's `COPY` and `CREATE TABLE`, and
+    the `chdb_hook.s3_role_arn` setting to default it. They name an AWS IAM
+    role for chDB to assume with the host credentials, for members of the
+    roles named by `chdb_hook.host_credentials_roles`.
 
 ### ⚠️ Breaking Changes
 
