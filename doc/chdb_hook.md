@@ -539,6 +539,7 @@ those you need.
 | box              | Tuple(high Point, low Point)           | The two corners, sorted as Postgres sorts.                             |
 | circle           | Tuple(center Point, radius Float64)    |                                                                        |
 | line             | Tuple(a Float64, b Float64, c Float64) | The equation `Ax + By + C = 0`.                                        |
+| vector           | Array(Float32)                         |                                                                        |
 <!-- ENCODE-TABLE-END -->
 
 Types absent from this table, such as `name`, `varchar`, `char`, `bit`,
@@ -657,6 +658,7 @@ writes follow separate conversion rules.
 | Nullable(T)                  | T                           |                                           | Sets nullable on the column                          |
 | Point                        | point                       |                                           |                                                      |
 | Polygon                      | polygon[]                   |                                           |                                                      |
+| QBit(T,N)                    | T[]                         |                                           | Transposes N elements to and from bit planes         |
 | Ring                         | polygon                     | lseg                                      | lseg requires two points                             |
 | SimpleAggregateFunction(f,T) | T                           |                                           | Stores values as T                                   |
 | String                       | text                        | bytea; input-compatible types             | bytea keeps raw bytes                                |
