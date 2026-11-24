@@ -44,6 +44,7 @@ typedef struct chdbCopyContext {
     const char* access_key;
     const char* access_secret;
     const char* session_token;
+    const char* role_arn; /* IAM role for chDB to assume */
     const char* format;
     const char* structure;
     const char* compression;

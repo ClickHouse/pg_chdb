@@ -330,6 +330,15 @@ make_ch_query(
              * finds on the host, which it resolves for AWS alone.
              */
             appendStringInfoString(query, ", NOSIGN");
+        } else if (ctx->role_arn[0] != '\0') {
+            /*
+             * Have chDB assume the role, using the credentials it finds on the
+             * host. extra_credentials() does not accept a query parameter, so
+             * write the ARN as an escaped literal.
+             */
+            appendStringInfoString(query, ", extra_credentials(role_arn = ");
+            PARAM("{role_arn:String}", "role_arn", ctx->role_arn);
+            appendStringInfoChar(query, ')');
         }
 
         /* Append remaining arguments and settings. */

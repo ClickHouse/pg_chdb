@@ -105,6 +105,45 @@ static int chdb_max_parsers = 0;
 static char* chdb_host_credentials_roles = NULL;
 
 /*
+ * Returns true if `arn` looks like an IAM role ARN, such as
+ * arn:aws:iam::123456789012:role/name. Only AWS role ARNs are recognized so
+ * far, as chDB assumes no other kind of role.
+ */
+static bool
+is_role_arn(const char* arn) {
+    const char* p = arn;
+
+    if (strncmp(p, "arn:aws", 7) != 0) {
+        return false;
+    }
+    for (p += 7; *p != ':'; p++) {
+        if (!((*p >= 'a' && *p <= 'z') || *p == '-')) {
+            return false;
+        }
+    }
+    if (strncmp(p, ":iam::", 6) != 0) {
+        return false;
+    }
+    p += 6;
+    for (int n = 0; n < 12; n++, p++) {
+        if (*p < '0' || *p > '9') {
+            return false;
+        }
+    }
+    if (strncmp(p, ":role/", 6) != 0 || p[6] == '\0') {
+        return false;
+    }
+    for (p += 6; *p; p++) {
+        if (!((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') ||
+              (*p >= '0' && *p <= '9') || strchr("+=,.@_/-", *p))) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+/*
  * _PG_init is the entry-point for the library.
  */
 void
@@ -292,6 +331,7 @@ contextualize_options(chdbCopyContext* ctx, List* options, List** others) {
     ctx->access_key     = "";
     ctx->access_secret  = "";
     ctx->session_token  = "";
+    ctx->role_arn       = "";
     ctx->format         = "";
     ctx->structure      = "";
     ctx->compression    = "";
@@ -306,6 +346,31 @@ contextualize_options(chdbCopyContext* ctx, List* options, List** others) {
             ctx->access_secret = defGetString(elem);
         } else if (strcmp(elem->defname, "session_token") == 0) {
             ctx->session_token = defGetString(elem);
+        } else if (strcmp(elem->defname, "role_arn") == 0) {
+            ctx->role_arn = defGetString(elem);
+            if (!ctx->host_credentials) {
+                ereport(
+                    ERROR,
+                    errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
+                    errmsg("chdb: permission denied to use option \"role_arn\""),
+                    errdetail(
+                        "Only roles with privileges of a role named by "
+                        "\"chdb_hook.host_credentials_roles\" may use the cloud "
+                        "credentials of the server."
+                    )
+                );
+            }
+            if (!is_role_arn(ctx->role_arn)) {
+                ereport(
+                    ERROR,
+                    errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+                    errmsg(
+                        "chdb: argument to option \"role_arn\" must be a valid IAM "
+                        "role ARN"
+                    ),
+                    errhint("Expected the form arn:aws:iam::123456789012:role/name.")
+                );
+            }
         } else if (strcmp(elem->defname, "format") == 0) {
             ctx->format = defGetString(elem);
         } else if (strcmp(elem->defname, "structure") == 0) {

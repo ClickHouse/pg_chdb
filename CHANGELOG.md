@@ -11,7 +11,7 @@ All notable changes to this project will be documented in this file. It uses the
 
 ### ⚡ Improvements
 
-*   Add a control file and installation script to support
+*   Added a control file and installation script to support
     `CREATE EXTENSION chdb_hook`. This allows chd_hook to be listed in
     `pg_available_extensions` alongside `chdb`. Add `chdb_hook_version()`
     as the sole function created by the extension. It's output is identical to
@@ -23,6 +23,10 @@ All notable changes to this project will be documented in this file. It uses the
     name may use the cloud credentials of the PostgreSQL host, currently AWS
     credentials for S3, rather than pass keys. Empty by default, so requests
     without keys stay anonymous.
+*   Added the `role_arn` option to chdb_hook's `COPY` and `CREATE TABLE`
+    commands. It names an AWS IAM role for chDB to assume with the host
+    credentials. Allowed only for members of the roles named by
+    `chdb_hook.host_credentials_roles`.
 
 ### ⚠️ Breaking Changes
 

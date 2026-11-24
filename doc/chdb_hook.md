@@ -329,6 +329,25 @@ AWS session token to use with the `access_key` and `access_secret`, often
 defined by the environment variable `AWS_SESSION_TOKEN`. Used only for S3
 URLs.
 
+#### `role_arn`
+
+The ARN of an AWS IAM role for chDB to assume, using the cloud credentials of
+the PostgreSQL host. Typically a role in another AWS account that grants
+access to its bucket and trusts the host to assume it:
+
+```sql
+COPY events FROM 's3://acme-data/events/*.parquet' (
+    role_arn 'arn:aws:iam::111122223333:role/pg-load'
+);
+```
+
+Use of this option requires the privileges of a role named by
+[`chdb_hook.host_credentials_roles`](#chdb_hookhost_credentials_roles).
+Without `role_arn`, no role assumed and requests are signed with the host
+credentials.
+
+Currently used only for S3 URLs without `access_key`, and ignored otherwise.
+
 #### `compression`
 
 File compression format. Use if the compression cannot be inferred from the
