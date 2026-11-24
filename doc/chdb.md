@@ -1,4 +1,4 @@
-chdb 0.1.3
+chdb 0.1.4
 ==========
 
 ## Synopsis
