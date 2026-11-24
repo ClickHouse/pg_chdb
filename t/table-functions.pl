@@ -241,14 +241,14 @@ subtest azure => sub {
     check_query(
         $node, 'just FROM azure',
         q{COPY stuff FROM 'az://example.org/path/file.csv'},
-        qr/Azure::Storage::StorageException: 404 Not Found/,
+        qr/Azure::Storage::StorageException: 404 Not Found|Azure::Core::Http::TransportException: Poco::Exception/,
         qr[\QSELECT * FROM azureBlobStorage({url:String}, {container:String}, {path:String}, {account_name:String}, {account_key:String}, {format:String}, {compression:String}, {structure:String}) SETTINGS azure_request_timeout_ms=30000],
         qr[\Q{ url: "https://example.org", container: "path", path: "file.csv", account_name: "", account_key: "", format: "auto", compression: "auto", structure: "id Nullable(Int32)" }],
     );
     check_query(
         $node, 'To azure with query',
         q{COPY stuff TO 'az://example.org/path/file.csv?x=y&abc=12'},
-        qr/\QDB::Exception: std::out_of_range: map::at:  key not found./,
+        qr/^$|\QDB::Exception: std::out_of_range: map::at:  key not found./,
         qr[\QINSERT INTO FUNCTION azureBlobStorage({url:String}, {container:String}, {path:String}, {account_name:String}, {account_key:String}, {format:String}, {compression:String}, {structure:String}) SETTINGS azure_truncate_on_insert = 1, azure_request_timeout_ms=30000],
         qr[\Q{ url: "https://example.org?x=y&abc=12", container: "path", path: "file.csv", account_name: "", account_key: "", format: "auto", compression: "auto", structure: "id Nullable(Int32)" }],
     );
@@ -288,7 +288,7 @@ subtest azure => sub {
     check_query(
         $node, 'FROM abfss host with structure',
         q{COPY stuff FROM 'abfss://hi@example.org/xyz/yep.csv' (access_key 'ac-key', structure 'x String')},
-        qr/Azure::Storage::StorageException: 404 Not Found/,
+        qr/Azure::Storage::StorageException: 404 Not Found|DB::Exception: Azure::Core::Http::TransportException: Poco::Exception/,
         qr[\QSELECT * FROM azureBlobStorage({url:String}, {container:String}, {path:String}, {account_name:String}, {account_key:String}, {format:String}, {compression:String}, {structure:String}) SETTINGS azure_request_timeout_ms=30000],
         qr[\Q{ url: "https://example.org", container: "hi", path: "xyz/yep.csv", account_name: "ac-key", account_key: "", format: "auto", compression: "auto", structure: "x String" }],
     );
@@ -296,7 +296,7 @@ subtest azure => sub {
     check_query(
         $node, 'FROM no-path abfs with format only',
         q{COPY stuff FROM 'abfs://slick@example.org' (format 'TSV')},
-        qr/Azure::Storage::StorageException: 404 Not Found/,
+        qr/Azure::Storage::StorageException: 404 Not Found|Azure::Core::Http::TransportException: Poco::Exception/,
         qr[\QSELECT * FROM azureBlobStorage({url:String}, {container:String}, {path:String}, {account_name:String}, {account_key:String}, {format:String}, {compression:String}, {structure:String}) SETTINGS azure_request_timeout_ms=30000],
         qr[\Q{ url: "https://example.org", container: "slick", path: "", account_name: "", account_key: "", format: "TSV", compression: "auto", structure: "id Nullable(Int32)" }],
     );

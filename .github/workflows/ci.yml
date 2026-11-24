@@ -32,7 +32,7 @@ jobs:
       matrix:
         pg: ${{ fromJson(needs.matrix.outputs.matrix) }}
         build: [dynamic, static]
-        libchdb: [v26.9.0, v26.7.0, v26.7.3]
+        libchdb: [v26.11.1, v26.9.0, v26.7.0, v26.7.3]
     env:
       BUNDLE_LIBCHDB: ${{ case(matrix.pg.os == 'linux' || matrix.build == 'static', '1', '') }}
       LIBCHDB_BUILD: ${{ matrix.build }}
